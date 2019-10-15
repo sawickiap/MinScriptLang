@@ -4,16 +4,23 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="PCH.cpp" />
     <ClCompile Include="MinScriptLangUsage.cpp" />
+    <ClCompile Include="TestsGeneral.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PCH.h" />
     <ClInclude Include="..\MinScriptLang.h">
       <Filter>MinScriptLang</Filter>
     </ClInclude>
+    <ClInclude Include="..\3rdParty\Catch2\catch.hpp">
+      <Filter>3rdParty</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="MinScriptLang">
       <UniqueIdentifier>{7df1c351-7904-42b4-8570-a9fcbffdded2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdParty">
+      <UniqueIdentifier>{5ac08972-6df3-45a6-bcfe-67aa9e9e9aec}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

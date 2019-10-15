@@ -25,8 +25,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="TestsGeneral.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\3rdParty\Catch2\catch.hpp" />
     <ClInclude Include="..\MinScriptLang.h" />
     <ClInclude Include="PCH.h" />
   </ItemGroup>

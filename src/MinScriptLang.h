@@ -18,19 +18,20 @@ namespace MinScriptLang {
 
 struct PlaceInCode
 {
-    size_t Index, Row, Column;
+    uint32_t Index, Row, Column;
 };
 
 class Error : public std::exception
 {
 public:
     Error(const PlaceInCode& place, std::string&& message) : m_Place{place}, m_Message{std::move(message)} { }
-    virtual const char* what() const noexcept { return m_Message.c_str(); }
+    virtual const char* what() const;
     const PlaceInCode& GetPlace() const { return m_Place; }
     const std::string& GetMessage() const { return m_Message; }
 private:
     PlaceInCode m_Place;
     std::string m_Message;
+    mutable std::string m_What;
 };
 
 class ParsingError : public Error
@@ -53,6 +54,7 @@ public:
     Environment();
     ~Environment();
     void Execute(const char* code, size_t codeLen);
+    const std::string& GetOutput() const;
 private:
     EnvironmentPimpl* pimpl;
 };
@@ -130,9 +132,9 @@ struct Token
 {
     PlaceInCode Place;
     TokenType_ Type;
-    Symbol Symbol;      // Only when Type == TokenType::Symbol
+    Symbol Symbol; // Only when Type == TokenType::Symbol
     string String; // Only when Type == TokenType::Identifier
-    double Number;      // Only when Type == TokenType::Number
+    double Number; // Only when Type == TokenType::Number
 };
 
 static inline bool IsDecimalNumber(char ch) { return ch >= '0' && ch <= '9'; }
@@ -143,6 +145,27 @@ static const char* GetDebugPrintIndent(uint32_t indentLevel)
 {
     return "                                                                                                                                                                                                                                                                "
         + (256 - std::min<uint32_t>(indentLevel, 128) * 2);
+}
+
+static void VFormat(string& str, const char* format, va_list argList)
+{
+    size_t dstLen = (size_t)_vscprintf(format, argList);
+    if(dstLen)
+    {
+        std::vector<char> buf(dstLen + 1);
+        vsprintf_s(&buf[0], dstLen + 1, format, argList);
+        str.assign(&buf[0], &buf[dstLen]);
+    }
+    else
+        str.clear();
+}
+
+static void Format(string& str, const char* format, ...)
+{
+    va_list argList;
+    va_start(argList, format);
+    VFormat(str, format, argList);
+    va_end(argList);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -235,13 +258,18 @@ private:
 namespace AST
 {
 
+struct ExecuteContext
+{
+    EnvironmentPimpl& env;
+};
+
 struct Statement
 {
     Statement(const PlaceInCode& place) : m_Place{place} { }
     virtual ~Statement() { }
     const PlaceInCode& GetPlace() const { return m_Place; }
     virtual void DebugPrint(uint32_t indentLevel) const = 0;
-    virtual void Execute() const = 0;
+    virtual void Execute(ExecuteContext& ctx) const = 0;
 private:
     const PlaceInCode m_Place;
 };
@@ -250,7 +278,7 @@ struct EmptyStatement : public Statement
 {
     EmptyStatement(const PlaceInCode& place) : Statement{place} { }
     virtual void DebugPrint(uint32_t indentLevel) const;
-    virtual void Execute() const { }
+    virtual void Execute(ExecuteContext& ctx) const { }
 };
 
 struct Block : public Statement
@@ -258,7 +286,7 @@ struct Block : public Statement
     Block(const PlaceInCode& place) : Statement{place} { }
     vector<unique_ptr<Statement>> Statements;
     virtual void DebugPrint(uint32_t indentLevel) const;
-    virtual void Execute() const;
+    virtual void Execute(ExecuteContext& ctx) const;
 };
 
 struct Script : Block
@@ -269,14 +297,14 @@ struct Script : Block
 struct Expression : Statement
 {
     Expression(const PlaceInCode& place) : Statement{place} { }
-    virtual Value Evaluate() const = 0;
-    virtual void Execute() const { Evaluate(); }
+    virtual Value Evaluate(ExecuteContext& ctx) const = 0;
+    virtual void Execute(ExecuteContext& ctx) const { Evaluate(ctx); }
 };
 
 struct Constant : Expression
 {
     Constant(const PlaceInCode& place) : Expression{place} { }
-    virtual void Execute() const { /* Nothing - just ignore its value. */ }
+    virtual void Execute(ExecuteContext& ctx) const { /* Nothing - just ignore its value. */ }
 };
 
 struct NumberConstant : Constant
@@ -284,7 +312,7 @@ struct NumberConstant : Constant
     double Number;
     NumberConstant(const PlaceInCode& place, double number) : Constant{place}, Number(number) { }
     virtual void DebugPrint(uint32_t indentLevel) const;
-    virtual Value Evaluate() const { return Value{Number}; }
+    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{Number}; }
 };
 
 struct IdentifierConstant : Constant
@@ -292,7 +320,7 @@ struct IdentifierConstant : Constant
     string Identifier;
     IdentifierConstant(const PlaceInCode& place, string&& identifier) : Constant{place}, Identifier(std::move(identifier)) { }
     virtual void DebugPrint(uint32_t indentLevel) const;
-    virtual Value Evaluate() const { return Value{string(Identifier)}; }
+    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{string(Identifier)}; }
 };
 
 struct Operator : Expression
@@ -311,7 +339,7 @@ struct UnaryOperator : Operator
     unique_ptr<Expression> Operand;
     UnaryOperator(const PlaceInCode& place, UnaryOperatorType type) : Operator{place}, Type(type) { }
     virtual void DebugPrint(uint32_t indentLevel) const { }
-    virtual Value Evaluate() const { return Value{}; }
+    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{}; }
 };
 
 enum class BinaryOperatorType
@@ -329,7 +357,7 @@ struct BinaryOperator : Operator
     unique_ptr<Expression> Operands[2];
     BinaryOperator(const PlaceInCode& place, BinaryOperatorType type) : Operator{place}, Type(type) { }
     virtual void DebugPrint(uint32_t indentLevel) const;
-    virtual Value Evaluate() const;
+    virtual Value Evaluate(ExecuteContext& ctx) const;
     
 private:
     Value Mul(Value&& lhs, Value&& rhs) const;
@@ -344,7 +372,7 @@ struct TernaryOperator : Operator
     unique_ptr<Expression> Operands[3];
     TernaryOperator(const PlaceInCode& place) : Operator{place} { }
     virtual void DebugPrint(uint32_t indentLevel) const { }
-    virtual Value Evaluate() const { return Value{}; }
+    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{}; }
 };
 
 enum class MultiOperatorType
@@ -359,10 +387,10 @@ struct MultiOperator : Operator
     vector<unique_ptr<Expression>> Operands;
     MultiOperator(const PlaceInCode& place, MultiOperatorType type) : Operator{place}, Type(type) { }
     virtual void DebugPrint(uint32_t indentLevel) const;
-    virtual Value Evaluate() const;
+    virtual Value Evaluate(ExecuteContext& ctx) const;
 
 private:
-    Value Call() const;
+    Value Call(ExecuteContext& ctx) const;
 };
 
 } // namespace AST
@@ -409,11 +437,23 @@ public:
     EnvironmentPimpl();
     ~EnvironmentPimpl();
     void Execute(const char* code, size_t codeLen);
-
+    const string& GetOutput() const { return m_Output; }
+    void Print(const char* s, size_t sLen) { m_Output.append(s, s + sLen); }
 
 private:
     AST::Script m_Script;
+    string m_Output;
 };
+
+////////////////////////////////////////////////////////////////////////////////
+// class Error implementation
+
+const char* Error::what() const
+{
+    if(m_What.empty())
+        Format(m_What, "(%u,%u): %s", m_Place.Row, m_Place.Column, m_Message.c_str());
+    return m_What.c_str();
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // class Tokenizer implementation
@@ -515,30 +555,11 @@ void Tokenizer::SkipSpacesAndComments()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Built in functions
-
-Value BuiltInFunction_Print(const Value* args, size_t argCount)
-{
-    for(size_t i = 0; i < argCount; ++i)
-    {
-        const Value& val = args[i];
-        switch(val.GetType())
-        {
-        case Value::Type::Null: break;
-        case Value::Type::Number: printf("%g\n", val.GetNumber()); break;
-        case Value::Type::String: printf("%s\n", val.GetString().c_str()); break;
-        default: assert(0);
-        }
-    }
-    return Value{};
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Abstract Syntax Tree implementation
 
 namespace AST {
 
-#define DEBUG_PRINT_FORMAT_STR_BEG "%4zu %4zu %s"
+#define DEBUG_PRINT_FORMAT_STR_BEG "(%u,%u) %s"
 #define DEBUG_PRINT_ARGS_BEG GetPlace().Row, GetPlace().Column, GetDebugPrintIndent(indentLevel)
 
 void EmptyStatement::DebugPrint(uint32_t indentLevel) const
@@ -554,10 +575,10 @@ void Block::DebugPrint(uint32_t indentLevel) const
         stmtPtr->DebugPrint(indentLevel);
 }
 
-void Block::Execute() const
+void Block::Execute(ExecuteContext& ctx) const
 {
     for(const auto& stmtPtr : Statements)
-        stmtPtr->Execute();
+        stmtPtr->Execute(ctx);
 }
 
 void NumberConstant::DebugPrint(uint32_t indentLevel) const
@@ -579,10 +600,10 @@ void BinaryOperator::DebugPrint(uint32_t indentLevel) const
     Operands[1]->DebugPrint(indentLevel);
 }
 
-Value BinaryOperator::Evaluate() const
+Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
 {
-    Value lhs = Operands[0]->Evaluate();
-    Value rhs = Operands[1]->Evaluate();
+    Value lhs = Operands[0]->Evaluate(ctx);
+    Value rhs = Operands[1]->Evaluate(ctx);
     switch(Type)
     {
     case BinaryOperatorType::Mul: return Mul(std::move(lhs), std::move(rhs));
@@ -638,24 +659,53 @@ void MultiOperator::DebugPrint(uint32_t indentLevel) const
         exprPtr->DebugPrint(indentLevel);
 }
 
-Value MultiOperator::Evaluate() const
+} // namespace AST
+
+////////////////////////////////////////////////////////////////////////////////
+// Built in functions
+
+Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t argCount)
+{
+    string s;
+    for(size_t i = 0; i < argCount; ++i)
+    {
+        const Value& val = args[i];
+        switch(val.GetType())
+        {
+        case Value::Type::Null: s.clear(); break;
+        case Value::Type::Number: Format(s, "%g\n", val.GetNumber()); break;
+        case Value::Type::String: Format(s, "%s\n", val.GetString().c_str()); break;
+        default: assert(0);
+        }
+        if(!s.empty())
+            ctx.env.Print(s.data(), s.length());
+    }
+    return Value{};
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// AST implementation
+
+namespace AST {
+
+Value MultiOperator::Evaluate(ExecuteContext& ctx) const
 {
     switch(Type)
     {
-    case MultiOperatorType::Call: return Call();
+    case MultiOperatorType::Call: return Call(ctx);
     default: assert(0); return Value{};
     }
 }
 
-Value MultiOperator::Call() const
+Value MultiOperator::Call(ExecuteContext& ctx) const
 {
     IdentifierConstant* calleeIdentifier = dynamic_cast<IdentifierConstant*>(Operands[0].get()); assert(calleeIdentifier); // #TODO make it flexible!
     const size_t argCount = Operands.size() - 1;
     vector<Value> values(argCount);
     for(size_t i = 0; i < argCount; ++i)
-        values[i] = Operands[i + 1]->Evaluate();
+        values[i] = Operands[i + 1]->Evaluate(ctx);
     if(calleeIdentifier->Identifier == "print")
-        return BuiltInFunction_Print(values.data(), values.size());
+        return BuiltInFunction_Print(ctx, values.data(), values.size());
     else
         throw ExecutionError(GetPlace(), string("Unknown function: ") + calleeIdentifier->Identifier);
 }
@@ -769,33 +819,38 @@ unique_ptr<AST::Expression> Parser::TryParseExpr5()
     unique_ptr<AST::Expression> expr = TryParseExpr2();
     if(expr)
     {
-        const PlaceInCode place = GetCurrentTokenPlace();
-        if(TryParseSymbol(Symbol::Mul))
+        for(;;)
         {
-            unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mul);
-            op->Operands[0] = std::move(expr);
-            op->Operands[1] = TryParseExpr5();
-            if(!op->Operands[1])
-                throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
-            return op;
-        }
-        if(TryParseSymbol(Symbol::Div))
-        {
-            unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Div);
-            op->Operands[0] = std::move(expr);
-            op->Operands[1] = TryParseExpr5();
-            if(!op->Operands[1])
-                throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
-            return op;
-        }
-        if(TryParseSymbol(Symbol::Mod))
-        {
-            unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mod);
-            op->Operands[0] = std::move(expr);
-            op->Operands[1] = TryParseExpr5();
-            if(!op->Operands[1])
-                throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
-            return op;
+            const PlaceInCode place = GetCurrentTokenPlace();
+            if(TryParseSymbol(Symbol::Mul))
+            {
+                unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mul);
+                op->Operands[0] = std::move(expr);
+                op->Operands[1] = TryParseExpr2();
+                if(!op->Operands[1])
+                    throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
+                expr = std::move(op);
+            }
+            else if(TryParseSymbol(Symbol::Div))
+            {
+                unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Div);
+                op->Operands[0] = std::move(expr);
+                op->Operands[1] = TryParseExpr2();
+                if(!op->Operands[1])
+                    throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
+                expr = std::move(op);
+            }
+            else if(TryParseSymbol(Symbol::Mod))
+            {
+                unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mod);
+                op->Operands[0] = std::move(expr);
+                op->Operands[1] = TryParseExpr2();
+                if(!op->Operands[1])
+                    throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
+                expr = std::move(op);
+            }
+            else
+                break;
         }
         return expr;
     }
@@ -807,24 +862,29 @@ unique_ptr<AST::Expression> Parser::TryParseExpr6()
     unique_ptr<AST::Expression> expr = TryParseExpr5();
     if(expr)
     {
-        const PlaceInCode place = GetCurrentTokenPlace();
-        if(TryParseSymbol(Symbol::Add))
+        for(;;)
         {
-            unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Add);
-            op->Operands[0] = std::move(expr);
-            op->Operands[1] = TryParseExpr6();
-            if(!op->Operands[1])
-                throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
-            return op;
-        }
-        if(TryParseSymbol(Symbol::Sub))
-        {
-            unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Sub);
-            op->Operands[0] = std::move(expr);
-            op->Operands[1] = TryParseExpr6();
-            if(!op->Operands[1])
-                throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
-            return op;
+            const PlaceInCode place = GetCurrentTokenPlace();
+            if(TryParseSymbol(Symbol::Add))
+            {
+                unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Add);
+                op->Operands[0] = std::move(expr);
+                op->Operands[1] = TryParseExpr5();
+                if(!op->Operands[1])
+                    throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
+                expr = std::move(op);
+            }
+            else if(TryParseSymbol(Symbol::Sub))
+            {
+                unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Sub);
+                op->Operands[0] = std::move(expr);
+                op->Operands[1] = TryParseExpr5();
+                if(!op->Operands[1])
+                    throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
+                expr = std::move(op);
+            }
+            else
+                break;
         }
         return expr;
     }
@@ -870,26 +930,17 @@ void EnvironmentPimpl::Execute(const char* code, size_t codeLen)
         parser.ParseScript(m_Script);
     }
 
-    m_Script.Execute();
+    AST::ExecuteContext executeContext{*this};
+    m_Script.Execute(executeContext);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // class Environment
 
-Environment::Environment() :
-    pimpl{new EnvironmentPimpl{}}
-{
-}
-
-Environment::~Environment()
-{
-    delete pimpl;
-}
-
-void Environment::Execute(const char* code, size_t codeLen)
-{
-    pimpl->Execute(code, codeLen);
-}
+Environment::Environment() : pimpl{new EnvironmentPimpl{}} { }
+Environment::~Environment() { delete pimpl; }
+void Environment::Execute(const char* code, size_t codeLen) { pimpl->Execute(code, codeLen); }
+const std::string& Environment::GetOutput() const { return pimpl->GetOutput(); }
 
 } // namespace MinScriptLang
 
