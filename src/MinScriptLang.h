@@ -117,6 +117,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expressio
 static const char* const ERROR_MESSAGE_EXPECTED_STATEMENT = "Expected statement.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL                     = "Expected symbol.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Expected symbol ';'.";
+static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN  = "Expected symbol '('.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Expected symbol ')'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
 
@@ -471,7 +472,6 @@ private:
     unique_ptr<AST::Expression> TryParseExpr16() { return TryParseExpr6(); }
     unique_ptr<AST::Expression> TryParseExpr17() { return TryParseExpr16(); }
     bool TryParseSymbol(Symbol symbol);
-    void ParseSymbol(Symbol symbol);
     bool TryParseKeyword(Keyword keyword);
     const PlaceInCode& GetCurrentTokenPlace() const { return m_Tokens[m_TokenIndex].Place; }
 };
@@ -807,6 +807,8 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
 ////////////////////////////////////////////////////////////////////////////////
 // class Parser implementation
 
+#define MUST_PARSE(result, errorMessage)   do { if(!(result)) throw ParsingError(GetCurrentTokenPlace(), (errorMessage)); } while(false)
+
 Parser::Parser(Tokenizer& tokenizer) :
     m_Tokenizer(tokenizer)
 {
@@ -854,7 +856,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     {
         unique_ptr<AST::Block> block = std::make_unique<AST::Block>(GetCurrentTokenPlace());
         ParseBlock(*block);
-        ParseSymbol(Symbol::CurlyBracketClose);
+        MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
         return block;
     }
 
@@ -862,20 +864,12 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     if(TryParseKeyword(Keyword::If))
     {
         unique_ptr<AST::Condition> condition = std::make_unique<AST::Condition>(place);
-        ParseSymbol(Symbol::RoundBrackerOpen);
-        condition->ConditionExpression = TryParseExpr17();
-        if(!condition->ConditionExpression)
-            throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
-        ParseSymbol(Symbol::RoundBracketClose);
-        condition->Statements[0] = TryParseStatement();
-        if(!condition->Statements[0])
-            throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBrackerOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
+        MUST_PARSE( condition->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
+        MUST_PARSE( condition->Statements[0] = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
         if(TryParseKeyword(Keyword::Else))
-        {
-            condition->Statements[1] = TryParseStatement();
-            if(!condition->Statements[1])
-                throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_STATEMENT);
-        }
+            MUST_PARSE( condition->Statements[1] = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
         return condition;
     }
     
@@ -883,7 +877,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     unique_ptr<AST::Expression> expr = TryParseExpr17();
     if(expr)
     {
-        ParseSymbol(Symbol::Semicolon);
+        MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
         return expr;
     }
     
@@ -924,10 +918,9 @@ unique_ptr<AST::Expression> Parser::TryParseExpr0()
     // '(' Constant ')'
     if(TryParseSymbol(Symbol::RoundBrackerOpen))
     {
-        unique_ptr<AST::Expression> expr = TryParseExpr17();
-        if(!expr)
-            throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
-        ParseSymbol(Symbol::RoundBracketClose);
+        unique_ptr<AST::Expression> expr;
+        MUST_PARSE( expr = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
         return expr;
     }
     else
@@ -959,13 +952,11 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
                 // Further arguments
                 while(TryParseSymbol(Symbol::Comma))
                 {
-                    expr = TryParseExpr16();
-                    if(!expr)
-                        throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+                    MUST_PARSE( expr = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                     multiOperator->Operands.push_back(std::move(expr));
                 }
             }
-            ParseSymbol(Symbol::RoundBracketClose);
+            MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
             return multiOperator;
         }
         return expr;
@@ -985,27 +976,21 @@ unique_ptr<AST::Expression> Parser::TryParseExpr5()
             {
                 unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mul);
                 op->Operands[0] = std::move(expr);
-                op->Operands[1] = TryParseExpr2();
-                if(!op->Operands[1])
-                    throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+                MUST_PARSE( op->Operands[1] = TryParseExpr2(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
             }
             else if(TryParseSymbol(Symbol::Div))
             {
                 unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Div);
                 op->Operands[0] = std::move(expr);
-                op->Operands[1] = TryParseExpr2();
-                if(!op->Operands[1])
-                    throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+                MUST_PARSE( op->Operands[1] = TryParseExpr2(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
             }
             else if(TryParseSymbol(Symbol::Mod))
             {
                 unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mod);
                 op->Operands[0] = std::move(expr);
-                op->Operands[1] = TryParseExpr2();
-                if(!op->Operands[1])
-                    throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+                MUST_PARSE( op->Operands[1] = TryParseExpr2(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
             }
             else
@@ -1028,18 +1013,14 @@ unique_ptr<AST::Expression> Parser::TryParseExpr6()
             {
                 unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Add);
                 op->Operands[0] = std::move(expr);
-                op->Operands[1] = TryParseExpr5();
-                if(!op->Operands[1])
-                    throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+                MUST_PARSE( op->Operands[1] = TryParseExpr5(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
             }
             else if(TryParseSymbol(Symbol::Sub))
             {
                 unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Sub);
                 op->Operands[0] = std::move(expr);
-                op->Operands[1] = TryParseExpr5();
-                if(!op->Operands[1])
-                    throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+                MUST_PARSE( op->Operands[1] = TryParseExpr5(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
             }
             else
@@ -1059,20 +1040,6 @@ bool Parser::TryParseSymbol(Symbol symbol)
         return true;
     }
     return false;
-}
-
-void Parser::ParseSymbol(Symbol symbol)
-{
-    if(!TryParseSymbol(symbol))
-    {
-        switch(symbol)
-        {
-        case Symbol::Semicolon: throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON);
-        case Symbol::RoundBracketClose: throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE);
-        case Symbol::CurlyBracketClose: throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE);
-        default: throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_SYMBOL);
-        }
-    }
 }
 
 bool Parser::TryParseKeyword(Keyword keyword)
