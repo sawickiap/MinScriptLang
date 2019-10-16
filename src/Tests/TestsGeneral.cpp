@@ -81,4 +81,10 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "0\n2\n");
     }
+    SECTION("Variables")
+    {
+        const char* code = "a=1; print(a); b=a+1; print(b); c=d=b*b; print(b, c, d);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n2\n2\n4\n4\n");
+    }
 }

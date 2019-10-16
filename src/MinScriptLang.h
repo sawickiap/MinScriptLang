@@ -117,6 +117,7 @@ static const char* const ERROR_MESSAGE_UNRECOGNIZED_TOKEN = "Unrecognized token.
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT = "Unexpected end of file inside multiline comment.";
 static const char* const ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expression.";
 static const char* const ERROR_MESSAGE_EXPECTED_STATEMENT = "Expected statement.";
+static const char* const ERROR_MESSAGE_EXPECTED_LVALUE = "Expected l-value.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL                     = "Expected symbol.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_COLON               = "Expected symbol ':'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Expected symbol ';'.";
@@ -145,8 +146,9 @@ enum class Symbol
     Mod,               // %
     Add,               // +
     Sub,               // -
+    Equal,             // =
 };
-static const char* SYMBOL_STR[] = { ",", "?", ":", ";", "(", ")", "*", "/", "%", "+", "-", };
+static const char* SYMBOL_STR[] = { ",", "?", ":", ";", "(", ")", "*", "/", "%", "+", "-", "=" };
 
 enum class Keyword
 {
@@ -315,7 +317,9 @@ class Object
 {
 public:
     bool HasKey(const Constant& key) const;
+    bool HasKey(const string& key) const;
     Value& GetValue(const Constant& key); // Creates new null value if doesn't exist.
+    Value& GetValue(const string& key); // Creates new null value if doesn't exist.
     bool Remove(const Constant& key); // Returns true if has been found and removed.
 
 private:
@@ -323,6 +327,12 @@ private:
     using StringMapType = std::unordered_map<string, Value>;
     NumberMapType m_NumberMap;
     StringMapType m_StringMap;
+};
+
+struct LValue
+{
+    Object& Obj;
+    Constant Key;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -383,6 +393,7 @@ struct Expression : Statement
 {
     Expression(const PlaceInCode& place) : Statement{place} { }
     virtual Value Evaluate(ExecuteContext& ctx) const = 0;
+    virtual LValue GetLValue(ExecuteContext& ctx) const;
     virtual void Execute(ExecuteContext& ctx) const { Evaluate(ctx); }
 };
 
@@ -405,7 +416,8 @@ struct Identifier : Constant
     string S;
     Identifier(const PlaceInCode& place, string&& s) : Constant{place}, S(std::move(s)) { }
     virtual void DebugPrint(uint32_t indentLevel) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{string(S)}; }
+    virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual LValue GetLValue(ExecuteContext& ctx) const;
 };
 
 struct Operator : Expression
@@ -434,6 +446,7 @@ enum class BinaryOperatorType
     Mod,
     Add,
     Sub,
+    Assignment,
 };
 
 struct BinaryOperator : Operator
@@ -450,6 +463,7 @@ private:
     Value Mod(Value&& lhs, Value&& rhs) const;
     Value Add(Value&& lhs, Value&& rhs) const;
     Value Sub(Value&& lhs, Value&& rhs) const;
+    Value Assignment(const LValue& lhs, Value&& rhs) const;
 };
 
 struct TernaryOperator : Operator
@@ -577,6 +591,7 @@ void Tokenizer::GetNextToken(Token& out)
     if(currentCode[0] == '%') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Mod; return; }
     if(currentCode[0] == '+') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Add; return; }
     if(currentCode[0] == '-') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Sub; return; }
+    if(currentCode[0] == '=') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Equal; return; }
     // Number
     const size_t currentCodeLen = m_Code.GetCurrentLen();
     if(IsDecimalNumber(currentCode[0]))
@@ -678,6 +693,11 @@ bool Object::HasKey(const Constant& key) const
     }
 }
 
+bool Object::HasKey(const string& key) const
+{
+    return m_StringMap.find(key) != m_StringMap.end();
+}
+
 Value& Object::GetValue(const Constant& key)
 {
     switch(key.GetType())
@@ -688,6 +708,11 @@ Value& Object::GetValue(const Constant& key)
         return m_StringMap[key.GetString()];
     default: assert(0); return m_NumberMap[0];
     }
+}
+
+Value& Object::GetValue(const string& key)
+{
+    return m_StringMap[key];
 }
 
 bool Object::Remove(const Constant& key)
@@ -763,6 +788,11 @@ void Block::Execute(ExecuteContext& ctx) const
         stmtPtr->Execute(ctx);
 }
 
+LValue Expression::GetLValue(ExecuteContext& ctx) const
+{
+    throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_EXPECTED_LVALUE));
+}
+
 void ConstantValue::DebugPrint(uint32_t indentLevel) const
 {
     switch(Val.GetType())
@@ -779,9 +809,24 @@ void Identifier::DebugPrint(uint32_t indentLevel) const
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier: %s\n", DEBUG_PRINT_ARGS_BEG, S.c_str());
 }
 
+Value Identifier::Evaluate(ExecuteContext& ctx) const
+{
+    // #TODO local, this, then global
+    // #TODO optimize because now finding 2 times.
+    if(ctx.GlobalContext.HasKey(S))
+        return ctx.GlobalContext.GetValue(S);
+    throw ExecutionError(GetPlace(), string("Variable \"") + S + "\" doesn't exist.");
+}
+
+LValue Identifier::GetLValue(ExecuteContext& ctx) const
+{
+    // #TODO local, this, then global
+    return LValue{ctx.GlobalContext, MinScriptLang::Constant{string(S)}};
+}
+
 void BinaryOperator::DebugPrint(uint32_t indentLevel) const
 {
-    static const char* BINARY_OPERATOR_TYPE_NAMES[] = { "Mul", "Div", "Mod", "Add", "Sub" };
+    static const char* BINARY_OPERATOR_TYPE_NAMES[] = { "Mul", "Div", "Mod", "Add", "Sub", "Assignment" };
     printf(DEBUG_PRINT_FORMAT_STR_BEG "BinaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, BINARY_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
     ++indentLevel;
     Operands[0]->DebugPrint(indentLevel);
@@ -790,15 +835,44 @@ void BinaryOperator::DebugPrint(uint32_t indentLevel) const
 
 Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
 {
-    Value lhs = Operands[0]->Evaluate(ctx);
-    Value rhs = Operands[1]->Evaluate(ctx);
     switch(Type)
     {
-    case BinaryOperatorType::Mul: return Mul(std::move(lhs), std::move(rhs));
-    case BinaryOperatorType::Div: return Div(std::move(lhs), std::move(rhs));
-    case BinaryOperatorType::Mod: return Mod(std::move(lhs), std::move(rhs));
-    case BinaryOperatorType::Add: return Add(std::move(lhs), std::move(rhs));
-    case BinaryOperatorType::Sub: return Sub(std::move(lhs), std::move(rhs));
+    case BinaryOperatorType::Mul:
+    {
+        Value lhs = Operands[0]->Evaluate(ctx);
+        Value rhs = Operands[1]->Evaluate(ctx);
+        return Mul(std::move(lhs), std::move(rhs));
+    }
+    case BinaryOperatorType::Div:
+    {
+        Value lhs = Operands[0]->Evaluate(ctx);
+        Value rhs = Operands[1]->Evaluate(ctx);
+        return Div(std::move(lhs), std::move(rhs));
+    }
+    case BinaryOperatorType::Mod:
+    {
+        Value lhs = Operands[0]->Evaluate(ctx);
+        Value rhs = Operands[1]->Evaluate(ctx);
+        return Mod(std::move(lhs), std::move(rhs));
+    }
+    case BinaryOperatorType::Add:
+    {
+        Value lhs = Operands[0]->Evaluate(ctx);
+        Value rhs = Operands[1]->Evaluate(ctx);
+        return Add(std::move(lhs), std::move(rhs));
+    }
+    case BinaryOperatorType::Sub:
+    {
+        Value lhs = Operands[0]->Evaluate(ctx);
+        Value rhs = Operands[1]->Evaluate(ctx);
+        return Sub(std::move(lhs), std::move(rhs));
+    }
+    case BinaryOperatorType::Assignment:
+    {
+        LValue lhs = Operands[0]->GetLValue(ctx);
+        Value rhs = Operands[1]->Evaluate(ctx);
+        return Assignment(lhs, std::move(rhs));
+    }
     default: assert(0); return Value{};
     }
 }
@@ -836,6 +910,13 @@ Value BinaryOperator::Sub(Value&& lhs, Value&& rhs) const
     CheckNumberOperand(Operands[0].get(), lhs);
     CheckNumberOperand(Operands[1].get(), rhs);
     return Value{lhs.GetNumber() - rhs.GetNumber()};
+}
+
+Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
+{
+    Value& valRef = lhs.Obj.GetValue(lhs.Key);
+    valRef = std::move(rhs);
+    return valRef;
 }
 
 void TernaryOperator::DebugPrint(uint32_t indentLevel) const
@@ -1146,7 +1227,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr16()
     unique_ptr<AST::Expression> expr = TryParseExpr6(); // #TODO TryParseExpr15
     if(expr)
     {
-        // Expr15 '?' Expr16 ':' Expr16
+        // Ternary operator: Expr15 '?' Expr16 ':' Expr16
         if(TryParseSymbol(Symbol::QuestionMark))
         {
             unique_ptr<AST::TernaryOperator> op = std::make_unique<AST::TernaryOperator>(GetCurrentTokenPlace());
@@ -1154,6 +1235,14 @@ unique_ptr<AST::Expression> Parser::TryParseExpr16()
             MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
             MUST_PARSE( TryParseSymbol(Symbol::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON );
             MUST_PARSE( op->Operands[2] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+            return op;
+        }
+        // Assignment: Expr15 = Expr16
+        if(TryParseSymbol(Symbol::Equal))
+        {
+            unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(GetCurrentTokenPlace(), AST::BinaryOperatorType::Assignment);
+            op->Operands[0] = std::move(expr);
+            MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
             return op;
         }
         // Just Expr15
