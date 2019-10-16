@@ -24,26 +24,31 @@ struct PlaceInCode
 class Error : public std::exception
 {
 public:
-    Error(const PlaceInCode& place, std::string&& message) : m_Place{place}, m_Message{std::move(message)} { }
-    virtual const char* what() const;
+    Error(const PlaceInCode& place) : m_Place{place} { }
     const PlaceInCode& GetPlace() const { return m_Place; }
-    const std::string& GetMessage() const { return m_Message; }
+    virtual const char* what() const override;
+    virtual const char* GetMessage() const = 0;
 private:
-    PlaceInCode m_Place;
-    std::string m_Message;
+    const PlaceInCode m_Place;
     mutable std::string m_What;
 };
 
 class ParsingError : public Error
 {
 public:
-    ParsingError(const PlaceInCode& place, std::string&& message) : Error{place, std::move(message)} { }
+    ParsingError(const PlaceInCode& place, const char* message) : Error{place}, m_Message{message} { }
+    virtual const char* GetMessage() const override { return m_Message; }
+private:
+    const char* const m_Message; // Externally owned
 };
 
 class ExecutionError : public Error
 {
 public:
-    ExecutionError(const PlaceInCode& place, std::string&& message) : Error{place, std::move(message)} { }
+    ExecutionError(const PlaceInCode& place, std::string&& message) : Error{place}, m_Message{std::move(message)} { }
+    virtual const char* GetMessage() const override { return m_Message.c_str(); }
+private:
+    const std::string m_Message;
 };
 
 class EnvironmentPimpl;
@@ -103,6 +108,16 @@ namespace MinScriptLang {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Basic facilities
+
+static const char* const ERROR_MESSAGE_PARSING_ERROR = "Parsing error.";
+static const char* const ERROR_MESSAGE_INVALID_NUMBER = "Invalid number.";
+static const char* const ERROR_MESSAGE_UNRECOGNIZED_TOKEN = "Unrecognized token.";
+static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT = "Unexpected end of file inside multiline comment.";
+static const char* const ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expression.";
+static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL                     = "Expected symbol.";
+static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Expected symbol ';'.";
+static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Expected symbol ')'.";
+static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
 
 // Name with underscore because f***g Windows.h defines TokenType as macro!
 enum class TokenType_
@@ -454,7 +469,7 @@ private:
 const char* Error::what() const
 {
     if(m_What.empty())
-        Format(m_What, "(%u,%u): %s", m_Place.Row, m_Place.Column, m_Message.c_str());
+        Format(m_What, "(%u,%u): %s", m_Place.Row, m_Place.Column, GetMessage());
     return m_What.c_str();
 }
 
@@ -500,7 +515,7 @@ void Tokenizer::GetNextToken(Token& out)
             ++tokenLen;
         // Letters straight after number are invalid.
         if(tokenLen < currentCodeLen && IsAlpha(currentCode[tokenLen]))
-            throw ParsingError(out.Place, "Invalid number.");
+            throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_NUMBER);
         out.Type = TokenType_::Number;
         out.Number = ParseNumber(currentCode, tokenLen);
         m_Code.MoveChars(tokenLen);
@@ -517,7 +532,7 @@ void Tokenizer::GetNextToken(Token& out)
         m_Code.MoveChars(tokenLen);
         return;
     }
-    throw ParsingError(out.Place, "Unrecognized token.");
+    throw ParsingError(out.Place, ERROR_MESSAGE_UNRECOGNIZED_TOKEN);
 }
 
 double Tokenizer::ParseNumber(const char* s, size_t sLen)
@@ -549,7 +564,7 @@ void Tokenizer::SkipSpacesAndComments()
             for(m_Code.MoveChars(2);; m_Code.MoveOneChar())
             {
                 if(m_Code.IsEnd())
-                    throw ParsingError(m_Code.GetCurrentPlace(), string("Unexpected end of file inside multiline comment."));
+                    throw ParsingError(m_Code.GetCurrentPlace(), ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT);
                 else if(m_Code.Peek("*/", 2))
                 {
                     m_Code.MoveChars(2);
@@ -741,7 +756,7 @@ void Parser::ParseScript(AST::Script& outScript)
 
     ParseBlock(outScript);
     if(m_Tokens[m_TokenIndex].Type != TokenType_::End)
-        throw ParsingError(GetCurrentTokenPlace(), string("Parsing error."));
+        throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_PARSING_ERROR);
 
     outScript.DebugPrint(0); // #TEMP
 }
@@ -807,7 +822,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr0()
     {
         unique_ptr<AST::Expression> expr = TryParseExpr17();
         if(!expr)
-            throw ParsingError(GetCurrentTokenPlace(), string("Expected expression."));
+            throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
         ParseSymbol(Symbol::RoundBracketClose);
         return expr;
     }
@@ -842,7 +857,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
                 {
                     expr = TryParseExpr16();
                     if(!expr)
-                        throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
+                        throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
                     multiOperator->Operands.push_back(std::move(expr));
                 }
             }
@@ -868,7 +883,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr5()
                 op->Operands[0] = std::move(expr);
                 op->Operands[1] = TryParseExpr2();
                 if(!op->Operands[1])
-                    throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
+                    throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
                 expr = std::move(op);
             }
             else if(TryParseSymbol(Symbol::Div))
@@ -877,7 +892,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr5()
                 op->Operands[0] = std::move(expr);
                 op->Operands[1] = TryParseExpr2();
                 if(!op->Operands[1])
-                    throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
+                    throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
                 expr = std::move(op);
             }
             else if(TryParseSymbol(Symbol::Mod))
@@ -886,7 +901,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr5()
                 op->Operands[0] = std::move(expr);
                 op->Operands[1] = TryParseExpr2();
                 if(!op->Operands[1])
-                    throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
+                    throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
                 expr = std::move(op);
             }
             else
@@ -911,7 +926,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr6()
                 op->Operands[0] = std::move(expr);
                 op->Operands[1] = TryParseExpr5();
                 if(!op->Operands[1])
-                    throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
+                    throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
                 expr = std::move(op);
             }
             else if(TryParseSymbol(Symbol::Sub))
@@ -920,7 +935,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr6()
                 op->Operands[0] = std::move(expr);
                 op->Operands[1] = TryParseExpr5();
                 if(!op->Operands[1])
-                    throw ParsingError(GetCurrentTokenPlace(), "Expected expression.");
+                    throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
                 expr = std::move(op);
             }
             else
@@ -947,7 +962,16 @@ bool Parser::TryParseSymbol(Symbol symbol)
 void Parser::ParseSymbol(Symbol symbol)
 {
     if(!TryParseSymbol(symbol))
-        throw ParsingError(GetCurrentTokenPlace(), string("Expected symbol \"") + SYMBOL_STR[(uint32_t)symbol] + "\".");
+    {
+        switch(symbol)
+        {
+        case Symbol::Semicolon: throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON);
+        case Symbol::RoundBracketClose: throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE);
+        case Symbol::CurlyBracketClose: throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE);
+        default: throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_SYMBOL);
+        }
+        
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
