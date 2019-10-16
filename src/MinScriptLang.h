@@ -86,6 +86,8 @@ private:
 /////////////////////////////////////////////////////////////////////////////////
 
 #include <vector>
+#include <map>
+#include <unordered_map>
 #include <string>
 #include <memory>
 #include <algorithm>
@@ -116,6 +118,7 @@ static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMME
 static const char* const ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expression.";
 static const char* const ERROR_MESSAGE_EXPECTED_STATEMENT = "Expected statement.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL                     = "Expected symbol.";
+static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_COLON               = "Expected symbol ':'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Expected symbol ';'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN  = "Expected symbol '('.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Expected symbol ')'.";
@@ -130,6 +133,8 @@ enum class TokenType_
 enum class Symbol
 {
     Comma,             // ,
+    QuestionMark,      // ?
+    Colon,             // :
     Semicolon,         // ;
     RoundBrackerOpen,  // (
     RoundBracketClose, // )
@@ -141,7 +146,7 @@ enum class Symbol
     Add,               // +
     Sub,               // -
 };
-static const char* SYMBOL_STR[] = { ",", ";", "(", ")", "*", "/", "%", "+", "-", };
+static const char* SYMBOL_STR[] = { ",", "?", ":", ";", "(", ")", "*", "/", "%", "+", "-", };
 
 enum class Keyword
 {
@@ -160,6 +165,21 @@ struct Token
         double Number;   // Only when Type == TokenType_::Number
     };
     string String; // Only when Type == TokenType::Identifier
+};
+
+struct Constant
+{
+public:
+    enum class Type { Number, String };
+    explicit Constant(double number) : m_Type{Type::Number}, m_Number(number) { }
+    explicit Constant(string&& s) : m_Type{Type::String}, m_String{std::move(s)} { }
+    Type GetType() const { return m_Type; }
+    double GetNumber() const { assert(m_Type == Type::Number); return m_Number; }
+    const string& GetString() const { assert(m_Type == Type::String); return m_String; }
+private:
+    Type m_Type;
+    double m_Number;
+    string m_String;
 };
 
 static inline bool IsDecimalNumber(char ch) { return ch >= '0' && ch <= '9'; }
@@ -289,6 +309,23 @@ private:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+// class Object definition
+
+class Object
+{
+public:
+    bool HasKey(const Constant& key) const;
+    Value& GetValue(const Constant& key); // Creates new null value if doesn't exist.
+    bool Remove(const Constant& key); // Returns true if has been found and removed.
+
+private:
+    using NumberMapType = std::map<double, Value>;
+    using StringMapType = std::unordered_map<string, Value>;
+    NumberMapType m_NumberMap;
+    StringMapType m_StringMap;
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // Abstract Syntax Tree definitions
 
 namespace AST
@@ -296,7 +333,8 @@ namespace AST
 
 struct ExecuteContext
 {
-    EnvironmentPimpl& env;
+    EnvironmentPimpl& Env;
+    Object& GlobalContext;
 };
 
 struct Statement
@@ -418,8 +456,8 @@ struct TernaryOperator : Operator
 {
     unique_ptr<Expression> Operands[3];
     TernaryOperator(const PlaceInCode& place) : Operator{place} { }
-    virtual void DebugPrint(uint32_t indentLevel) const { }
-    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{}; }
+    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
 enum class MultiOperatorType
@@ -469,7 +507,7 @@ private:
     unique_ptr<AST::Expression> TryParseExpr2();
     unique_ptr<AST::Expression> TryParseExpr5();
     unique_ptr<AST::Expression> TryParseExpr6();
-    unique_ptr<AST::Expression> TryParseExpr16() { return TryParseExpr6(); }
+    unique_ptr<AST::Expression> TryParseExpr16();
     unique_ptr<AST::Expression> TryParseExpr17() { return TryParseExpr16(); }
     bool TryParseSymbol(Symbol symbol);
     bool TryParseKeyword(Keyword keyword);
@@ -490,6 +528,7 @@ public:
 
 private:
     AST::Script m_Script;
+    Object m_GlobalContext;
     string m_Output;
 };
 
@@ -526,6 +565,8 @@ void Tokenizer::GetNextToken(Token& out)
     // Symbols
     const char* const currentCode = m_Code.GetCurrentCode();
     if(currentCode[0] == ',') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Comma; return; }
+    if(currentCode[0] == '?') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::QuestionMark; return; }
+    if(currentCode[0] == ':') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Colon; return; }
     if(currentCode[0] == ';') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Semicolon; return; }
     if(currentCode[0] == '(') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBrackerOpen; return; }
     if(currentCode[0] == ')') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBracketClose; return; }
@@ -619,6 +660,61 @@ void Tokenizer::SkipSpacesAndComments()
         }
         else
             break;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// class Object implementation
+
+bool Object::HasKey(const Constant& key) const
+{
+    switch(key.GetType())
+    {
+    case Constant::Type::Number:
+        return m_NumberMap.find(key.GetNumber()) != m_NumberMap.end();
+    case Constant::Type::String:
+        return m_StringMap.find(key.GetString()) != m_StringMap.end();
+    default: assert(0); return false;
+    }
+}
+
+Value& Object::GetValue(const Constant& key)
+{
+    switch(key.GetType())
+    {
+    case Constant::Type::Number:
+        return m_NumberMap[key.GetNumber()];
+    case Constant::Type::String:
+        return m_StringMap[key.GetString()];
+    default: assert(0); return m_NumberMap[0];
+    }
+}
+
+bool Object::Remove(const Constant& key)
+{
+    switch(key.GetType())
+    {
+    case Constant::Type::Number:
+    {
+        auto it = m_NumberMap.find(key.GetNumber());
+        if(it != m_NumberMap.end())
+        {
+            m_NumberMap.erase(it);
+            return true;
+        }
+        return false;
+    }
+    case Constant::Type::String:
+    {
+        auto it = m_StringMap.find(key.GetString());
+        if(it != m_StringMap.end())
+        {
+            m_StringMap.erase(it);
+            return true;
+        }
+        return false;
+    }
+    default: assert(0); return false;
     }
 }
 
@@ -742,6 +838,20 @@ Value BinaryOperator::Sub(Value&& lhs, Value&& rhs) const
     return Value{lhs.GetNumber() - rhs.GetNumber()};
 }
 
+void TernaryOperator::DebugPrint(uint32_t indentLevel) const
+{
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "TernaryOperator\n", DEBUG_PRINT_ARGS_BEG);
+    ++indentLevel;
+    Operands[0]->DebugPrint(indentLevel);
+    Operands[1]->DebugPrint(indentLevel);
+    Operands[2]->DebugPrint(indentLevel);
+}
+
+Value TernaryOperator::Evaluate(ExecuteContext& ctx) const
+{
+    return Operands[0]->Evaluate(ctx).IsTrue() ? Operands[1]->Evaluate(ctx) : Operands[2]->Evaluate(ctx);
+}
+
 void MultiOperator::DebugPrint(uint32_t indentLevel) const
 {
     static const char* MULTI_OPERATOR_TYPE_NAMES[] = { "None", "Call" };
@@ -770,7 +880,7 @@ Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t 
         default: assert(0);
         }
         if(!s.empty())
-            ctx.env.Print(s.data(), s.length());
+            ctx.Env.Print(s.data(), s.length());
     }
     return Value{};
 }
@@ -1031,6 +1141,27 @@ unique_ptr<AST::Expression> Parser::TryParseExpr6()
     return unique_ptr<AST::Expression>{};
 }
 
+unique_ptr<AST::Expression> Parser::TryParseExpr16()
+{
+    unique_ptr<AST::Expression> expr = TryParseExpr6(); // #TODO TryParseExpr15
+    if(expr)
+    {
+        // Expr15 '?' Expr16 ':' Expr16
+        if(TryParseSymbol(Symbol::QuestionMark))
+        {
+            unique_ptr<AST::TernaryOperator> op = std::make_unique<AST::TernaryOperator>(GetCurrentTokenPlace());
+            op->Operands[0] = std::move(expr);
+            MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+            MUST_PARSE( TryParseSymbol(Symbol::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON );
+            MUST_PARSE( op->Operands[2] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+            return op;
+        }
+        // Just Expr15
+        return expr;
+    }
+    return unique_ptr<AST::Expression>{};
+}
+
 bool Parser::TryParseSymbol(Symbol symbol)
 {
     if(m_Tokens[m_TokenIndex].Type == TokenType_::Symbol &&
@@ -1073,7 +1204,7 @@ void EnvironmentPimpl::Execute(const char* code, size_t codeLen)
         parser.ParseScript(m_Script);
     }
 
-    AST::ExecuteContext executeContext{*this};
+    AST::ExecuteContext executeContext{*this, m_GlobalContext};
     m_Script.Execute(executeContext);
 }
 

@@ -69,4 +69,16 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n10\n11\n");
     }
+    SECTION("If conditions nested")
+    {
+        const char* code = "if(false) print(1); else if(false) print(2); else print(3);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "3\n");
+    }
+    SECTION("Ternary operator")
+    {
+        const char* code = "print(false ? 1 : 0); print(true ? false ? 1 : 2 : true ? 3 : 4);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n2\n");
+    }
 }
