@@ -23,6 +23,11 @@ TEST_CASE("Basic")
         const char* code = "print(1)";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
     }
+    SECTION("Garbage after last statement")
+    {
+        const char* code = "print(1); $~!@#$%^^&*()}";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+    }
     SECTION("Print Add Sub")
     {
         const char* code = "print(2 + 6 - 3);";
@@ -40,5 +45,11 @@ TEST_CASE("Basic")
         const char* code = "print(2 + 3 * ((4))); print((2 + 3) * 4);";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "14\n20\n");
+    }
+    SECTION("Curly brackets block")
+    {
+        const char* code = "print(1); { print(2); print(3); } print(4); { }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n2\n3\n4\n");
     }
 }

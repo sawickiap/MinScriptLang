@@ -120,6 +120,8 @@ enum class Symbol
     Semicolon,         // ;
     RoundBrackerOpen,  // (
     RoundBracketClose, // )
+    CurlyBracketOpen,  // {
+    CurlyBracketClose, // }
     Mul,               // *
     Div,               // /
     Mod,               // %
@@ -415,7 +417,7 @@ private:
     vector<Token> m_Tokens;
     size_t m_TokenIndex = 0;
 
-    void ParseBlockContent(AST::Block& outBlock);
+    void ParseBlock(AST::Block& outBlock);
     unique_ptr<AST::Statement> TryParseStatement();
     unique_ptr<AST::Constant> TryParseConstant();
     unique_ptr<AST::Expression> TryParseExpr0();
@@ -482,6 +484,8 @@ void Tokenizer::GetNextToken(Token& out)
     if(currentCode[0] == ';') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Semicolon; return; }
     if(currentCode[0] == '(') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBrackerOpen; return; }
     if(currentCode[0] == ')') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBracketClose; return; }
+    if(currentCode[0] == '{') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::CurlyBracketOpen; return; }
+    if(currentCode[0] == '}') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::CurlyBracketClose; return; }
     if(currentCode[0] == '*') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Mul; return; }
     if(currentCode[0] == '/') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Div; return; }
     if(currentCode[0] == '%') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Mod; return; }
@@ -732,18 +736,20 @@ void Parser::ParseScript(AST::Script& outScript)
             break;
     }
 
-    ParseBlockContent(outScript);
+    ParseBlock(outScript);
+    if(m_Tokens[m_TokenIndex].Type != TokenType_::End)
+        throw ParsingError(GetCurrentTokenPlace(), string("Parsing error."));
 
     outScript.DebugPrint(0); // #TEMP
 }
 
-void Parser::ParseBlockContent(AST::Block& outBlock)
+void Parser::ParseBlock(AST::Block& outBlock)
 {
     while(m_Tokens[m_TokenIndex].Type != TokenType_::End)
     {
         unique_ptr<AST::Statement> stmt = TryParseStatement();
         if(!stmt)
-            throw ParsingError(GetCurrentTokenPlace(), string("Cannot parse statement."));
+            break;
         outBlock.Statements.push_back(std::move(stmt));
     }
 }
@@ -751,9 +757,20 @@ void Parser::ParseBlockContent(AST::Block& outBlock)
 unique_ptr<AST::Statement> Parser::TryParseStatement()
 {
     const PlaceInCode place = GetCurrentTokenPlace();
+    
     // Empty statement: ';'
     if(TryParseSymbol(Symbol::Semicolon))
         return std::make_unique<AST::EmptyStatement>(place);
+    
+    // Block: '{' Block '}'
+    if(TryParseSymbol(Symbol::CurlyBracketOpen))
+    {
+        unique_ptr<AST::Block> block = std::make_unique<AST::Block>(GetCurrentTokenPlace());
+        ParseBlock(*block);
+        ParseSymbol(Symbol::CurlyBracketClose);
+        return block;
+    }
+    
     // Expression as statement: Expr17 ';'
     unique_ptr<AST::Expression> expr = TryParseExpr17();
     if(expr)
@@ -761,6 +778,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
         ParseSymbol(Symbol::Semicolon);
         return expr;
     }
+    
     return unique_ptr<AST::Statement>{};
 }
 
