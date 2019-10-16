@@ -498,6 +498,9 @@ void Tokenizer::GetNextToken(Token& out)
         size_t tokenLen = 1;
         while(tokenLen < currentCodeLen && IsDecimalNumber(currentCode[tokenLen]))
             ++tokenLen;
+        // Letters straight after number are invalid.
+        if(tokenLen < currentCodeLen && IsAlpha(currentCode[tokenLen]))
+            throw ParsingError(out.Place, "Invalid number.");
         out.Type = TokenType_::Number;
         out.Number = ParseNumber(currentCode, tokenLen);
         m_Code.MoveChars(tokenLen);

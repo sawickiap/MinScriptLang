@@ -18,6 +18,11 @@ TEST_CASE("Basic")
         const char* code = "/* foo";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
     }
+    SECTION("Characters after number")
+    {
+        const char* code = "123print(1);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+    }
     SECTION("Missing semicolon")
     {
         const char* code = "print(1)";
