@@ -144,9 +144,9 @@ static const char* SYMBOL_STR[] = { ",", ";", "(", ")", "*", "/", "%", "+", "-",
 
 enum class Keyword
 {
-    If, Else, Count
+    Null, False, True, If, Else, Count
 };
-static const char* KEYWORD_STR[] = { "if", "else" };
+static const char* KEYWORD_STR[] = { "null", "false", "true", "if", "else" };
 
 struct Token
 {
@@ -353,20 +353,20 @@ struct Constant : Expression
     virtual void Execute(ExecuteContext& ctx) const { /* Nothing - just ignore its value. */ }
 };
 
-struct NumberConstant : Constant
+struct ConstantValue : Constant
 {
-    double Number;
-    NumberConstant(const PlaceInCode& place, double number) : Constant{place}, Number(number) { }
+    Value Val;
+    ConstantValue(const PlaceInCode& place, Value&& val) : Constant{place}, Val{std::move(val)} { }
     virtual void DebugPrint(uint32_t indentLevel) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{Number}; }
+    virtual Value Evaluate(ExecuteContext& ctx) const { return Val; }
 };
 
-struct IdentifierConstant : Constant
+struct Identifier : Constant
 {
-    string Identifier;
-    IdentifierConstant(const PlaceInCode& place, string&& identifier) : Constant{place}, Identifier(std::move(identifier)) { }
+    string S;
+    Identifier(const PlaceInCode& place, string&& s) : Constant{place}, S(std::move(s)) { }
     virtual void DebugPrint(uint32_t indentLevel) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{string(Identifier)}; }
+    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{string(S)}; }
 };
 
 struct Operator : Expression
@@ -667,14 +667,20 @@ void Block::Execute(ExecuteContext& ctx) const
         stmtPtr->Execute(ctx);
 }
 
-void NumberConstant::DebugPrint(uint32_t indentLevel) const
+void ConstantValue::DebugPrint(uint32_t indentLevel) const
 {
-    printf(DEBUG_PRINT_FORMAT_STR_BEG "Number %g\n", DEBUG_PRINT_ARGS_BEG, Number);
+    switch(Val.GetType())
+    {
+    case Value::Type::Null: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant null\n", DEBUG_PRINT_ARGS_BEG); break;
+    case Value::Type::Number: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant number: %g\n", DEBUG_PRINT_ARGS_BEG, Val.GetNumber()); break;
+    case Value::Type::String: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant string: %s\n", DEBUG_PRINT_ARGS_BEG, Val.GetString().c_str()); break;
+    default: assert(0);
+    }
 }
 
-void IdentifierConstant::DebugPrint(uint32_t indentLevel) const
+void Identifier::DebugPrint(uint32_t indentLevel) const
 {
-    printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier %s\n", DEBUG_PRINT_ARGS_BEG, Identifier.c_str());
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier: %s\n", DEBUG_PRINT_ARGS_BEG, S.c_str());
 }
 
 void BinaryOperator::DebugPrint(uint32_t indentLevel) const
@@ -785,15 +791,15 @@ Value MultiOperator::Evaluate(ExecuteContext& ctx) const
 
 Value MultiOperator::Call(ExecuteContext& ctx) const
 {
-    IdentifierConstant* calleeIdentifier = dynamic_cast<IdentifierConstant*>(Operands[0].get()); assert(calleeIdentifier); // #TODO make it flexible!
+    Identifier* calleeIdentifier = dynamic_cast<Identifier*>(Operands[0].get()); assert(calleeIdentifier); // #TODO make it flexible!
     const size_t argCount = Operands.size() - 1;
     vector<Value> values(argCount);
     for(size_t i = 0; i < argCount; ++i)
         values[i] = Operands[i + 1]->Evaluate(ctx);
-    if(calleeIdentifier->Identifier == "print")
+    if(calleeIdentifier->S == "print")
         return BuiltInFunction_Print(ctx, values.data(), values.size());
     else
-        throw ExecutionError(GetPlace(), string("Unknown function: ") + calleeIdentifier->Identifier);
+        throw ExecutionError(GetPlace(), string("Unknown function: ") + calleeIdentifier->S);
 }
 
 } // namespace AST
@@ -891,10 +897,24 @@ unique_ptr<AST::Constant> Parser::TryParseConstant()
     {
     case TokenType_::Number:
         ++m_TokenIndex;
-        return std::make_unique<AST::NumberConstant>(t.Place, t.Number);
+        return std::make_unique<AST::ConstantValue>(t.Place, Value{t.Number});
     case TokenType_::Identifier:
         ++m_TokenIndex;
-        return std::make_unique<AST::IdentifierConstant>(t.Place, string(t.String));
+        return std::make_unique<AST::Identifier>(t.Place, string(t.String));
+    case TokenType_::Keyword:
+        switch(t.Keyword)
+        {
+        case Keyword::Null:
+            ++m_TokenIndex;
+            return std::make_unique<AST::ConstantValue>(t.Place, Value{});
+        case Keyword::False:
+            ++m_TokenIndex;
+            return std::make_unique<AST::ConstantValue>(t.Place, Value{0.0});
+        case Keyword::True:
+            ++m_TokenIndex;
+            return std::make_unique<AST::ConstantValue>(t.Place, Value{1.0});
+        }
+        break;
     }
     return unique_ptr<AST::Constant>{};
 }

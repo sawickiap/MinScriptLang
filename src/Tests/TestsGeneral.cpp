@@ -57,9 +57,15 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n2\n3\n4\n");
     }
+    SECTION("Constants null false true")
+    {
+        const char* code = "print(null); print(false); print(true); print(true + true - false);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n1\n2\n");
+    }
     SECTION("If conditions")
     {
-        const char* code = "if(1) print(1); if(0) print(2); if(2); if(2-2) { } else { print(10); print(11); }";
+        const char* code = "if(true) print(true); if(false) print(2); if(2); if(2-2) { } else { print(10); print(11); }";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n10\n11\n");
     }
