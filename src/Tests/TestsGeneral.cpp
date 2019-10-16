@@ -57,4 +57,10 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n2\n3\n4\n");
     }
+    SECTION("If conditions")
+    {
+        const char* code = "if(1) print(1); if(0) print(2); if(2); if(2-2) { } else { print(10); print(11); }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n10\n11\n");
+    }
 }

@@ -114,6 +114,7 @@ static const char* const ERROR_MESSAGE_INVALID_NUMBER = "Invalid number.";
 static const char* const ERROR_MESSAGE_UNRECOGNIZED_TOKEN = "Unrecognized token.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT = "Unexpected end of file inside multiline comment.";
 static const char* const ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expression.";
+static const char* const ERROR_MESSAGE_EXPECTED_STATEMENT = "Expected statement.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL                     = "Expected symbol.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Expected symbol ';'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Expected symbol ')'.";
@@ -122,11 +123,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Ex
 // Name with underscore because f***g Windows.h defines TokenType as macro!
 enum class TokenType_
 {
-    None,
-    Symbol,
-    Identifier,
-    Number,
-    End,
+    None, Symbol, Keyword, Identifier, Number, End
 };
 
 enum class Symbol
@@ -145,13 +142,23 @@ enum class Symbol
 };
 static const char* SYMBOL_STR[] = { ",", ";", "(", ")", "*", "/", "%", "+", "-", };
 
+enum class Keyword
+{
+    If, Else, Count
+};
+static const char* KEYWORD_STR[] = { "if", "else" };
+
 struct Token
 {
     PlaceInCode Place;
     TokenType_ Type;
-    Symbol Symbol; // Only when Type == TokenType::Symbol
+    union
+    {
+        Symbol Symbol;   // Only when Type == TokenType_::Symbol
+        Keyword Keyword; // Only when Type == TokenType_::Keyword
+        double Number;   // Only when Type == TokenType_::Number
+    };
     string String; // Only when Type == TokenType::Identifier
-    double Number; // Only when Type == TokenType::Number
 };
 
 static inline bool IsDecimalNumber(char ch) { return ch >= '0' && ch <= '9'; }
@@ -259,6 +266,17 @@ public:
     double GetNumber() const { assert(m_Type == Type::Number); return m_Number; }
     const string& GetString() const { assert(m_Type == Type::String); return m_String; }
 
+    bool IsTrue() const
+    {
+        switch(m_Type)
+        {
+        case Type::Null: return false;
+        case Type::Number: return m_Number != 0.f;
+        case Type::String: return !m_String.empty();
+        default: assert(0); return false;
+        }
+    }
+
     void SetNull() { m_Type = Type::Null; m_String.clear(); }
     void SetNumber(double number) { m_Type = Type::Number; m_Number = number; m_String.clear(); }
     void SetString(string&& str) { m_Type = Type::String; m_String = std::move(str); }
@@ -296,6 +314,17 @@ struct EmptyStatement : public Statement
     EmptyStatement(const PlaceInCode& place) : Statement{place} { }
     virtual void DebugPrint(uint32_t indentLevel) const;
     virtual void Execute(ExecuteContext& ctx) const { }
+};
+
+struct Expression;
+
+struct Condition : public Statement
+{
+    unique_ptr<Expression> ConditionExpression;
+    unique_ptr<Statement> Statements[2]; // [0] executed if true, [1] executed if false, optional.
+    Condition(const PlaceInCode& place) : Statement{place} { }
+    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void Execute(ExecuteContext& ctx) const;
 };
 
 struct Block : public Statement
@@ -443,6 +472,7 @@ private:
     unique_ptr<AST::Expression> TryParseExpr17() { return TryParseExpr16(); }
     bool TryParseSymbol(Symbol symbol);
     void ParseSymbol(Symbol symbol);
+    bool TryParseKeyword(Keyword keyword);
     const PlaceInCode& GetCurrentTokenPlace() const { return m_Tokens[m_TokenIndex].Place; }
 };
   
@@ -521,12 +551,27 @@ void Tokenizer::GetNextToken(Token& out)
         m_Code.MoveChars(tokenLen);
         return;
     }
-    // Identifier
+    // Identifier or keyword
     if(IsAlpha(currentCode[0]))
     {
         size_t tokenLen = 1;
         while(tokenLen < currentCodeLen && IsAlphaNumeric(currentCode[tokenLen]))
             ++tokenLen;
+
+        // Detect keyword
+        for(size_t i = 0; i < (size_t)Keyword::Count; ++i)
+        {
+            const size_t keywordLen = strlen(KEYWORD_STR[i]);
+            if(keywordLen == tokenLen && memcmp(KEYWORD_STR[i], currentCode, tokenLen) == 0)
+            {
+                out.Type = TokenType_::Keyword;
+                out.Keyword = (Keyword)i;
+                m_Code.MoveChars(keywordLen);
+                return;
+            }
+        }
+
+        // Identifier
         out.Type = TokenType_::Identifier;
         out.String = string{currentCode, currentCode + tokenLen};
         m_Code.MoveChars(tokenLen);
@@ -588,6 +633,24 @@ namespace AST {
 void EmptyStatement::DebugPrint(uint32_t indentLevel) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Empty\n", DEBUG_PRINT_ARGS_BEG);
+}
+
+void Condition::DebugPrint(uint32_t indentLevel) const
+{
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "Condition\n", DEBUG_PRINT_ARGS_BEG);
+    ++indentLevel;
+    ConditionExpression->DebugPrint(indentLevel);
+    Statements[0]->DebugPrint(indentLevel);
+    if(Statements[1])
+        Statements[1]->DebugPrint(indentLevel);
+}
+
+void Condition::Execute(ExecuteContext& ctx) const
+{
+    if(ConditionExpression->Evaluate(ctx).IsTrue())
+        Statements[0]->Execute(ctx);
+    else if(Statements[1])
+        Statements[1]->Execute(ctx);
 }
 
 void Block::DebugPrint(uint32_t indentLevel) const
@@ -788,6 +851,27 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
         ParseSymbol(Symbol::CurlyBracketClose);
         return block;
     }
+
+    // Condition: 'if' '(' Expr17 ')' Statement [ 'else' Statement ]
+    if(TryParseKeyword(Keyword::If))
+    {
+        unique_ptr<AST::Condition> condition = std::make_unique<AST::Condition>(place);
+        ParseSymbol(Symbol::RoundBrackerOpen);
+        condition->ConditionExpression = TryParseExpr17();
+        if(!condition->ConditionExpression)
+            throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+        ParseSymbol(Symbol::RoundBracketClose);
+        condition->Statements[0] = TryParseStatement();
+        if(!condition->Statements[0])
+            throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+        if(TryParseKeyword(Keyword::Else))
+        {
+            condition->Statements[1] = TryParseStatement();
+            if(!condition->Statements[1])
+                throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+        }
+        return condition;
+    }
     
     // Expression as statement: Expr17 ';'
     unique_ptr<AST::Expression> expr = TryParseExpr17();
@@ -948,15 +1032,13 @@ unique_ptr<AST::Expression> Parser::TryParseExpr6()
 
 bool Parser::TryParseSymbol(Symbol symbol)
 {
-    if(m_TokenIndex < m_Tokens.size() &&
-        m_Tokens[m_TokenIndex].Type == TokenType_::Symbol &&
+    if(m_Tokens[m_TokenIndex].Type == TokenType_::Symbol &&
         m_Tokens[m_TokenIndex].Symbol == symbol)
     {
         ++m_TokenIndex;
         return true;
     }
-    else
-        return false;
+    return false;
 }
 
 void Parser::ParseSymbol(Symbol symbol)
@@ -970,8 +1052,18 @@ void Parser::ParseSymbol(Symbol symbol)
         case Symbol::CurlyBracketClose: throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE);
         default: throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_EXPECTED_SYMBOL);
         }
-        
     }
+}
+
+bool Parser::TryParseKeyword(Keyword keyword)
+{
+    if(m_Tokens[m_TokenIndex].Type == TokenType_::Keyword &&
+        m_Tokens[m_TokenIndex].Keyword == keyword)
+    {
+        ++m_TokenIndex;
+        return true;
+    }
+    return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
