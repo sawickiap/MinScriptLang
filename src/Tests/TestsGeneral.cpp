@@ -35,4 +35,10 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "14\n-2\n40\n");
     }
+    SECTION("Round brackets expression grouping")
+    {
+        const char* code = "print(2 + 3 * ((4))); print((2 + 3) * 4);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "14\n20\n");
+    }
 }

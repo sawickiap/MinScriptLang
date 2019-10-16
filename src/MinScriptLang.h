@@ -417,7 +417,8 @@ private:
 
     void ParseBlockContent(AST::Block& outBlock);
     unique_ptr<AST::Statement> TryParseStatement();
-    unique_ptr<AST::Constant> TryParseExpr0();
+    unique_ptr<AST::Constant> TryParseConstant();
+    unique_ptr<AST::Expression> TryParseExpr0();
     unique_ptr<AST::Expression> TryParseExpr2();
     unique_ptr<AST::Expression> TryParseExpr5();
     unique_ptr<AST::Expression> TryParseExpr6();
@@ -763,22 +764,40 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     return unique_ptr<AST::Statement>{};
 }
 
-unique_ptr<AST::Constant> Parser::TryParseExpr0()
+unique_ptr<AST::Constant> Parser::TryParseConstant()
 {
-    if(m_TokenIndex < m_Tokens.size())
+    const Token& t = m_Tokens[m_TokenIndex];
+    switch(t.Type)
     {
-        const Token& t = m_Tokens[m_TokenIndex];
-        switch(t.Type)
-        {
-        case TokenType_::Number:
-            ++m_TokenIndex;
-            return std::make_unique<AST::NumberConstant>(t.Place, t.Number);
-        case TokenType_::Identifier:
-            ++m_TokenIndex;
-            return std::make_unique<AST::IdentifierConstant>(t.Place, string(t.String));
-        }
+    case TokenType_::Number:
+        ++m_TokenIndex;
+        return std::make_unique<AST::NumberConstant>(t.Place, t.Number);
+    case TokenType_::Identifier:
+        ++m_TokenIndex;
+        return std::make_unique<AST::IdentifierConstant>(t.Place, string(t.String));
     }
     return unique_ptr<AST::Constant>{};
+}
+
+unique_ptr<AST::Expression> Parser::TryParseExpr0()
+{
+    // '(' Constant ')'
+    if(TryParseSymbol(Symbol::RoundBrackerOpen))
+    {
+        unique_ptr<AST::Expression> expr = TryParseExpr17();
+        if(!expr)
+            throw ParsingError(GetCurrentTokenPlace(), string("Expected expression."));
+        ParseSymbol(Symbol::RoundBracketClose);
+        return expr;
+    }
+    else
+    {
+        // Constant
+        unique_ptr<AST::Constant> constant = TryParseConstant();
+        if(constant)
+            return constant;
+    }
+    return unique_ptr<AST::Expression>{};
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr2()
