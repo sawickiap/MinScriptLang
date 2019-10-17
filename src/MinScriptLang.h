@@ -1020,7 +1020,7 @@ void Parser::ParseScript(AST::Script& outScript)
     if(m_Tokens[m_TokenIndex].Type != TokenType_::End)
         throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_PARSING_ERROR);
 
-    outScript.DebugPrint(0); // #TEMP
+    //outScript.DebugPrint(0); // #TEMP
 }
 
 void Parser::ParseBlock(AST::Block& outBlock)

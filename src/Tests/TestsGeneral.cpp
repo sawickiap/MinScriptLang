@@ -71,9 +71,10 @@ TEST_CASE("Basic")
     }
     SECTION("If conditions nested")
     {
-        const char* code = "if(false) print(1); else if(false) print(2); else print(3);";
+        const char* code = "if(false) print(1); else if(false) print(2); else print(3); \n"
+            "if(true) if(false) print(1); else print(2);";
         env.Execute(code, strlen(code));
-        REQUIRE(env.GetOutput() == "3\n");
+        REQUIRE(env.GetOutput() == "3\n2\n");
     }
     SECTION("Ternary operator")
     {
