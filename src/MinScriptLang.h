@@ -99,6 +99,9 @@ private:
 #include <ctype.h>
 
 using std::unique_ptr;
+using std::shared_ptr;
+using std::make_unique;
+using std::make_shared;
 using std::string;
 using std::vector;
 
@@ -124,6 +127,23 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Ex
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN  = "Expected symbol '('.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Expected symbol ')'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
+
+struct Constant
+{
+public:
+    enum class Type { Number, String };
+    explicit Constant(double number) : m_Type{Type::Number}, m_Number(number) { }
+    explicit Constant(string&& s) : m_Type{Type::String}, m_String{std::move(s)} { }
+    Type GetType() const { return m_Type; }
+    double GetNumber() const { assert(m_Type == Type::Number); return m_Number; }
+    const string& GetString() const { assert(m_Type == Type::String); return m_String; }
+    void SetNumber(double v) { m_Type = Type::Number; m_Number = v; m_String.clear(); }
+    void SetString(string&& s) { m_Type = Type::String; m_String = std::move(s); }
+private:
+    Type m_Type;
+    double m_Number = 0.0;
+    string m_String;
+};
 
 // Name with underscore because f***g Windows.h defines TokenType as macro!
 enum class TokenType_
@@ -167,21 +187,6 @@ struct Token
         double Number;   // Only when Type == TokenType_::Number
     };
     string String; // Only when Type == TokenType::Identifier
-};
-
-struct Constant
-{
-public:
-    enum class Type { Number, String };
-    explicit Constant(double number) : m_Type{Type::Number}, m_Number(number) { }
-    explicit Constant(string&& s) : m_Type{Type::String}, m_String{std::move(s)} { }
-    Type GetType() const { return m_Type; }
-    double GetNumber() const { assert(m_Type == Type::Number); return m_Number; }
-    const string& GetString() const { assert(m_Type == Type::String); return m_String; }
-private:
-    Type m_Type;
-    double m_Number;
-    string m_String;
 };
 
 static inline bool IsDecimalNumber(char ch) { return ch >= '0' && ch <= '9'; }
@@ -397,24 +402,24 @@ struct Expression : Statement
     virtual void Execute(ExecuteContext& ctx) const { Evaluate(ctx); }
 };
 
-struct Constant : Expression
+struct ConstantExpression : Expression
 {
-    Constant(const PlaceInCode& place) : Expression{place} { }
+    ConstantExpression(const PlaceInCode& place) : Expression{place} { }
     virtual void Execute(ExecuteContext& ctx) const { /* Nothing - just ignore its value. */ }
 };
 
-struct ConstantValue : Constant
+struct ConstantValue : ConstantExpression
 {
     Value Val;
-    ConstantValue(const PlaceInCode& place, Value&& val) : Constant{place}, Val{std::move(val)} { }
+    ConstantValue(const PlaceInCode& place, Value&& val) : ConstantExpression{place}, Val{std::move(val)} { }
     virtual void DebugPrint(uint32_t indentLevel) const;
     virtual Value Evaluate(ExecuteContext& ctx) const { return Val; }
 };
 
-struct Identifier : Constant
+struct Identifier : ConstantExpression
 {
     string S;
-    Identifier(const PlaceInCode& place, string&& s) : Constant{place}, S(std::move(s)) { }
+    Identifier(const PlaceInCode& place, string&& s) : ConstantExpression{place}, S(std::move(s)) { }
     virtual void DebugPrint(uint32_t indentLevel) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
@@ -516,7 +521,7 @@ private:
 
     void ParseBlock(AST::Block& outBlock);
     unique_ptr<AST::Statement> TryParseStatement();
-    unique_ptr<AST::Constant> TryParseConstant();
+    unique_ptr<AST::ConstantExpression> TryParseConstantExpr();
     unique_ptr<AST::Expression> TryParseExpr0();
     unique_ptr<AST::Expression> TryParseExpr2();
     unique_ptr<AST::Expression> TryParseExpr5();
@@ -821,7 +826,7 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
 {
     // #TODO local, this, then global
-    return LValue{ctx.GlobalContext, MinScriptLang::Constant{string(S)}};
+    return LValue{ctx.GlobalContext, Constant{string(S)}};
 }
 
 void BinaryOperator::DebugPrint(uint32_t indentLevel) const
@@ -1040,12 +1045,12 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     
     // Empty statement: ';'
     if(TryParseSymbol(Symbol::Semicolon))
-        return std::make_unique<AST::EmptyStatement>(place);
+        return make_unique<AST::EmptyStatement>(place);
     
     // Block: '{' Block '}'
     if(TryParseSymbol(Symbol::CurlyBracketOpen))
     {
-        unique_ptr<AST::Block> block = std::make_unique<AST::Block>(GetCurrentTokenPlace());
+        unique_ptr<AST::Block> block = make_unique<AST::Block>(GetCurrentTokenPlace());
         ParseBlock(*block);
         MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
         return block;
@@ -1054,7 +1059,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     // Condition: 'if' '(' Expr17 ')' Statement [ 'else' Statement ]
     if(TryParseKeyword(Keyword::If))
     {
-        unique_ptr<AST::Condition> condition = std::make_unique<AST::Condition>(place);
+        unique_ptr<AST::Condition> condition = make_unique<AST::Condition>(place);
         MUST_PARSE( TryParseSymbol(Symbol::RoundBrackerOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
         MUST_PARSE( condition->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
@@ -1075,38 +1080,38 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     return unique_ptr<AST::Statement>{};
 }
 
-unique_ptr<AST::Constant> Parser::TryParseConstant()
+unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
 {
     const Token& t = m_Tokens[m_TokenIndex];
     switch(t.Type)
     {
     case TokenType_::Number:
         ++m_TokenIndex;
-        return std::make_unique<AST::ConstantValue>(t.Place, Value{t.Number});
+        return make_unique<AST::ConstantValue>(t.Place, Value{t.Number});
     case TokenType_::Identifier:
         ++m_TokenIndex;
-        return std::make_unique<AST::Identifier>(t.Place, string(t.String));
+        return make_unique<AST::Identifier>(t.Place, string(t.String));
     case TokenType_::Keyword:
         switch(t.Keyword)
         {
         case Keyword::Null:
             ++m_TokenIndex;
-            return std::make_unique<AST::ConstantValue>(t.Place, Value{});
+            return make_unique<AST::ConstantValue>(t.Place, Value{});
         case Keyword::False:
             ++m_TokenIndex;
-            return std::make_unique<AST::ConstantValue>(t.Place, Value{0.0});
+            return make_unique<AST::ConstantValue>(t.Place, Value{0.0});
         case Keyword::True:
             ++m_TokenIndex;
-            return std::make_unique<AST::ConstantValue>(t.Place, Value{1.0});
+            return make_unique<AST::ConstantValue>(t.Place, Value{1.0});
         }
         break;
     }
-    return unique_ptr<AST::Constant>{};
+    return unique_ptr<AST::ConstantExpression>{};
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr0()
 {
-    // '(' Constant ')'
+    // '(' ConstantExpr ')'
     if(TryParseSymbol(Symbol::RoundBrackerOpen))
     {
         unique_ptr<AST::Expression> expr;
@@ -1117,7 +1122,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr0()
     else
     {
         // Constant
-        unique_ptr<AST::Constant> constant = TryParseConstant();
+        unique_ptr<AST::ConstantExpression> constant = TryParseConstantExpr();
         if(constant)
             return constant;
     }
@@ -1132,7 +1137,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
         const PlaceInCode place = GetCurrentTokenPlace();
         if(TryParseSymbol(Symbol::RoundBrackerOpen))
         {
-            unique_ptr<AST::MultiOperator> multiOperator = std::make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
+            unique_ptr<AST::MultiOperator> multiOperator = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
             // Callee
             multiOperator->Operands.push_back(std::move(expr));
             // First argument
@@ -1165,21 +1170,21 @@ unique_ptr<AST::Expression> Parser::TryParseExpr5()
             const PlaceInCode place = GetCurrentTokenPlace();
             if(TryParseSymbol(Symbol::Mul))
             {
-                unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mul);
+                unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mul);
                 op->Operands[0] = std::move(expr);
                 MUST_PARSE( op->Operands[1] = TryParseExpr2(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
             }
             else if(TryParseSymbol(Symbol::Div))
             {
-                unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Div);
+                unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Div);
                 op->Operands[0] = std::move(expr);
                 MUST_PARSE( op->Operands[1] = TryParseExpr2(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
             }
             else if(TryParseSymbol(Symbol::Mod))
             {
-                unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mod);
+                unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mod);
                 op->Operands[0] = std::move(expr);
                 MUST_PARSE( op->Operands[1] = TryParseExpr2(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
@@ -1202,14 +1207,14 @@ unique_ptr<AST::Expression> Parser::TryParseExpr6()
             const PlaceInCode place = GetCurrentTokenPlace();
             if(TryParseSymbol(Symbol::Add))
             {
-                unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Add);
+                unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Add);
                 op->Operands[0] = std::move(expr);
                 MUST_PARSE( op->Operands[1] = TryParseExpr5(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
             }
             else if(TryParseSymbol(Symbol::Sub))
             {
-                unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Sub);
+                unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Sub);
                 op->Operands[0] = std::move(expr);
                 MUST_PARSE( op->Operands[1] = TryParseExpr5(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
@@ -1230,7 +1235,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr16()
         // Ternary operator: Expr15 '?' Expr16 ':' Expr16
         if(TryParseSymbol(Symbol::QuestionMark))
         {
-            unique_ptr<AST::TernaryOperator> op = std::make_unique<AST::TernaryOperator>(GetCurrentTokenPlace());
+            unique_ptr<AST::TernaryOperator> op = make_unique<AST::TernaryOperator>(GetCurrentTokenPlace());
             op->Operands[0] = std::move(expr);
             MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
             MUST_PARSE( TryParseSymbol(Symbol::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON );
@@ -1240,7 +1245,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr16()
         // Assignment: Expr15 = Expr16
         if(TryParseSymbol(Symbol::Equal))
         {
-            unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(GetCurrentTokenPlace(), AST::BinaryOperatorType::Assignment);
+            unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(GetCurrentTokenPlace(), AST::BinaryOperatorType::Assignment);
             op->Operands[0] = std::move(expr);
             MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
             return op;
