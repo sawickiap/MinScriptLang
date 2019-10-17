@@ -148,11 +148,12 @@ private:
 // Name with underscore because f***g Windows.h defines TokenType as macro!
 enum class TokenType_
 {
-    None, Symbol, Keyword, Identifier, Number, End
+    None, Symbol, Identifier, Number, End
 };
 
 enum class Symbol
 {
+    // Symbols
     Comma,             // ,
     QuestionMark,      // ?
     Colon,             // :
@@ -167,14 +168,13 @@ enum class Symbol
     Add,               // +
     Sub,               // -
     Equal,             // =
-};
-static const char* SYMBOL_STR[] = { ",", "?", ":", ";", "(", ")", "*", "/", "%", "+", "-", "=" };
-
-enum class Keyword
-{
+    // Keywords
     Null, False, True, If, Else, Count
 };
-static const char* KEYWORD_STR[] = { "null", "false", "true", "if", "else" };
+static const char* SYMBOL_STR[] = {
+    ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", // Symbols
+    "null", "false", "true", "if", "else", // Keywords
+};
 
 struct Token
 {
@@ -182,9 +182,8 @@ struct Token
     TokenType_ Type;
     union
     {
-        Symbol Symbol;   // Only when Type == TokenType_::Symbol
-        Keyword Keyword; // Only when Type == TokenType_::Keyword
-        double Number;   // Only when Type == TokenType_::Number
+        Symbol Symbol; // Only when Type == TokenType_::Symbol
+        double Number; // Only when Type == TokenType_::Number
     };
     string String; // Only when Type == TokenType::Identifier
 };
@@ -529,7 +528,6 @@ private:
     unique_ptr<AST::Expression> TryParseExpr16();
     unique_ptr<AST::Expression> TryParseExpr17() { return TryParseExpr16(); }
     bool TryParseSymbol(Symbol symbol);
-    bool TryParseKeyword(Keyword keyword);
     const PlaceInCode& GetCurrentTokenPlace() const { return m_Tokens[m_TokenIndex].Place; }
 };
   
@@ -620,13 +618,13 @@ void Tokenizer::GetNextToken(Token& out)
             ++tokenLen;
 
         // Detect keyword
-        for(size_t i = 0; i < (size_t)Keyword::Count; ++i)
+        for(size_t i = (size_t)Symbol::Null; i < (size_t)Symbol::Count; ++i)
         {
-            const size_t keywordLen = strlen(KEYWORD_STR[i]);
-            if(keywordLen == tokenLen && memcmp(KEYWORD_STR[i], currentCode, tokenLen) == 0)
+            const size_t keywordLen = strlen(SYMBOL_STR[i]);
+            if(keywordLen == tokenLen && memcmp(SYMBOL_STR[i], currentCode, tokenLen) == 0)
             {
-                out.Type = TokenType_::Keyword;
-                out.Keyword = (Keyword)i;
+                out.Type = TokenType_::Symbol;
+                out.Symbol = (Symbol)i;
                 m_Code.MoveChars(keywordLen);
                 return;
             }
@@ -1025,7 +1023,7 @@ void Parser::ParseScript(AST::Script& outScript)
     if(m_Tokens[m_TokenIndex].Type != TokenType_::End)
         throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_PARSING_ERROR);
 
-    //outScript.DebugPrint(0); // #TEMP
+    //outScript.DebugPrint(0); // #DELME
 }
 
 void Parser::ParseBlock(AST::Block& outBlock)
@@ -1057,14 +1055,14 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     }
 
     // Condition: 'if' '(' Expr17 ')' Statement [ 'else' Statement ]
-    if(TryParseKeyword(Keyword::If))
+    if(TryParseSymbol(Symbol::If))
     {
         unique_ptr<AST::Condition> condition = make_unique<AST::Condition>(place);
         MUST_PARSE( TryParseSymbol(Symbol::RoundBrackerOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
         MUST_PARSE( condition->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
         MUST_PARSE( condition->Statements[0] = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
-        if(TryParseKeyword(Keyword::Else))
+        if(TryParseSymbol(Symbol::Else))
             MUST_PARSE( condition->Statements[1] = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
         return condition;
     }
@@ -1091,16 +1089,16 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
     case TokenType_::Identifier:
         ++m_TokenIndex;
         return make_unique<AST::Identifier>(t.Place, string(t.String));
-    case TokenType_::Keyword:
-        switch(t.Keyword)
+    case TokenType_::Symbol:
+        switch(t.Symbol)
         {
-        case Keyword::Null:
+        case Symbol::Null:
             ++m_TokenIndex;
             return make_unique<AST::ConstantValue>(t.Place, Value{});
-        case Keyword::False:
+        case Symbol::False:
             ++m_TokenIndex;
             return make_unique<AST::ConstantValue>(t.Place, Value{0.0});
-        case Keyword::True:
+        case Symbol::True:
             ++m_TokenIndex;
             return make_unique<AST::ConstantValue>(t.Place, Value{1.0});
         }
@@ -1260,17 +1258,6 @@ bool Parser::TryParseSymbol(Symbol symbol)
 {
     if(m_Tokens[m_TokenIndex].Type == TokenType_::Symbol &&
         m_Tokens[m_TokenIndex].Symbol == symbol)
-    {
-        ++m_TokenIndex;
-        return true;
-    }
-    return false;
-}
-
-bool Parser::TryParseKeyword(Keyword keyword)
-{
-    if(m_Tokens[m_TokenIndex].Type == TokenType_::Keyword &&
-        m_Tokens[m_TokenIndex].Keyword == keyword)
     {
         ++m_TokenIndex;
         return true;
