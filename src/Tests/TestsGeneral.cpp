@@ -124,4 +124,10 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "0\n0\n");
     }
+    SECTION("Bitwise shift")
+    {
+        const char* code = "a=2; print(a<<0); print(a<<2); print(a<<33); print(a>>1); print(a>>2); print(-a<<3); print(-256>>4);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "2\n8\n1.71799e+10\n1\n0\n-16\n-16\n");
+    }
 }
