@@ -100,4 +100,16 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "6\n4\n2\n");
     }
+    SECTION("for loop")
+    {
+        const char* code = "for(a=10; a; a=a-2) { print(a); }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "10\n8\n6\n4\n2\n");
+    }
+    SECTION("for loop with empty sections")
+    {
+        const char* code = "a=10; for(; a;) { print(a); a=a-2; }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "10\n8\n6\n4\n2\n");
+    }
 }

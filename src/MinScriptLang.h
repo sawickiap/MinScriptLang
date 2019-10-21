@@ -170,11 +170,11 @@ enum class Symbol
     Sub,               // -
     Equal,             // =
     // Keywords
-    Null, False, True, If, Else, While, Do, Count
+    Null, False, True, If, Else, While, Do, For, Count
 };
 static const char* SYMBOL_STR[] = {
     ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", // Symbols
-    "null", "false", "true", "if", "else", "while", "do", // Keywords
+    "null", "false", "true", "if", "else", "while", "do", "for", // Keywords
 };
 
 struct Token
@@ -387,6 +387,17 @@ struct WhileLoop : public Statement
     unique_ptr<Expression> ConditionExpression;
     unique_ptr<Statement> Body;
     explicit WhileLoop(const PlaceInCode& place, WhileLoopType type) : Statement{place}, Type{type} { }
+    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void Execute(ExecuteContext& ctx) const;
+};
+
+struct ForLoop : public Statement
+{
+    unique_ptr<Expression> InitExpression; // Optional
+    unique_ptr<Expression> ConditionExpression; // Optional
+    unique_ptr<Expression> IterationExpression; // Optional
+    unique_ptr<Statement> Body;
+    explicit ForLoop(const PlaceInCode& place) : Statement{place} { }
     virtual void DebugPrint(uint32_t indentLevel) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
@@ -820,6 +831,37 @@ void WhileLoop::Execute(ExecuteContext& ctx) const
     }
 }
 
+void ForLoop::DebugPrint(uint32_t indentLevel) const
+{
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "For\n", DEBUG_PRINT_ARGS_BEG);
+    ++indentLevel;
+    if(InitExpression)
+        InitExpression->DebugPrint(indentLevel);
+    else
+        printf(DEBUG_PRINT_FORMAT_STR_BEG "(Init expression empty)\n", DEBUG_PRINT_ARGS_BEG);
+    if(ConditionExpression)
+        ConditionExpression->DebugPrint(indentLevel);
+    else
+        printf(DEBUG_PRINT_FORMAT_STR_BEG "(Condition expression empty)\n", DEBUG_PRINT_ARGS_BEG);
+    if(IterationExpression)
+        IterationExpression->DebugPrint(indentLevel);
+    else
+        printf(DEBUG_PRINT_FORMAT_STR_BEG "(Iteration expression empty)\n", DEBUG_PRINT_ARGS_BEG);
+    Body->DebugPrint(indentLevel);
+}
+
+void ForLoop::Execute(ExecuteContext& ctx) const
+{
+    if(InitExpression)
+        InitExpression->Execute(ctx);
+    while(ConditionExpression ? ConditionExpression->Evaluate(ctx).IsTrue() : true)
+    {
+        Body->Execute(ctx);
+        if(IterationExpression)
+            IterationExpression->Execute(ctx);
+    }
+}
+
 void Block::DebugPrint(uint32_t indentLevel) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Block\n", DEBUG_PRINT_ARGS_BEG);
@@ -1131,6 +1173,30 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
         MUST_PARSE( loop->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
         MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
+        return loop;
+    }
+
+    // Loop: 'for' '(' Expr17? ';' Expr17? ';' Expr17? ')' Statement
+    if(TryParseSymbol(Symbol::For))
+    {
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
+        unique_ptr<AST::ForLoop> loop = make_unique<AST::ForLoop>(place);
+        if(!TryParseSymbol(Symbol::Semicolon))
+        {
+            MUST_PARSE( loop->InitExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+            MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
+        }
+        if(!TryParseSymbol(Symbol::Semicolon))
+        {
+            MUST_PARSE( loop->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+            MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
+        }
+        if(!TryParseSymbol(Symbol::RoundBracketClose))
+        {
+            MUST_PARSE( loop->IterationExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+            MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
+        }
+        MUST_PARSE( loop->Body = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
         return loop;
     }
     
