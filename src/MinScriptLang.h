@@ -130,6 +130,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Ex
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
 static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
+static const char* const ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
 
 struct Constant
 {
@@ -171,6 +172,8 @@ enum class Symbol
     Add,               // +
     Sub,               // -
     Equal,             // =
+    ExclamationMark,   // !
+    Tilde,             // ~
     // Multiple character symbols
     Incrementation,    // ++
     Decrementation,    // --
@@ -178,7 +181,7 @@ enum class Symbol
     Null, False, True, If, Else, While, Do, For, Count
 };
 static const char* SYMBOL_STR[] = {
-    ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", // Symbols
+    ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", // Symbols
     "++", "--", // Multiple character symbols
     "null", "false", "true", "if", "else", "while", "do", "for", // Keywords
 };
@@ -464,6 +467,8 @@ enum class UnaryOperatorType
     Predecrementation,
     Plus,
     Minus,
+    LogicalNot,
+    BitwiseNot,
     None,
 };
 
@@ -614,40 +619,36 @@ void Tokenizer::GetNextToken(Token& out)
         return;
     }
 
+    constexpr Symbol firstMultiCharSymbol = Symbol::Incrementation;
+    constexpr Symbol firstKeywordSymbol = Symbol::Null;
+
     const char* const currentCode = m_Code.GetCurrentCode();
     const size_t currentCodeLen = m_Code.GetCurrentLen();
-    const char currentChar = *currentCode;
-    // Multi character symbols
-    if(currentCodeLen >= 2)
+    // Multi char symbol
+    for(size_t i = (size_t)firstMultiCharSymbol; i < (size_t)firstKeywordSymbol; ++i)
     {
-        if(memcmp(currentCode, SYMBOL_STR[(size_t)Symbol::Incrementation], 2) == 0)
+        const size_t symbolLen = strlen(SYMBOL_STR[i]);
+        if(currentCodeLen >= symbolLen && memcmp(SYMBOL_STR[i], currentCode, symbolLen) == 0)
         {
-            m_Code.MoveChars(2);
-            out.Type = TokenType_::Symbol; out.Symbol = Symbol::Incrementation; return;
-        }
-        if(memcmp(currentCode, SYMBOL_STR[(size_t)Symbol::Decrementation], 2) == 0)
-        {
-            m_Code.MoveChars(2);
-            out.Type = TokenType_::Symbol; out.Symbol = Symbol::Decrementation; return;
+            out.Type = TokenType_::Symbol;
+            out.Symbol = (Symbol)i;
+            m_Code.MoveChars(symbolLen);
+            return;
         }
     }
-    // Symbols
-    if(currentChar == ',') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Comma; return; }
-    if(currentChar == '?') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::QuestionMark; return; }
-    if(currentChar == ':') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Colon; return; }
-    if(currentChar == ';') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Semicolon; return; }
-    if(currentChar == '(') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBracketOpen; return; }
-    if(currentChar == ')') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBracketClose; return; }
-    if(currentChar == '{') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::CurlyBracketOpen; return; }
-    if(currentChar == '}') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::CurlyBracketClose; return; }
-    if(currentChar == '*') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Mul; return; }
-    if(currentChar == '/') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Div; return; }
-    if(currentChar == '%') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Mod; return; }
-    if(currentChar == '+') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Add; return; }
-    if(currentChar == '-') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Sub; return; }
-    if(currentChar == '=') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Equal; return; }
+    // Symbol
+    for(size_t i = 0; i < (size_t)firstMultiCharSymbol; ++i)
+    {
+        if(currentCode[0] == SYMBOL_STR[i][0])
+        {
+            out.Type = TokenType_::Symbol;
+            out.Symbol = (Symbol)i;
+            m_Code.MoveOneChar();
+            return;
+        }
+    }
     // Number
-    if(IsDecimalNumber(currentChar))
+    if(IsDecimalNumber(currentCode[0]))
     {
         size_t tokenLen = 1;
         while(tokenLen < currentCodeLen && IsDecimalNumber(currentCode[tokenLen]))
@@ -661,14 +662,13 @@ void Tokenizer::GetNextToken(Token& out)
         return;
     }
     // Identifier or keyword
-    if(IsAlpha(currentChar))
+    if(IsAlpha(currentCode[0]))
     {
         size_t tokenLen = 1;
         while(tokenLen < currentCodeLen && IsAlphaNumeric(currentCode[tokenLen]))
             ++tokenLen;
-
-        // Detect keyword
-        for(size_t i = (size_t)Symbol::Null; i < (size_t)Symbol::Count; ++i)
+        // Keyword
+        for(size_t i = (size_t)firstKeywordSymbol; i < (size_t)Symbol::Count; ++i)
         {
             const size_t keywordLen = strlen(SYMBOL_STR[i]);
             if(keywordLen == tokenLen && memcmp(SYMBOL_STR[i], currentCode, tokenLen) == 0)
@@ -679,7 +679,6 @@ void Tokenizer::GetNextToken(Token& out)
                 return;
             }
         }
-
         // Identifier
         out.Type = TokenType_::Identifier;
         out.String = string{currentCode, currentCode + tokenLen};
@@ -970,7 +969,8 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
 
 void UnaryOperator::DebugPrint(uint32_t indentLevel) const
 {
-    static const char* UNARY_OPERATOR_TYPE_NAMES[] = { "Preincrementation", "Predecrementation", "Plus", "Minus" };
+    static const char* UNARY_OPERATOR_TYPE_NAMES[] = {
+        "Preincrementation", "Predecrementation", "Plus", "Minus", "Logical NOT", "Bitwise NOT" };
     printf(DEBUG_PRINT_FORMAT_STR_BEG "UnaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, UNARY_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
     ++indentLevel;
     Operand->DebugPrint(indentLevel);
@@ -996,7 +996,9 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         return *val;
     }
     else if(Type == UnaryOperatorType::Plus ||
-        Type == UnaryOperatorType::Minus)
+        Type == UnaryOperatorType::Minus ||
+        Type == UnaryOperatorType::LogicalNot ||
+        Type == UnaryOperatorType::BitwiseNot)
     {
         Value val = Operand->Evaluate(ctx);
         if(val.GetType() != Value::Type::Number)
@@ -1005,6 +1007,8 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         {
         case UnaryOperatorType::Plus: return val;
         case UnaryOperatorType::Minus: return Value{-val.GetNumber()};
+        case UnaryOperatorType::LogicalNot: return Value{val.IsTrue() ? 0.0 : 1.0};
+        case UnaryOperatorType::BitwiseNot: throw ExecutionError(GetPlace(), ERROR_MESSAGE_NOT_IMPLEMENTED); // #TODO implement
         default: assert(0); return Value{};
         }
     }
@@ -1396,34 +1400,20 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
 unique_ptr<AST::Expression> Parser::TryParseExpr3()
 {
     const PlaceInCode place = GetCurrentTokenPlace();
-    // Preincrementation: '++' Expr3
-    if(TryParseSymbol(Symbol::Incrementation))
-    {
-        unique_ptr<AST::UnaryOperator> op = make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Preincrementation);
-        MUST_PARSE( op->Operand = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-        return op;
+#define PARSE_UNARY_OPERATOR(symbol, unaryOperatorType) \
+    if(TryParseSymbol(symbol)) \
+    { \
+        unique_ptr<AST::UnaryOperator> op = make_unique<AST::UnaryOperator>(place, unaryOperatorType); \
+        MUST_PARSE( op->Operand = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION ); \
+        return op; \
     }
-    // Predecrementation: '--' Expr3
-    if(TryParseSymbol(Symbol::Decrementation))
-    {
-        unique_ptr<AST::UnaryOperator> op = make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Predecrementation);
-        MUST_PARSE( op->Operand = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-        return op;
-    }
-    // Plus: '+' Expr3
-    if(TryParseSymbol(Symbol::Add))
-    {
-        unique_ptr<AST::UnaryOperator> op = make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Plus);
-        MUST_PARSE( op->Operand = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-        return op;
-    }
-    // Minus: '-' Expr3
-    if(TryParseSymbol(Symbol::Sub))
-    {
-        unique_ptr<AST::UnaryOperator> op = make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Minus);
-        MUST_PARSE( op->Operand = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-        return op;
-    }
+    PARSE_UNARY_OPERATOR(Symbol::Incrementation, AST::UnaryOperatorType::Preincrementation)
+    PARSE_UNARY_OPERATOR(Symbol::Decrementation, AST::UnaryOperatorType::Predecrementation)
+    PARSE_UNARY_OPERATOR(Symbol::Add, AST::UnaryOperatorType::Plus)
+    PARSE_UNARY_OPERATOR(Symbol::Sub, AST::UnaryOperatorType::Minus)
+    PARSE_UNARY_OPERATOR(Symbol::ExclamationMark, AST::UnaryOperatorType::LogicalNot)
+    PARSE_UNARY_OPERATOR(Symbol::Tilde, AST::UnaryOperatorType::BitwiseNot)
+#undef PARSE_UNARY_OPERATOR
     // Just Expr2 or null if failed.
     return TryParseExpr2();
 }

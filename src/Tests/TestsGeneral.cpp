@@ -118,4 +118,10 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "-4\n-3\n-2\n-1\n");
     }
+    SECTION("Logical operators")
+    {
+        const char* code = "print(!true); print(!!0);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n0\n");
+    }
 }
