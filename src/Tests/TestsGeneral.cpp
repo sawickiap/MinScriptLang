@@ -88,4 +88,16 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n2\n2\n4\n4\n");
     }
+    SECTION("while loop")
+    {
+        const char* code = "a=6; while(a) { print(a); a = a - 2; }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "6\n4\n2\n");
+    }
+    SECTION("do while loop")
+    {
+        const char* code = "a=6; do { print(a); a = a - 2; } while(a);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "6\n4\n2\n");
+    }
 }

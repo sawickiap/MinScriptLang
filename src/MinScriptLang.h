@@ -127,6 +127,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Ex
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN  = "Expected symbol '('.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Expected symbol ')'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
+static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
 
 struct Constant
 {
@@ -158,7 +159,7 @@ enum class Symbol
     QuestionMark,      // ?
     Colon,             // :
     Semicolon,         // ;
-    RoundBrackerOpen,  // (
+    RoundBracketOpen,  // (
     RoundBracketClose, // )
     CurlyBracketOpen,  // {
     CurlyBracketClose, // }
@@ -169,11 +170,11 @@ enum class Symbol
     Sub,               // -
     Equal,             // =
     // Keywords
-    Null, False, True, If, Else, Count
+    Null, False, True, If, Else, While, Do, Count
 };
 static const char* SYMBOL_STR[] = {
     ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", // Symbols
-    "null", "false", "true", "if", "else", // Keywords
+    "null", "false", "true", "if", "else", "while", "do", // Keywords
 };
 
 struct Token
@@ -353,7 +354,7 @@ struct ExecuteContext
 
 struct Statement
 {
-    Statement(const PlaceInCode& place) : m_Place{place} { }
+    explicit Statement(const PlaceInCode& place) : m_Place{place} { }
     virtual ~Statement() { }
     const PlaceInCode& GetPlace() const { return m_Place; }
     virtual void DebugPrint(uint32_t indentLevel) const = 0;
@@ -364,7 +365,7 @@ private:
 
 struct EmptyStatement : public Statement
 {
-    EmptyStatement(const PlaceInCode& place) : Statement{place} { }
+    explicit EmptyStatement(const PlaceInCode& place) : Statement{place} { }
     virtual void DebugPrint(uint32_t indentLevel) const;
     virtual void Execute(ExecuteContext& ctx) const { }
 };
@@ -375,14 +376,24 @@ struct Condition : public Statement
 {
     unique_ptr<Expression> ConditionExpression;
     unique_ptr<Statement> Statements[2]; // [0] executed if true, [1] executed if false, optional.
-    Condition(const PlaceInCode& place) : Statement{place} { }
+    explicit Condition(const PlaceInCode& place) : Statement{place} { }
+    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void Execute(ExecuteContext& ctx) const;
+};
+
+struct WhileLoop : public Statement
+{
+    const enum WhileLoopType { While, DoWhile } Type;
+    unique_ptr<Expression> ConditionExpression;
+    unique_ptr<Statement> Body;
+    explicit WhileLoop(const PlaceInCode& place, WhileLoopType type) : Statement{place}, Type{type} { }
     virtual void DebugPrint(uint32_t indentLevel) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
 struct Block : public Statement
 {
-    Block(const PlaceInCode& place) : Statement{place} { }
+    explicit Block(const PlaceInCode& place) : Statement{place} { }
     vector<unique_ptr<Statement>> Statements;
     virtual void DebugPrint(uint32_t indentLevel) const;
     virtual void Execute(ExecuteContext& ctx) const;
@@ -390,12 +401,12 @@ struct Block : public Statement
 
 struct Script : Block
 {
-    Script(const PlaceInCode& place) : Block{place} { }
+    explicit Script(const PlaceInCode& place) : Block{place} { }
 };
 
 struct Expression : Statement
 {
-    Expression(const PlaceInCode& place) : Statement{place} { }
+    explicit Expression(const PlaceInCode& place) : Statement{place} { }
     virtual Value Evaluate(ExecuteContext& ctx) const = 0;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
     virtual void Execute(ExecuteContext& ctx) const { Evaluate(ctx); }
@@ -403,7 +414,7 @@ struct Expression : Statement
 
 struct ConstantExpression : Expression
 {
-    ConstantExpression(const PlaceInCode& place) : Expression{place} { }
+    explicit ConstantExpression(const PlaceInCode& place) : Expression{place} { }
     virtual void Execute(ExecuteContext& ctx) const { /* Nothing - just ignore its value. */ }
 };
 
@@ -426,7 +437,7 @@ struct Identifier : ConstantExpression
 
 struct Operator : Expression
 {
-    Operator(const PlaceInCode& place) : Expression{place} { }
+    explicit Operator(const PlaceInCode& place) : Expression{place} { }
 };
 
 enum class UnaryOperatorType
@@ -473,7 +484,7 @@ private:
 struct TernaryOperator : Operator
 {
     unique_ptr<Expression> Operands[3];
-    TernaryOperator(const PlaceInCode& place) : Operator{place} { }
+    explicit TernaryOperator(const PlaceInCode& place) : Operator{place} { }
     virtual void DebugPrint(uint32_t indentLevel) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
 };
@@ -585,7 +596,7 @@ void Tokenizer::GetNextToken(Token& out)
     if(currentCode[0] == '?') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::QuestionMark; return; }
     if(currentCode[0] == ':') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Colon; return; }
     if(currentCode[0] == ';') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Semicolon; return; }
-    if(currentCode[0] == '(') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBrackerOpen; return; }
+    if(currentCode[0] == '(') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBracketOpen; return; }
     if(currentCode[0] == ')') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBracketClose; return; }
     if(currentCode[0] == '{') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::CurlyBracketOpen; return; }
     if(currentCode[0] == '}') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::CurlyBracketClose; return; }
@@ -775,6 +786,38 @@ void Condition::Execute(ExecuteContext& ctx) const
         Statements[0]->Execute(ctx);
     else if(Statements[1])
         Statements[1]->Execute(ctx);
+}
+
+void WhileLoop::DebugPrint(uint32_t indentLevel) const
+{
+    const char* name = nullptr;
+    switch(Type)
+    {
+    case WhileLoopType::While: name = "While"; break;
+    case WhileLoopType::DoWhile: name = "DoWhile"; break;
+    default: assert(0);
+    }
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "%s\n", DEBUG_PRINT_ARGS_BEG, name);
+    ++indentLevel;
+    ConditionExpression->DebugPrint(indentLevel);
+    Body->DebugPrint(indentLevel);
+}
+
+void WhileLoop::Execute(ExecuteContext& ctx) const
+{
+    switch(Type)
+    {
+    case WhileLoopType::While:
+        while(ConditionExpression->Evaluate(ctx).IsTrue())
+            Body->Execute(ctx);
+        break;
+    case WhileLoopType::DoWhile:
+        do
+            Body->Execute(ctx);
+        while(ConditionExpression->Evaluate(ctx).IsTrue());
+        break;
+    default: assert(0);
+    }
 }
 
 void Block::DebugPrint(uint32_t indentLevel) const
@@ -1057,14 +1100,38 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     // Condition: 'if' '(' Expr17 ')' Statement [ 'else' Statement ]
     if(TryParseSymbol(Symbol::If))
     {
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
         unique_ptr<AST::Condition> condition = make_unique<AST::Condition>(place);
-        MUST_PARSE( TryParseSymbol(Symbol::RoundBrackerOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
         MUST_PARSE( condition->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
         MUST_PARSE( condition->Statements[0] = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
         if(TryParseSymbol(Symbol::Else))
             MUST_PARSE( condition->Statements[1] = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
         return condition;
+    }
+
+    // Loop: 'while' '(' Expr17 ')' Statement
+    if(TryParseSymbol(Symbol::While))
+    {
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
+        unique_ptr<AST::WhileLoop> loop = make_unique<AST::WhileLoop>(place, AST::WhileLoop::WhileLoopType::While);
+        MUST_PARSE( loop->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
+        MUST_PARSE( loop->Body = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
+        return loop;
+    }
+
+    // Loop: 'do' Statement 'while' '(' Expr17 ')' ';'    - loop
+    if(TryParseSymbol(Symbol::Do))
+    {
+        unique_ptr<AST::WhileLoop> loop = make_unique<AST::WhileLoop>(place, AST::WhileLoop::WhileLoopType::DoWhile);
+        MUST_PARSE( loop->Body = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
+        MUST_PARSE( TryParseSymbol(Symbol::While), ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE );
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
+        MUST_PARSE( loop->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
+        MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
+        return loop;
     }
     
     // Expression as statement: Expr17 ';'
@@ -1110,7 +1177,7 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
 unique_ptr<AST::Expression> Parser::TryParseExpr0()
 {
     // '(' ConstantExpr ')'
-    if(TryParseSymbol(Symbol::RoundBrackerOpen))
+    if(TryParseSymbol(Symbol::RoundBracketOpen))
     {
         unique_ptr<AST::Expression> expr;
         MUST_PARSE( expr = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
@@ -1133,7 +1200,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
     if(expr)
     {
         const PlaceInCode place = GetCurrentTokenPlace();
-        if(TryParseSymbol(Symbol::RoundBrackerOpen))
+        if(TryParseSymbol(Symbol::RoundBracketOpen))
         {
             unique_ptr<AST::MultiOperator> multiOperator = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
             // Callee
