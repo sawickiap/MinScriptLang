@@ -289,11 +289,10 @@ private:
 class Value
 {
 public:
-    enum class Type { Null, Number, String };
+    enum class Type { Number, String };
 
     Value() { }
-    Value(Type type) : m_Type(type) { }
-    Value(double number) : m_Type(Type::Number), m_Number(number) { }
+    Value(double number) : m_Number(number) { }
     Value(string&& str) : m_Type(Type::String), m_String(std::move(str)) { }
 
     Type GetType() const { return m_Type; }
@@ -304,19 +303,17 @@ public:
     {
         switch(m_Type)
         {
-        case Type::Null: return false;
         case Type::Number: return m_Number != 0.f;
         case Type::String: return !m_String.empty();
         default: assert(0); return false;
         }
     }
 
-    void SetNull() { m_Type = Type::Null; m_String.clear(); }
     void SetNumber(double number) { m_Type = Type::Number; m_Number = number; m_String.clear(); }
     void SetString(string&& str) { m_Type = Type::String; m_String = std::move(str); }
 
 private:
-    Type m_Type = Type::Null;
+    Type m_Type = Type::Number;
     double m_Number = 0.0;
     string m_String;
 };
@@ -945,7 +942,6 @@ void ConstantValue::DebugPrint(uint32_t indentLevel) const
 {
     switch(Val.GetType())
     {
-    case Value::Type::Null: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant null\n", DEBUG_PRINT_ARGS_BEG); break;
     case Value::Type::Number: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant number: %g\n", DEBUG_PRINT_ARGS_BEG, Val.GetNumber()); break;
     case Value::Type::String: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant string: %s\n", DEBUG_PRINT_ARGS_BEG, Val.GetString().c_str()); break;
     default: assert(0);
@@ -1146,7 +1142,6 @@ Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t 
         const Value& val = args[i];
         switch(val.GetType())
         {
-        case Value::Type::Null: s.clear(); break;
         case Value::Type::Number: Format(s, "%g\n", val.GetNumber()); break;
         case Value::Type::String: Format(s, "%s\n", val.GetString().c_str()); break;
         default: assert(0);

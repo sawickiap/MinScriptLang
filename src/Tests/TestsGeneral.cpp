@@ -59,9 +59,9 @@ TEST_CASE("Basic")
     }
     SECTION("Constants null false true")
     {
-        const char* code = "print(null); print(false); print(true); print(true + true - false);";
+        const char* code = "print(null); print(false); print(true); print(true + true - null - false);";
         env.Execute(code, strlen(code));
-        REQUIRE(env.GetOutput() == "0\n1\n2\n");
+        REQUIRE(env.GetOutput() == "0\n0\n1\n2\n");
     }
     SECTION("If conditions")
     {
