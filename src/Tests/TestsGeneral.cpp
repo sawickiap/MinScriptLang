@@ -112,4 +112,10 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "10\n8\n6\n4\n2\n");
     }
+    SECTION("Preincrementation")
+    {
+        const char* code = "for(a=-4; a; ++a) { print(a); }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "-4\n-3\n-2\n-1\n");
+    }
 }

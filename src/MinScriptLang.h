@@ -121,6 +121,7 @@ static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMME
 static const char* const ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expression.";
 static const char* const ERROR_MESSAGE_EXPECTED_STATEMENT = "Expected statement.";
 static const char* const ERROR_MESSAGE_EXPECTED_LVALUE = "Expected l-value.";
+static const char* const ERROR_MESSAGE_EXPECTED_NUMBER = "Expected number.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL                     = "Expected symbol.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_COLON               = "Expected symbol ':'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Expected symbol ';'.";
@@ -128,6 +129,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN  = "Ex
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Expected symbol ')'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
+static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
 
 struct Constant
 {
@@ -169,11 +171,15 @@ enum class Symbol
     Add,               // +
     Sub,               // -
     Equal,             // =
+    // Multiple character symbols
+    Incrementation,    // ++
+    Decrementation,    // --
     // Keywords
     Null, False, True, If, Else, While, Do, For, Count
 };
 static const char* SYMBOL_STR[] = {
     ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", // Symbols
+    "++", "--", // Multiple character symbols
     "null", "false", "true", "if", "else", "while", "do", "for", // Keywords
 };
 
@@ -323,8 +329,10 @@ class Object
 public:
     bool HasKey(const Constant& key) const;
     bool HasKey(const string& key) const;
-    Value& GetValue(const Constant& key); // Creates new null value if doesn't exist.
-    Value& GetValue(const string& key); // Creates new null value if doesn't exist.
+    Value& GetOrCreateValue(const Constant& key); // Creates new null value if doesn't exist.
+    Value& GetOrCreateValue(const string& key); // Creates new null value if doesn't exist.
+    Value* TryGetValue(const Constant& key); // Returns null if doesn't exist.
+    Value* TryGetValue(const string& key); // Returns null if doesn't exist.
     bool Remove(const Constant& key); // Returns true if has been found and removed.
 
 private:
@@ -381,9 +389,11 @@ struct Condition : public Statement
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
+const enum WhileLoopType { While, DoWhile };
+
 struct WhileLoop : public Statement
 {
-    const enum WhileLoopType { While, DoWhile } Type;
+    WhileLoopType Type;
     unique_ptr<Expression> ConditionExpression;
     unique_ptr<Statement> Body;
     explicit WhileLoop(const PlaceInCode& place, WhileLoopType type) : Statement{place}, Type{type} { }
@@ -453,6 +463,10 @@ struct Operator : Expression
 
 enum class UnaryOperatorType
 {
+    Preincrementation,
+    Predecrementation,
+    Plus,
+    Minus,
     None,
 };
 
@@ -461,8 +475,8 @@ struct UnaryOperator : Operator
     UnaryOperatorType Type;
     unique_ptr<Expression> Operand;
     UnaryOperator(const PlaceInCode& place, UnaryOperatorType type) : Operator{place}, Type(type) { }
-    virtual void DebugPrint(uint32_t indentLevel) const { }
-    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{}; }
+    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
 enum class BinaryOperatorType
@@ -545,6 +559,7 @@ private:
     unique_ptr<AST::ConstantExpression> TryParseConstantExpr();
     unique_ptr<AST::Expression> TryParseExpr0();
     unique_ptr<AST::Expression> TryParseExpr2();
+    unique_ptr<AST::Expression> TryParseExpr3();
     unique_ptr<AST::Expression> TryParseExpr5();
     unique_ptr<AST::Expression> TryParseExpr6();
     unique_ptr<AST::Expression> TryParseExpr16();
@@ -601,25 +616,41 @@ void Tokenizer::GetNextToken(Token& out)
         out.Type = TokenType_::End;
         return;
     }
-    // Symbols
+
     const char* const currentCode = m_Code.GetCurrentCode();
-    if(currentCode[0] == ',') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Comma; return; }
-    if(currentCode[0] == '?') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::QuestionMark; return; }
-    if(currentCode[0] == ':') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Colon; return; }
-    if(currentCode[0] == ';') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Semicolon; return; }
-    if(currentCode[0] == '(') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBracketOpen; return; }
-    if(currentCode[0] == ')') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBracketClose; return; }
-    if(currentCode[0] == '{') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::CurlyBracketOpen; return; }
-    if(currentCode[0] == '}') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::CurlyBracketClose; return; }
-    if(currentCode[0] == '*') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Mul; return; }
-    if(currentCode[0] == '/') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Div; return; }
-    if(currentCode[0] == '%') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Mod; return; }
-    if(currentCode[0] == '+') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Add; return; }
-    if(currentCode[0] == '-') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Sub; return; }
-    if(currentCode[0] == '=') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Equal; return; }
-    // Number
     const size_t currentCodeLen = m_Code.GetCurrentLen();
-    if(IsDecimalNumber(currentCode[0]))
+    const char currentChar = *currentCode;
+    // Multi character symbols
+    if(currentCodeLen >= 2)
+    {
+        if(memcmp(currentCode, SYMBOL_STR[(size_t)Symbol::Incrementation], 2) == 0)
+        {
+            m_Code.MoveChars(2);
+            out.Type = TokenType_::Symbol; out.Symbol = Symbol::Incrementation; return;
+        }
+        if(memcmp(currentCode, SYMBOL_STR[(size_t)Symbol::Decrementation], 2) == 0)
+        {
+            m_Code.MoveChars(2);
+            out.Type = TokenType_::Symbol; out.Symbol = Symbol::Decrementation; return;
+        }
+    }
+    // Symbols
+    if(currentChar == ',') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Comma; return; }
+    if(currentChar == '?') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::QuestionMark; return; }
+    if(currentChar == ':') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Colon; return; }
+    if(currentChar == ';') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Semicolon; return; }
+    if(currentChar == '(') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBracketOpen; return; }
+    if(currentChar == ')') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::RoundBracketClose; return; }
+    if(currentChar == '{') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::CurlyBracketOpen; return; }
+    if(currentChar == '}') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::CurlyBracketClose; return; }
+    if(currentChar == '*') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Mul; return; }
+    if(currentChar == '/') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Div; return; }
+    if(currentChar == '%') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Mod; return; }
+    if(currentChar == '+') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Add; return; }
+    if(currentChar == '-') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Sub; return; }
+    if(currentChar == '=') { m_Code.MoveOneChar(); out.Type = TokenType_::Symbol; out.Symbol = Symbol::Equal; return; }
+    // Number
+    if(IsDecimalNumber(currentChar))
     {
         size_t tokenLen = 1;
         while(tokenLen < currentCodeLen && IsDecimalNumber(currentCode[tokenLen]))
@@ -633,7 +664,7 @@ void Tokenizer::GetNextToken(Token& out)
         return;
     }
     // Identifier or keyword
-    if(IsAlpha(currentCode[0]))
+    if(IsAlpha(currentChar))
     {
         size_t tokenLen = 1;
         while(tokenLen < currentCodeLen && IsAlphaNumeric(currentCode[tokenLen]))
@@ -723,7 +754,7 @@ bool Object::HasKey(const string& key) const
     return m_StringMap.find(key) != m_StringMap.end();
 }
 
-Value& Object::GetValue(const Constant& key)
+Value& Object::GetOrCreateValue(const Constant& key)
 {
     switch(key.GetType())
     {
@@ -735,9 +766,38 @@ Value& Object::GetValue(const Constant& key)
     }
 }
 
-Value& Object::GetValue(const string& key)
+Value& Object::GetOrCreateValue(const string& key)
 {
     return m_StringMap[key];
+}
+
+Value* Object::TryGetValue(const Constant& key)
+{
+    switch(key.GetType())
+    {
+    case Constant::Type::Number:
+    {
+        auto it = m_NumberMap.find(key.GetNumber());
+        if(it != m_NumberMap.end())
+            return &it->second;
+    }
+    case Constant::Type::String:
+    {
+        auto it = m_StringMap.find(key.GetString());
+        if(it != m_StringMap.end())
+            return &it->second;
+    }
+    default: assert(0);
+    }
+    return nullptr;
+}
+
+Value* Object::TryGetValue(const string& key)
+{
+    auto it = m_StringMap.find(key);
+    if(it != m_StringMap.end())
+        return &it->second;
+    return nullptr;
 }
 
 bool Object::Remove(const Constant& key)
@@ -900,9 +960,9 @@ void Identifier::DebugPrint(uint32_t indentLevel) const
 Value Identifier::Evaluate(ExecuteContext& ctx) const
 {
     // #TODO local, this, then global
-    // #TODO optimize because now finding 2 times.
-    if(ctx.GlobalContext.HasKey(S))
-        return ctx.GlobalContext.GetValue(S);
+    Value* val = ctx.GlobalContext.TryGetValue(S);
+    if(val)
+        return *val;
     throw ExecutionError(GetPlace(), string("Variable \"") + S + "\" doesn't exist.");
 }
 
@@ -910,6 +970,49 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
 {
     // #TODO local, this, then global
     return LValue{ctx.GlobalContext, Constant{string(S)}};
+}
+
+void UnaryOperator::DebugPrint(uint32_t indentLevel) const
+{
+    static const char* UNARY_OPERATOR_TYPE_NAMES[] = { "Preincrementation", "Predecrementation", "Plus", "Minus" };
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "UnaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, UNARY_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
+    ++indentLevel;
+    Operand->DebugPrint(indentLevel);
+}
+
+Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
+{
+    if(Type == UnaryOperatorType::Preincrementation ||
+        Type == UnaryOperatorType::Predecrementation)
+    {
+        LValue lval = Operand->GetLValue(ctx);
+        Value* val = lval.Obj.TryGetValue(lval.Key);
+        if(val == nullptr)
+            throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_VARIABLE_DOESNT_EXIST));
+        if(val->GetType() != Value::Type::Number)
+            throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_EXPECTED_NUMBER));
+        switch(Type)
+        {
+        case UnaryOperatorType::Preincrementation: val->SetNumber(val->GetNumber() + 1.0); break;
+        case UnaryOperatorType::Predecrementation: val->SetNumber(val->GetNumber() - 1.0); break;
+        default: assert(0); return Value{};
+        }
+        return *val;
+    }
+    else if(Type == UnaryOperatorType::Plus ||
+        Type == UnaryOperatorType::Minus)
+    {
+        Value val = Operand->Evaluate(ctx);
+        if(val.GetType() != Value::Type::Number)
+            throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_EXPECTED_NUMBER));
+        switch(Type)
+        {
+        case UnaryOperatorType::Plus: return val;
+        case UnaryOperatorType::Minus: return Value{-val.GetNumber()};
+        default: assert(0); return Value{};
+        }
+    }
+    assert(0); return Value{};
 }
 
 void BinaryOperator::DebugPrint(uint32_t indentLevel) const
@@ -1002,7 +1105,7 @@ Value BinaryOperator::Sub(Value&& lhs, Value&& rhs) const
 
 Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
 {
-    Value& valRef = lhs.Obj.GetValue(lhs.Key);
+    Value& valRef = lhs.Obj.GetOrCreateValue(lhs.Key);
     valRef = std::move(rhs);
     return valRef;
 }
@@ -1156,7 +1259,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     if(TryParseSymbol(Symbol::While))
     {
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
-        unique_ptr<AST::WhileLoop> loop = make_unique<AST::WhileLoop>(place, AST::WhileLoop::WhileLoopType::While);
+        unique_ptr<AST::WhileLoop> loop = make_unique<AST::WhileLoop>(place, AST::WhileLoopType::While);
         MUST_PARSE( loop->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
         MUST_PARSE( loop->Body = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
@@ -1166,7 +1269,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     // Loop: 'do' Statement 'while' '(' Expr17 ')' ';'    - loop
     if(TryParseSymbol(Symbol::Do))
     {
-        unique_ptr<AST::WhileLoop> loop = make_unique<AST::WhileLoop>(place, AST::WhileLoop::WhileLoopType::DoWhile);
+        unique_ptr<AST::WhileLoop> loop = make_unique<AST::WhileLoop>(place, AST::WhileLoopType::DoWhile);
         MUST_PARSE( loop->Body = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
         MUST_PARSE( TryParseSymbol(Symbol::While), ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE );
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
@@ -1242,7 +1345,7 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
 
 unique_ptr<AST::Expression> Parser::TryParseExpr0()
 {
-    // '(' ConstantExpr ')'
+    // '(' Expr17 ')'
     if(TryParseSymbol(Symbol::RoundBracketOpen))
     {
         unique_ptr<AST::Expression> expr;
@@ -1266,6 +1369,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
     if(expr)
     {
         const PlaceInCode place = GetCurrentTokenPlace();
+        // Call: Expr0 '(' [ Expr16 ( ',' Expr16 )* ')'
         if(TryParseSymbol(Symbol::RoundBracketOpen))
         {
             unique_ptr<AST::MultiOperator> multiOperator = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
@@ -1286,14 +1390,52 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
             MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
             return multiOperator;
         }
+        // #TODO Indexing: Expr0 '[' Expr17 ']'
+        // #TODO Member access: Expr0 '.' TOKEN_IDENTIFIER
+        // Just Expr0
         return expr;
     }
     return unique_ptr<AST::Expression>{};
 }
 
+unique_ptr<AST::Expression> Parser::TryParseExpr3()
+{
+    const PlaceInCode place = GetCurrentTokenPlace();
+    // Preincrementation: '++' Expr3
+    if(TryParseSymbol(Symbol::Incrementation))
+    {
+        unique_ptr<AST::UnaryOperator> op = make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Preincrementation);
+        MUST_PARSE( op->Operand = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        return op;
+    }
+    // Predecrementation: '--' Expr3
+    if(TryParseSymbol(Symbol::Decrementation))
+    {
+        unique_ptr<AST::UnaryOperator> op = make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Predecrementation);
+        MUST_PARSE( op->Operand = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        return op;
+    }
+    // Plus: '+' Expr3
+    if(TryParseSymbol(Symbol::Add))
+    {
+        unique_ptr<AST::UnaryOperator> op = make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Plus);
+        MUST_PARSE( op->Operand = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        return op;
+    }
+    // Minus: '-' Expr3
+    if(TryParseSymbol(Symbol::Sub))
+    {
+        unique_ptr<AST::UnaryOperator> op = make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Minus);
+        MUST_PARSE( op->Operand = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        return op;
+    }
+    // Just Expr2 or null if failed.
+    return TryParseExpr2();
+}
+
 unique_ptr<AST::Expression> Parser::TryParseExpr5()
 {
-    unique_ptr<AST::Expression> expr = TryParseExpr2();
+    unique_ptr<AST::Expression> expr = TryParseExpr3();
     if(expr)
     {
         for(;;)
@@ -1303,21 +1445,21 @@ unique_ptr<AST::Expression> Parser::TryParseExpr5()
             {
                 unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mul);
                 op->Operands[0] = std::move(expr);
-                MUST_PARSE( op->Operands[1] = TryParseExpr2(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+                MUST_PARSE( op->Operands[1] = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
             }
             else if(TryParseSymbol(Symbol::Div))
             {
                 unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Div);
                 op->Operands[0] = std::move(expr);
-                MUST_PARSE( op->Operands[1] = TryParseExpr2(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+                MUST_PARSE( op->Operands[1] = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
             }
             else if(TryParseSymbol(Symbol::Mod))
             {
                 unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mod);
                 op->Operands[0] = std::move(expr);
-                MUST_PARSE( op->Operands[1] = TryParseExpr2(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+                MUST_PARSE( op->Operands[1] = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 expr = std::move(op);
             }
             else
