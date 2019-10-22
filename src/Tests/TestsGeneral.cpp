@@ -156,4 +156,12 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n1\n0\n");
     }
+    SECTION("Logical operators short circuit")
+    {
+        const char* code = "(print(101)||true)&&print(102); (print(201)||false)&&print(202);"
+            "print(301)||print(302); (print(401)||true)||print(402);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "101\n102\n201\n"
+            "301\n302\n401\n");
+    }
 }
