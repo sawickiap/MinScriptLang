@@ -1370,36 +1370,35 @@ unique_ptr<AST::Expression> Parser::TryParseExpr0()
 unique_ptr<AST::Expression> Parser::TryParseExpr2()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr0();
-    if(expr)
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+
+    const PlaceInCode place = GetCurrentTokenPlace();
+    // Call: Expr0 '(' [ Expr16 ( ',' Expr16 )* ')'
+    if(TryParseSymbol(Symbol::RoundBracketOpen))
     {
-        const PlaceInCode place = GetCurrentTokenPlace();
-        // Call: Expr0 '(' [ Expr16 ( ',' Expr16 )* ')'
-        if(TryParseSymbol(Symbol::RoundBracketOpen))
+        unique_ptr<AST::MultiOperator> multiOperator = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
+        // Callee
+        multiOperator->Operands.push_back(std::move(expr));
+        // First argument
+        expr = TryParseExpr16();
+        if(expr)
         {
-            unique_ptr<AST::MultiOperator> multiOperator = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
-            // Callee
             multiOperator->Operands.push_back(std::move(expr));
-            // First argument
-            expr = TryParseExpr16();
-            if(expr)
+            // Further arguments
+            while(TryParseSymbol(Symbol::Comma))
             {
+                MUST_PARSE( expr = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                 multiOperator->Operands.push_back(std::move(expr));
-                // Further arguments
-                while(TryParseSymbol(Symbol::Comma))
-                {
-                    MUST_PARSE( expr = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-                    multiOperator->Operands.push_back(std::move(expr));
-                }
             }
-            MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
-            return multiOperator;
         }
-        // #TODO Indexing: Expr0 '[' Expr17 ']'
-        // #TODO Member access: Expr0 '.' TOKEN_IDENTIFIER
-        // Just Expr0
-        return expr;
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
+        return multiOperator;
     }
-    return unique_ptr<AST::Expression>{};
+    // #TODO Indexing: Expr0 '[' Expr17 ']'
+    // #TODO Member access: Expr0 '.' TOKEN_IDENTIFIER
+    // Just Expr0
+    return expr;
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr3()
@@ -1434,190 +1433,181 @@ unique_ptr<AST::Expression> Parser::TryParseExpr3()
 unique_ptr<AST::Expression> Parser::TryParseExpr5()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr3();
-    if(expr)
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+ 
+    for(;;)
     {
-        for(;;)
-        {
-            const PlaceInCode place = GetCurrentTokenPlace();
-            if(TryParseSymbol(Symbol::Mul))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Mul, TryParseExpr3)
-            else if(TryParseSymbol(Symbol::Div))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Div, TryParseExpr3)
-            else if(TryParseSymbol(Symbol::Mod))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Mod, TryParseExpr3)
-            else
-                break;
-        }
-        return expr;
+        const PlaceInCode place = GetCurrentTokenPlace();
+        if(TryParseSymbol(Symbol::Mul))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Mul, TryParseExpr3)
+        else if(TryParseSymbol(Symbol::Div))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Div, TryParseExpr3)
+        else if(TryParseSymbol(Symbol::Mod))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Mod, TryParseExpr3)
+        else
+            break;
     }
-    return unique_ptr<AST::Expression>{};
+    return expr;
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr6()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr5();
-    if(expr)
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+
+    for(;;)
     {
-        for(;;)
-        {
-            const PlaceInCode place = GetCurrentTokenPlace();
-            if(TryParseSymbol(Symbol::Add))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Add, TryParseExpr5)
-            else if(TryParseSymbol(Symbol::Sub))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Sub, TryParseExpr5)
-            else
-                break;
-        }
-        return expr;
+        const PlaceInCode place = GetCurrentTokenPlace();
+        if(TryParseSymbol(Symbol::Add))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Add, TryParseExpr5)
+        else if(TryParseSymbol(Symbol::Sub))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Sub, TryParseExpr5)
+        else
+            break;
     }
-    return unique_ptr<AST::Expression>{};
+    return expr;
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr7()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr6();
-    if(expr)
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+
+    for(;;)
     {
-        for(;;)
-        {
-            const PlaceInCode place = GetCurrentTokenPlace();
-            if(TryParseSymbol(Symbol::ShiftLeft))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::ShiftLeft, TryParseExpr6)
-            else if(TryParseSymbol(Symbol::ShiftRight))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::ShiftRight, TryParseExpr6)
-            else
-                break;
-        }
-        return expr;
+        const PlaceInCode place = GetCurrentTokenPlace();
+        if(TryParseSymbol(Symbol::ShiftLeft))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::ShiftLeft, TryParseExpr6)
+        else if(TryParseSymbol(Symbol::ShiftRight))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::ShiftRight, TryParseExpr6)
+        else
+            break;
     }
-    return unique_ptr<AST::Expression>{};
+    return expr;
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr9()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr7();
-    if(expr)
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+
+    for(;;)
     {
-        for(;;)
-        {
-            const PlaceInCode place = GetCurrentTokenPlace();
-            if(TryParseSymbol(Symbol::Less))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Less, TryParseExpr7)
-            else if(TryParseSymbol(Symbol::LessEqual))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::LessEqual, TryParseExpr7)
-            else if(TryParseSymbol(Symbol::Greater))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Greater, TryParseExpr7)
-            else if(TryParseSymbol(Symbol::GreaterEqual))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::GreaterEqual, TryParseExpr7)
-            else
-                break;
-        }
-        return expr;
+        const PlaceInCode place = GetCurrentTokenPlace();
+        if(TryParseSymbol(Symbol::Less))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Less, TryParseExpr7)
+        else if(TryParseSymbol(Symbol::LessEqual))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::LessEqual, TryParseExpr7)
+        else if(TryParseSymbol(Symbol::Greater))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Greater, TryParseExpr7)
+        else if(TryParseSymbol(Symbol::GreaterEqual))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::GreaterEqual, TryParseExpr7)
+        else
+            break;
     }
-    return unique_ptr<AST::Expression>{};
+    return expr;
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr10()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr9();
-    if(expr)
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+
+    for(;;)
     {
-        for(;;)
-        {
-            const PlaceInCode place = GetCurrentTokenPlace();
-            if(TryParseSymbol(Symbol::Equal))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Equal, TryParseExpr9)
-            else if(TryParseSymbol(Symbol::NotEqual))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::NotEqual, TryParseExpr9)
-            else
-                break;
-        }
-        return expr;
+        const PlaceInCode place = GetCurrentTokenPlace();
+        if(TryParseSymbol(Symbol::Equal))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Equal, TryParseExpr9)
+        else if(TryParseSymbol(Symbol::NotEqual))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::NotEqual, TryParseExpr9)
+        else
+            break;
     }
-    return unique_ptr<AST::Expression>{};
+    return expr;
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr11()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr10();
-    if(expr)
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+
+    for(;;)
     {
-        for(;;)
-        {
-            const PlaceInCode place = GetCurrentTokenPlace();
-            if(TryParseSymbol(Symbol::Amperstand))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::BitwiseAnd, TryParseExpr10)
-            else
-                break;
-        }
-        return expr;
+        const PlaceInCode place = GetCurrentTokenPlace();
+        if(TryParseSymbol(Symbol::Amperstand))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::BitwiseAnd, TryParseExpr10)
+        else
+            break;
     }
-    return unique_ptr<AST::Expression>{};
+    return expr;
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr12()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr11();
-    if(expr)
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+
+    for(;;)
     {
-        for(;;)
-        {
-            const PlaceInCode place = GetCurrentTokenPlace();
-            if(TryParseSymbol(Symbol::Caret))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::BitwiseXor, TryParseExpr11)
-            else
-                break;
-        }
-        return expr;
+        const PlaceInCode place = GetCurrentTokenPlace();
+        if(TryParseSymbol(Symbol::Caret))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::BitwiseXor, TryParseExpr11)
+        else
+            break;
     }
-    return unique_ptr<AST::Expression>{};
+    return expr;
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr13()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr12();
-    if(expr)
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+
+    for(;;)
     {
-        for(;;)
-        {
-            const PlaceInCode place = GetCurrentTokenPlace();
-            if(TryParseSymbol(Symbol::Pipe))
-                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::BitwiseOr, TryParseExpr12)
-            else
-                break;
-        }
-        return expr;
+        const PlaceInCode place = GetCurrentTokenPlace();
+        if(TryParseSymbol(Symbol::Pipe))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::BitwiseOr, TryParseExpr12)
+        else
+            break;
     }
-    return unique_ptr<AST::Expression>{};
+    return expr;
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr16()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr13(); // #TODO TryParseExpr15
-    if(expr)
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+
+    // Ternary operator: Expr15 '?' Expr16 ':' Expr16
+    if(TryParseSymbol(Symbol::QuestionMark))
     {
-        // Ternary operator: Expr15 '?' Expr16 ':' Expr16
-        if(TryParseSymbol(Symbol::QuestionMark))
-        {
-            unique_ptr<AST::TernaryOperator> op = make_unique<AST::TernaryOperator>(GetCurrentTokenPlace());
-            op->Operands[0] = std::move(expr);
-            MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-            MUST_PARSE( TryParseSymbol(Symbol::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON );
-            MUST_PARSE( op->Operands[2] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-            return op;
-        }
-        // Assignment: Expr15 = Expr16
-        if(TryParseSymbol(Symbol::Assign))
-        {
-            unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(GetCurrentTokenPlace(), AST::BinaryOperatorType::Assignment);
-            op->Operands[0] = std::move(expr);
-            MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-            return op;
-        }
-        // Just Expr15
-        return expr;
+        unique_ptr<AST::TernaryOperator> op = make_unique<AST::TernaryOperator>(GetCurrentTokenPlace());
+        op->Operands[0] = std::move(expr);
+        MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        MUST_PARSE( TryParseSymbol(Symbol::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON );
+        MUST_PARSE( op->Operands[2] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        return op;
     }
-    return unique_ptr<AST::Expression>{};
+    // Assignment: Expr15 = Expr16
+    if(TryParseSymbol(Symbol::Assign))
+    {
+        unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(GetCurrentTokenPlace(), AST::BinaryOperatorType::Assignment);
+        op->Operands[0] = std::move(expr);
+        MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        return op;
+    }
+    // Just Expr15
+    return expr;
 }
 
 bool Parser::TryParseSymbol(Symbol symbol)
