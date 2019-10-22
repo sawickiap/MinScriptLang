@@ -188,6 +188,8 @@ enum class Symbol
     GreaterEqual,      // >=
     Equal,             // ==
     NotEqual,          // !=
+    DoubleAmperstand,  // &&
+    DoublePipe,        // ||
     // Keywords
     Null, False, True, If, Else, While, Do, For, Count
 };
@@ -195,7 +197,7 @@ static const char* SYMBOL_STR[] = {
     // Symbols
     ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", "&", "^", "|",
     // Multiple character symbols
-    "++", "--", "<<", ">>", "<=", ">=", "==", "!=",
+    "++", "--", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
     // Keywords
     "null", "false", "true", "if", "else", "while", "do", "for",
 };
@@ -502,7 +504,7 @@ enum class BinaryOperatorType
 {
     Mul, Div, Mod, Add, Sub, ShiftLeft, ShiftRight, Assignment,
     Less, Greater, LessEqual, GreaterEqual, Equal, NotEqual,
-    BitwiseAnd, BitwiseXor, BitwiseOr,
+    BitwiseAnd, BitwiseXor, BitwiseOr, LogicalAnd, LogicalOr,
 };
 
 struct BinaryOperator : Operator
@@ -581,6 +583,8 @@ private:
     unique_ptr<AST::Expression> TryParseExpr11();
     unique_ptr<AST::Expression> TryParseExpr12();
     unique_ptr<AST::Expression> TryParseExpr13();
+    unique_ptr<AST::Expression> TryParseExpr14();
+    unique_ptr<AST::Expression> TryParseExpr15();
     unique_ptr<AST::Expression> TryParseExpr16();
     unique_ptr<AST::Expression> TryParseExpr17() { return TryParseExpr16(); }
     bool TryParseSymbol(Symbol symbol);
@@ -1044,7 +1048,7 @@ void BinaryOperator::DebugPrint(uint32_t indentLevel) const
     static const char* BINARY_OPERATOR_TYPE_NAMES[] = {
         "Mul", "Div", "Mod", "Add", "Sub", "Shift left", "Shift right", "Assignment",
         "Less", "Greater", "LessEqual", "GreaterEqual", "Equal", "NotEqual",
-        "BitwiseAnd", "BitwiseXor", "BitwiseOr", };
+        "BitwiseAnd", "BitwiseXor", "BitwiseOr", "LogicalAnd", "LogicalOr", };
     printf(DEBUG_PRINT_FORMAT_STR_BEG "BinaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, BINARY_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
     ++indentLevel;
     Operands[0]->DebugPrint(indentLevel);
@@ -1063,6 +1067,20 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
 
     // Remaining operators use r-values.
     Value lhs = Operands[0]->Evaluate(ctx);
+
+    // Logical operators with short circuit for right hand side operand.
+    if(Type == BinaryOperatorType::LogicalAnd || Type == BinaryOperatorType::LogicalOr)
+    {
+        bool result = false;
+        switch(Type)
+        {
+        case BinaryOperatorType::LogicalAnd: result = lhs.IsTrue() ? Operands[1]->Evaluate(ctx).IsTrue() : false; break;
+        case BinaryOperatorType::LogicalOr:  result = lhs.IsTrue() ? true : Operands[1]->Evaluate(ctx).IsTrue(); break;
+        }
+        return Value{result ? 1.0 : 0.0};
+    }
+
+    // Remaining operators use both operands as r-values.
     Value rhs = Operands[1]->Evaluate(ctx);
 
     // Remaining operators require numbers.
@@ -1582,9 +1600,41 @@ unique_ptr<AST::Expression> Parser::TryParseExpr13()
     return expr;
 }
 
+unique_ptr<AST::Expression> Parser::TryParseExpr14()
+{
+    unique_ptr<AST::Expression> expr = TryParseExpr13();
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+    for(;;)
+    {
+        const PlaceInCode place = GetCurrentTokenPlace();
+        if(TryParseSymbol(Symbol::DoubleAmperstand))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::LogicalAnd, TryParseExpr13)
+        else
+            break;
+    }
+    return expr;
+}
+
+unique_ptr<AST::Expression> Parser::TryParseExpr15()
+{
+    unique_ptr<AST::Expression> expr = TryParseExpr14();
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+    for(;;)
+    {
+        const PlaceInCode place = GetCurrentTokenPlace();
+        if(TryParseSymbol(Symbol::DoublePipe))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::LogicalOr, TryParseExpr14)
+        else
+            break;
+    }
+    return expr;
+}
+
 unique_ptr<AST::Expression> Parser::TryParseExpr16()
 {
-    unique_ptr<AST::Expression> expr = TryParseExpr13(); // #TODO TryParseExpr15
+    unique_ptr<AST::Expression> expr = TryParseExpr15();
     if(!expr)
         return unique_ptr<AST::Expression>{};
 

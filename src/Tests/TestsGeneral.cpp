@@ -150,4 +150,10 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "10\n5\n53206\n");
     }
+    SECTION("Logical operators")
+    {
+        const char* code = "a=3; print(1==1 && a==3); print(false || true); print(false || true && false);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n1\n0\n");
+    }
 }
