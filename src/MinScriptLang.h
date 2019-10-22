@@ -174,17 +174,21 @@ enum class Symbol
     Equal,             // =
     ExclamationMark,   // !
     Tilde,             // ~
+    Less,              // <
+    Greater,           // >
     // Multiple character symbols
     Incrementation,    // ++
     Decrementation,    // --
     ShiftLeft,         // <<
     ShiftRight,        // >>
+    LessEqual,         // <=
+    GreaterEqual,      // >=
     // Keywords
     Null, False, True, If, Else, While, Do, For, Count
 };
 static const char* SYMBOL_STR[] = {
-    ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", // Symbols
-    "++", "--", "<<", ">>", // Multiple character symbols
+    ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", // Symbols
+    "++", "--", "<<", ">>", "<=", ">=", // Multiple character symbols
     "null", "false", "true", "if", "else", "while", "do", "for", // Keywords
 };
 
@@ -496,6 +500,10 @@ enum class BinaryOperatorType
     ShiftLeft,
     ShiftRight,
     Assignment,
+    Less,
+    Greater,
+    LessEqual,
+    GreaterEqual,
 };
 
 struct BinaryOperator : Operator
@@ -507,11 +515,6 @@ struct BinaryOperator : Operator
     virtual Value Evaluate(ExecuteContext& ctx) const;
     
 private:
-    Value Mul(Value&& lhs, Value&& rhs) const;
-    Value Div(Value&& lhs, Value&& rhs) const;
-    Value Mod(Value&& lhs, Value&& rhs) const;
-    Value Add(Value&& lhs, Value&& rhs) const;
-    Value Sub(Value&& lhs, Value&& rhs) const;
     Value ShiftLeft(Value&& lhs, Value&& rhs) const;
     Value ShiftRight(Value&& lhs, Value&& rhs) const;
     Value Assignment(const LValue& lhs, Value&& rhs) const;
@@ -574,6 +577,7 @@ private:
     unique_ptr<AST::Expression> TryParseExpr5();
     unique_ptr<AST::Expression> TryParseExpr6();
     unique_ptr<AST::Expression> TryParseExpr7();
+    unique_ptr<AST::Expression> TryParseExpr9();
     unique_ptr<AST::Expression> TryParseExpr16();
     unique_ptr<AST::Expression> TryParseExpr17() { return TryParseExpr16(); }
     bool TryParseSymbol(Symbol symbol);
@@ -1044,99 +1048,42 @@ void BinaryOperator::DebugPrint(uint32_t indentLevel) const
 
 Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
 {
-    switch(Type)
-    {
-    case BinaryOperatorType::Mul:
-    {
-        Value lhs = Operands[0]->Evaluate(ctx);
-        Value rhs = Operands[1]->Evaluate(ctx);
-        return Mul(std::move(lhs), std::move(rhs));
-    }
-    case BinaryOperatorType::Div:
-    {
-        Value lhs = Operands[0]->Evaluate(ctx);
-        Value rhs = Operands[1]->Evaluate(ctx);
-        return Div(std::move(lhs), std::move(rhs));
-    }
-    case BinaryOperatorType::Mod:
-    {
-        Value lhs = Operands[0]->Evaluate(ctx);
-        Value rhs = Operands[1]->Evaluate(ctx);
-        return Mod(std::move(lhs), std::move(rhs));
-    }
-    case BinaryOperatorType::Add:
-    {
-        Value lhs = Operands[0]->Evaluate(ctx);
-        Value rhs = Operands[1]->Evaluate(ctx);
-        return Add(std::move(lhs), std::move(rhs));
-    }
-    case BinaryOperatorType::Sub:
-    {
-        Value lhs = Operands[0]->Evaluate(ctx);
-        Value rhs = Operands[1]->Evaluate(ctx);
-        return Sub(std::move(lhs), std::move(rhs));
-    }
-    case BinaryOperatorType::ShiftLeft:
-    {
-        Value lhs = Operands[0]->Evaluate(ctx);
-        Value rhs = Operands[1]->Evaluate(ctx);
-        return ShiftLeft(std::move(lhs), std::move(rhs));
-    }
-    case BinaryOperatorType::ShiftRight:
-    {
-        Value lhs = Operands[0]->Evaluate(ctx);
-        Value rhs = Operands[1]->Evaluate(ctx);
-        return ShiftRight(std::move(lhs), std::move(rhs));
-    }
-    case BinaryOperatorType::Assignment:
+    // This operator is special, requires l-value.
+    if(Type == BinaryOperatorType::Assignment)
     {
         LValue lhs = Operands[0]->GetLValue(ctx);
         Value rhs = Operands[1]->Evaluate(ctx);
         return Assignment(lhs, std::move(rhs));
     }
-    default: assert(0); return Value{};
+
+    // Remaining operators use r-values.
+    Value lhs = Operands[0]->Evaluate(ctx);
+    Value rhs = Operands[1]->Evaluate(ctx);
+
+    // Remaining operators require numbers.
+    CheckNumberOperand(Operands[0].get(), lhs);
+    CheckNumberOperand(Operands[1].get(), rhs);
+
+    switch(Type)
+    {
+    case BinaryOperatorType::Mul:          return Value{lhs.GetNumber() * rhs.GetNumber()};
+    case BinaryOperatorType::Div:          return Value{lhs.GetNumber() / rhs.GetNumber()};
+    case BinaryOperatorType::Mod:          return Value{fmod(lhs.GetNumber(), rhs.GetNumber())};
+    case BinaryOperatorType::Add:          return Value{lhs.GetNumber() + rhs.GetNumber()};
+    case BinaryOperatorType::Sub:          return Value{lhs.GetNumber() - rhs.GetNumber()};
+    case BinaryOperatorType::ShiftLeft:    return ShiftLeft(std::move(lhs), std::move(rhs));
+    case BinaryOperatorType::ShiftRight:   return ShiftRight(std::move(lhs), std::move(rhs));
+    case BinaryOperatorType::Less:         return Value{lhs.GetNumber() <  rhs.GetNumber() ? 1.0 : 0.0};
+    case BinaryOperatorType::LessEqual:    return Value{lhs.GetNumber() <= rhs.GetNumber() ? 1.0 : 0.0};
+    case BinaryOperatorType::Greater:      return Value{lhs.GetNumber() >  rhs.GetNumber() ? 1.0 : 0.0};
+    case BinaryOperatorType::GreaterEqual: return Value{lhs.GetNumber() >= rhs.GetNumber() ? 1.0 : 0.0};
     }
-}
 
-Value BinaryOperator::Mul(Value&& lhs, Value&& rhs) const
-{
-    CheckNumberOperand(Operands[0].get(), lhs);
-    CheckNumberOperand(Operands[1].get(), rhs);
-    return Value{lhs.GetNumber() * rhs.GetNumber()};
-}
-
-Value BinaryOperator::Div(Value&& lhs, Value&& rhs) const
-{
-    CheckNumberOperand(Operands[0].get(), lhs);
-    CheckNumberOperand(Operands[1].get(), rhs);
-    return Value{lhs.GetNumber() / rhs.GetNumber()};
-}
-
-Value BinaryOperator::Mod(Value&& lhs, Value&& rhs) const
-{
-    CheckNumberOperand(Operands[0].get(), lhs);
-    CheckNumberOperand(Operands[1].get(), rhs);
-    return Value{fmod(lhs.GetNumber(), rhs.GetNumber())};
-}
-
-Value BinaryOperator::Add(Value&& lhs, Value&& rhs) const
-{
-    CheckNumberOperand(Operands[0].get(), lhs);
-    CheckNumberOperand(Operands[1].get(), rhs);
-    return Value{lhs.GetNumber() + rhs.GetNumber()};
-}
-
-Value BinaryOperator::Sub(Value&& lhs, Value&& rhs) const
-{
-    CheckNumberOperand(Operands[0].get(), lhs);
-    CheckNumberOperand(Operands[1].get(), rhs);
-    return Value{lhs.GetNumber() - rhs.GetNumber()};
+    assert(0); return Value{};
 }
 
 Value BinaryOperator::ShiftLeft(Value&& lhs, Value&& rhs) const
 {
-    CheckNumberOperand(Operands[0].get(), lhs);
-    CheckNumberOperand(Operands[1].get(), rhs);
     const int64_t lhsInt = (int64_t)lhs.GetNumber();
     const int64_t rhsInt = (int64_t)rhs.GetNumber();
     const int64_t resultInt = lhsInt << rhsInt;
@@ -1145,8 +1092,6 @@ Value BinaryOperator::ShiftLeft(Value&& lhs, Value&& rhs) const
 
 Value BinaryOperator::ShiftRight(Value&& lhs, Value&& rhs) const
 {
-    CheckNumberOperand(Operands[0].get(), lhs);
-    CheckNumberOperand(Operands[1].get(), rhs);
     const int64_t lhsInt = (int64_t)lhs.GetNumber();
     const int64_t rhsInt = (int64_t)rhs.GetNumber();
     const int64_t resultInt = lhsInt >> rhsInt;
@@ -1538,9 +1483,33 @@ unique_ptr<AST::Expression> Parser::TryParseExpr7()
     return unique_ptr<AST::Expression>{};
 }
 
+unique_ptr<AST::Expression> Parser::TryParseExpr9()
+{
+    unique_ptr<AST::Expression> expr = TryParseExpr7();
+    if(expr)
+    {
+        for(;;)
+        {
+            const PlaceInCode place = GetCurrentTokenPlace();
+            if(TryParseSymbol(Symbol::Less))
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Less, TryParseExpr7)
+            else if(TryParseSymbol(Symbol::LessEqual))
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::LessEqual, TryParseExpr7)
+            else if(TryParseSymbol(Symbol::Greater))
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Greater, TryParseExpr7)
+            else if(TryParseSymbol(Symbol::GreaterEqual))
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::GreaterEqual, TryParseExpr7)
+            else
+                break;
+        }
+        return expr;
+    }
+    return unique_ptr<AST::Expression>{};
+}
+
 unique_ptr<AST::Expression> Parser::TryParseExpr16()
 {
-    unique_ptr<AST::Expression> expr = TryParseExpr7(); // #TODO TryParseExpr15
+    unique_ptr<AST::Expression> expr = TryParseExpr9(); // #TODO TryParseExpr15
     if(expr)
     {
         // Ternary operator: Expr15 '?' Expr16 ':' Expr16
