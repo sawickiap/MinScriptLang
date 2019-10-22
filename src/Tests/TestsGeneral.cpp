@@ -144,4 +144,10 @@ TEST_CASE("Basic")
         REQUIRE(env.GetOutput() == "1\n0\n1\n1\n"
             "1\n0\n1\n1\n");
     }
+    SECTION("Bitwise operators")
+    {
+        const char* code = "a=4294967295; /*0xFFFFFFFF*/ print(a&10); print(a&1|4); print(16 | a & 65535 ^ 12345);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "10\n5\n53206\n");
+    }
 }
