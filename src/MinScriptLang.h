@@ -131,6 +131,8 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Ex
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
 static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
 static const char* const ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
+static const char* const ERROR_MESSAGE_BREAK_WITHOUT_LOOP = "Break without a loop.";
+static const char* const ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP = "Continue without a loop.";
 
 struct Constant
 {
@@ -191,7 +193,7 @@ enum class Symbol
     DoubleAmperstand,  // &&
     DoublePipe,        // ||
     // Keywords
-    Null, False, True, If, Else, While, Do, For, Count
+    Null, False, True, If, Else, While, Do, For, Break, Continue, Count
 };
 static const char* SYMBOL_STR[] = {
     // Symbols
@@ -199,7 +201,7 @@ static const char* SYMBOL_STR[] = {
     // Multiple character symbols
     "++", "--", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
     // Keywords
-    "null", "false", "true", "if", "else", "while", "do", "for",
+    "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue",
 };
 
 struct Token
@@ -244,6 +246,9 @@ static void Format(string& str, const char* format, ...)
     VFormat(str, format, argList);
     va_end(argList);
 }
+
+class BreakException { };
+class ContinueException { };
 
 ////////////////////////////////////////////////////////////////////////////////
 // class CodeReader definition
@@ -428,6 +433,15 @@ struct ForLoop : public Statement
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
+enum class LoopBreakType { Break, Continue };
+struct LoopBreakStatement : public Statement
+{
+    LoopBreakType Type;
+    explicit LoopBreakStatement(const PlaceInCode& place, LoopBreakType type) : Statement{place}, Type{type} { }
+    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void Execute(ExecuteContext& ctx) const;
+};
+
 struct Block : public Statement
 {
     explicit Block(const PlaceInCode& place) : Statement{place} { }
@@ -439,6 +453,7 @@ struct Block : public Statement
 struct Script : Block
 {
     explicit Script(const PlaceInCode& place) : Block{place} { }
+    virtual void Execute(ExecuteContext& ctx) const;
 };
 
 struct Expression : Statement
@@ -898,11 +913,37 @@ void WhileLoop::Execute(ExecuteContext& ctx) const
     {
     case WhileLoopType::While:
         while(ConditionExpression->Evaluate(ctx).IsTrue())
-            Body->Execute(ctx);
+        {
+            try
+            {
+                Body->Execute(ctx);
+            }
+            catch(BreakException)
+            {
+                break;
+            }
+            catch(ContinueException)
+            {
+                continue;
+            }
+        }
         break;
     case WhileLoopType::DoWhile:
         do
-            Body->Execute(ctx);
+        {
+            try
+            {
+                Body->Execute(ctx);
+            }
+            catch(BreakException)
+            {
+                break;
+            }
+            catch(ContinueException)
+            {
+                continue;
+            }
+        }
         while(ConditionExpression->Evaluate(ctx).IsTrue());
         break;
     default: assert(0);
@@ -934,9 +975,38 @@ void ForLoop::Execute(ExecuteContext& ctx) const
         InitExpression->Execute(ctx);
     while(ConditionExpression ? ConditionExpression->Evaluate(ctx).IsTrue() : true)
     {
-        Body->Execute(ctx);
+        try
+        {
+            Body->Execute(ctx);
+        }
+        catch(BreakException)
+        {
+            break;
+        }
+        catch(ContinueException)
+        {
+        }
         if(IterationExpression)
             IterationExpression->Execute(ctx);
+    }
+}
+
+void LoopBreakStatement::DebugPrint(uint32_t indentLevel) const
+{
+    static const char* TYPE_NAMES[] = { "Break", "Continue" };
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "%s\n", DEBUG_PRINT_ARGS_BEG, TYPE_NAMES[(size_t)Type]);
+}
+
+void LoopBreakStatement::Execute(ExecuteContext& ctx) const
+{
+    switch(Type)
+    {
+    case LoopBreakType::Break:
+        throw BreakException{};
+    case LoopBreakType::Continue:
+        throw ContinueException{};
+    default:
+        assert(0);
     }
 }
 
@@ -952,6 +1022,22 @@ void Block::Execute(ExecuteContext& ctx) const
 {
     for(const auto& stmtPtr : Statements)
         stmtPtr->Execute(ctx);
+}
+
+void Script::Execute(ExecuteContext& ctx) const
+{
+    try
+    {
+        Block::Execute(ctx);
+    }
+    catch(BreakException)
+    {
+        throw ExecutionError{GetPlace(), ERROR_MESSAGE_BREAK_WITHOUT_LOOP};
+    }
+    catch(ContinueException)
+    {
+        throw ExecutionError{GetPlace(), ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP};
+    }
 }
 
 LValue Expression::GetLValue(ExecuteContext& ctx) const
@@ -1333,7 +1419,21 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
         MUST_PARSE( loop->Body = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
         return loop;
     }
+
+    // 'break' ';'
+    if(TryParseSymbol(Symbol::Break))
+    {
+        MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
+        return make_unique<AST::LoopBreakStatement>(place, AST::LoopBreakType::Break);
+    }
     
+    // 'continue' ';'
+    if(TryParseSymbol(Symbol::Continue))
+    {
+        MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
+        return make_unique<AST::LoopBreakStatement>(place, AST::LoopBreakType::Continue);
+    }
+
     // Expression as statement: Expr17 ';'
     unique_ptr<AST::Expression> expr = TryParseExpr17();
     if(expr)

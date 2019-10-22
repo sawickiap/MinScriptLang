@@ -176,4 +176,29 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "0\n1\n2\n3\n4\n");
     }
+    SECTION("Loop break")
+    {
+        const char* code = "for(i=0;; ++i) { print(i); if(i>=5) break; }"
+            "i=5; while(true) { print(i); break; }"
+            "do { print(i); if(--i==0) break; } while(true);"
+            "i=0; for(;;) { print(i); if(++i==4) { break; } }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n1\n2\n3\n4\n5\n"
+            "5\n"
+            "5\n4\n3\n2\n1\n"
+            "0\n1\n2\n3\n");
+    }
+    SECTION("Loop continue")
+    {
+        const char* code = "for(i=0; i<10; ++i) { if(i>5) continue; print(i); }"
+            "i=-10; while(true) { ++i; if(i<-5) { continue; } print(i); if(i>0) break; }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n1\n2\n3\n4\n5\n"
+            "-5\n-4\n-3\n-2\n-1\n0\n1\n");
+    }
+    SECTION("Error break without a loop")
+    {
+        const char* code = "if(true) { do { print(1); }while(false); break; }";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
 }
