@@ -130,4 +130,10 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "2\n8\n1.71799e+10\n1\n0\n-16\n-16\n");
     }
+    SECTION("Bitwise not")
+    {
+        const char* code = "a=226; a=~a+1; print(a);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "-226\n");
+    }
 }

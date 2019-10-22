@@ -481,6 +481,9 @@ struct UnaryOperator : Operator
     UnaryOperator(const PlaceInCode& place, UnaryOperatorType type) : Operator{place}, Type(type) { }
     virtual void DebugPrint(uint32_t indentLevel) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
+
+private:
+    Value BitwiseNot(Value&& operand) const;
 };
 
 enum class BinaryOperatorType
@@ -1015,11 +1018,18 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         case UnaryOperatorType::Plus: return val;
         case UnaryOperatorType::Minus: return Value{-val.GetNumber()};
         case UnaryOperatorType::LogicalNot: return Value{val.IsTrue() ? 0.0 : 1.0};
-        case UnaryOperatorType::BitwiseNot: throw ExecutionError(GetPlace(), ERROR_MESSAGE_NOT_IMPLEMENTED); // #TODO implement
+        case UnaryOperatorType::BitwiseNot: return BitwiseNot(std::move(val));
         default: assert(0); return Value{};
         }
     }
     assert(0); return Value{};
+}
+
+Value UnaryOperator::BitwiseNot(Value&& operand) const
+{
+    const int64_t operandInt = (int64_t)operand.GetNumber();
+    const int64_t resultInt = ~operandInt;
+    return Value{(double)resultInt};
 }
 
 void BinaryOperator::DebugPrint(uint32_t indentLevel) const
@@ -1443,7 +1453,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr3()
 #define PARSE_UNARY_OPERATOR(symbol, unaryOperatorType) \
     if(TryParseSymbol(symbol)) \
     { \
-        unique_ptr<AST::UnaryOperator> op = make_unique<AST::UnaryOperator>(place, unaryOperatorType); \
+        unique_ptr<AST::UnaryOperator> op = make_unique<AST::UnaryOperator>(place, (unaryOperatorType)); \
         MUST_PARSE( op->Operand = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION ); \
         return op; \
     }
@@ -1458,6 +1468,14 @@ unique_ptr<AST::Expression> Parser::TryParseExpr3()
     return TryParseExpr2();
 }
 
+#define PARSE_BINARY_OPERATOR(binaryOperatorType, exprParseFunc) \
+    { \
+        unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, (binaryOperatorType)); \
+        op->Operands[0] = std::move(expr); \
+        MUST_PARSE( op->Operands[1] = (exprParseFunc)(), ERROR_MESSAGE_EXPECTED_EXPRESSION ); \
+        expr = std::move(op); \
+    }
+
 unique_ptr<AST::Expression> Parser::TryParseExpr5()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr3();
@@ -1467,26 +1485,11 @@ unique_ptr<AST::Expression> Parser::TryParseExpr5()
         {
             const PlaceInCode place = GetCurrentTokenPlace();
             if(TryParseSymbol(Symbol::Mul))
-            {
-                unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mul);
-                op->Operands[0] = std::move(expr);
-                MUST_PARSE( op->Operands[1] = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-                expr = std::move(op);
-            }
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Mul, TryParseExpr3)
             else if(TryParseSymbol(Symbol::Div))
-            {
-                unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Div);
-                op->Operands[0] = std::move(expr);
-                MUST_PARSE( op->Operands[1] = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-                expr = std::move(op);
-            }
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Div, TryParseExpr3)
             else if(TryParseSymbol(Symbol::Mod))
-            {
-                unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Mod);
-                op->Operands[0] = std::move(expr);
-                MUST_PARSE( op->Operands[1] = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-                expr = std::move(op);
-            }
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Mod, TryParseExpr3)
             else
                 break;
         }
@@ -1504,19 +1507,9 @@ unique_ptr<AST::Expression> Parser::TryParseExpr6()
         {
             const PlaceInCode place = GetCurrentTokenPlace();
             if(TryParseSymbol(Symbol::Add))
-            {
-                unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Add);
-                op->Operands[0] = std::move(expr);
-                MUST_PARSE( op->Operands[1] = TryParseExpr5(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-                expr = std::move(op);
-            }
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Add, TryParseExpr5)
             else if(TryParseSymbol(Symbol::Sub))
-            {
-                unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Sub);
-                op->Operands[0] = std::move(expr);
-                MUST_PARSE( op->Operands[1] = TryParseExpr5(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-                expr = std::move(op);
-            }
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Sub, TryParseExpr5)
             else
                 break;
         }
@@ -1534,19 +1527,9 @@ unique_ptr<AST::Expression> Parser::TryParseExpr7()
         {
             const PlaceInCode place = GetCurrentTokenPlace();
             if(TryParseSymbol(Symbol::ShiftLeft))
-            {
-                unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::ShiftLeft);
-                op->Operands[0] = std::move(expr);
-                MUST_PARSE( op->Operands[1] = TryParseExpr6(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-                expr = std::move(op);
-            }
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::ShiftLeft, TryParseExpr6)
             else if(TryParseSymbol(Symbol::ShiftRight))
-            {
-                unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::ShiftRight);
-                op->Operands[0] = std::move(expr);
-                MUST_PARSE( op->Operands[1] = TryParseExpr6(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-                expr = std::move(op);
-            }
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::ShiftRight, TryParseExpr6)
             else
                 break;
         }
