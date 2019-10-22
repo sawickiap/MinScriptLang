@@ -136,4 +136,12 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "-226\n");
     }
+    SECTION("Comparisons")
+    {
+        const char* code = "a=-10; b=2; c=1000000000000; print(a<b); print(c<=b); print(c>a); print(b>=b); \n"
+            "print(a==a); print(a==b); print(a!=b); print(b==4/2);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n0\n1\n1\n"
+            "1\n0\n1\n1\n");
+    }
 }

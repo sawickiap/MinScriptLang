@@ -171,7 +171,7 @@ enum class Symbol
     Mod,               // %
     Add,               // +
     Sub,               // -
-    Equal,             // =
+    Assign,            // =
     ExclamationMark,   // !
     Tilde,             // ~
     Less,              // <
@@ -183,12 +183,14 @@ enum class Symbol
     ShiftRight,        // >>
     LessEqual,         // <=
     GreaterEqual,      // >=
+    Equal,             // ==
+    NotEqual,          // !=
     // Keywords
     Null, False, True, If, Else, While, Do, For, Count
 };
 static const char* SYMBOL_STR[] = {
     ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", // Symbols
-    "++", "--", "<<", ">>", "<=", ">=", // Multiple character symbols
+    "++", "--", "<<", ">>", "<=", ">=", "==", "!=", // Multiple character symbols
     "null", "false", "true", "if", "else", "while", "do", "for", // Keywords
 };
 
@@ -492,18 +494,7 @@ private:
 
 enum class BinaryOperatorType
 {
-    Mul,
-    Div,
-    Mod,
-    Add,
-    Sub,
-    ShiftLeft,
-    ShiftRight,
-    Assignment,
-    Less,
-    Greater,
-    LessEqual,
-    GreaterEqual,
+    Mul, Div, Mod, Add, Sub, ShiftLeft, ShiftRight, Assignment, Less, Greater, LessEqual, GreaterEqual, Equal, NotEqual,
 };
 
 struct BinaryOperator : Operator
@@ -578,6 +569,7 @@ private:
     unique_ptr<AST::Expression> TryParseExpr6();
     unique_ptr<AST::Expression> TryParseExpr7();
     unique_ptr<AST::Expression> TryParseExpr9();
+    unique_ptr<AST::Expression> TryParseExpr10();
     unique_ptr<AST::Expression> TryParseExpr16();
     unique_ptr<AST::Expression> TryParseExpr17() { return TryParseExpr16(); }
     bool TryParseSymbol(Symbol symbol);
@@ -1039,7 +1031,8 @@ Value UnaryOperator::BitwiseNot(Value&& operand) const
 void BinaryOperator::DebugPrint(uint32_t indentLevel) const
 {
     static const char* BINARY_OPERATOR_TYPE_NAMES[] = {
-        "Mul", "Div", "Mod", "Add", "Sub", "Shift left", "Shift right", "Assignment" };
+        "Mul", "Div", "Mod", "Add", "Sub", "Shift left", "Shift right", "Assignment", "Less", "Greater", "LessEqual", "GreaterEqual",
+        "Equal", "NotEqual", };
     printf(DEBUG_PRINT_FORMAT_STR_BEG "BinaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, BINARY_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
     ++indentLevel;
     Operands[0]->DebugPrint(indentLevel);
@@ -1077,6 +1070,8 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     case BinaryOperatorType::LessEqual:    return Value{lhs.GetNumber() <= rhs.GetNumber() ? 1.0 : 0.0};
     case BinaryOperatorType::Greater:      return Value{lhs.GetNumber() >  rhs.GetNumber() ? 1.0 : 0.0};
     case BinaryOperatorType::GreaterEqual: return Value{lhs.GetNumber() >= rhs.GetNumber() ? 1.0 : 0.0};
+    case BinaryOperatorType::Equal:        return Value{lhs.GetNumber() == rhs.GetNumber() ? 1.0 : 0.0};
+    case BinaryOperatorType::NotEqual:     return Value{lhs.GetNumber() != rhs.GetNumber() ? 1.0 : 0.0};
     }
 
     assert(0); return Value{};
@@ -1507,9 +1502,29 @@ unique_ptr<AST::Expression> Parser::TryParseExpr9()
     return unique_ptr<AST::Expression>{};
 }
 
+unique_ptr<AST::Expression> Parser::TryParseExpr10()
+{
+    unique_ptr<AST::Expression> expr = TryParseExpr9();
+    if(expr)
+    {
+        for(;;)
+        {
+            const PlaceInCode place = GetCurrentTokenPlace();
+            if(TryParseSymbol(Symbol::Equal))
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Equal, TryParseExpr9)
+            else if(TryParseSymbol(Symbol::NotEqual))
+                PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::NotEqual, TryParseExpr9)
+            else
+                break;
+        }
+        return expr;
+    }
+    return unique_ptr<AST::Expression>{};
+}
+
 unique_ptr<AST::Expression> Parser::TryParseExpr16()
 {
-    unique_ptr<AST::Expression> expr = TryParseExpr9(); // #TODO TryParseExpr15
+    unique_ptr<AST::Expression> expr = TryParseExpr10(); // #TODO TryParseExpr15
     if(expr)
     {
         // Ternary operator: Expr15 '?' Expr16 ':' Expr16
@@ -1523,7 +1538,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr16()
             return op;
         }
         // Assignment: Expr15 = Expr16
-        if(TryParseSymbol(Symbol::Equal))
+        if(TryParseSymbol(Symbol::Assign))
         {
             unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(GetCurrentTokenPlace(), AST::BinaryOperatorType::Assignment);
             op->Operands[0] = std::move(expr);
