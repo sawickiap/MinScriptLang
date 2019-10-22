@@ -166,12 +166,12 @@ enum class Symbol
     RoundBracketClose, // )
     CurlyBracketOpen,  // {
     CurlyBracketClose, // }
-    Mul,               // *
-    Div,               // /
-    Mod,               // %
-    Add,               // +
-    Sub,               // -
-    Assign,            // =
+    Asterisk,          // *
+    Slash,             // /
+    Percent,           // %
+    Plus,              // +
+    Dash,              // -
+    Equals,            // =
     ExclamationMark,   // !
     Tilde,             // ~
     Less,              // <
@@ -180,14 +180,14 @@ enum class Symbol
     Caret,             // ^
     Pipe,              // |
     // Multiple character symbols
-    Incrementation,    // ++
-    Decrementation,    // --
-    ShiftLeft,         // <<
-    ShiftRight,        // >>
-    LessEqual,         // <=
-    GreaterEqual,      // >=
-    Equal,             // ==
-    NotEqual,          // !=
+    DoublePlus,        // ++
+    DoubleDash,        // --
+    DoubleLess,        // <<
+    DoubleGreater,     // >>
+    LessEquals,        // <=
+    GreaterEquals,     // >=
+    DoubleEquals,      // ==
+    ExclamationEquals, // !=
     DoubleAmperstand,  // &&
     DoublePipe,        // ||
     // Keywords
@@ -641,7 +641,7 @@ void Tokenizer::GetNextToken(Token& out)
         return;
     }
 
-    constexpr Symbol firstMultiCharSymbol = Symbol::Incrementation;
+    constexpr Symbol firstMultiCharSymbol = Symbol::DoublePlus;
     constexpr Symbol firstKeywordSymbol = Symbol::Null;
 
     const char* const currentCode = m_Code.GetCurrentCode();
@@ -1438,10 +1438,10 @@ unique_ptr<AST::Expression> Parser::TryParseExpr3()
         MUST_PARSE( op->Operand = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION ); \
         return op; \
     }
-    PARSE_UNARY_OPERATOR(Symbol::Incrementation, AST::UnaryOperatorType::Preincrementation)
-    PARSE_UNARY_OPERATOR(Symbol::Decrementation, AST::UnaryOperatorType::Predecrementation)
-    PARSE_UNARY_OPERATOR(Symbol::Add, AST::UnaryOperatorType::Plus)
-    PARSE_UNARY_OPERATOR(Symbol::Sub, AST::UnaryOperatorType::Minus)
+    PARSE_UNARY_OPERATOR(Symbol::DoublePlus, AST::UnaryOperatorType::Preincrementation)
+    PARSE_UNARY_OPERATOR(Symbol::DoubleDash, AST::UnaryOperatorType::Predecrementation)
+    PARSE_UNARY_OPERATOR(Symbol::Plus, AST::UnaryOperatorType::Plus)
+    PARSE_UNARY_OPERATOR(Symbol::Dash, AST::UnaryOperatorType::Minus)
     PARSE_UNARY_OPERATOR(Symbol::ExclamationMark, AST::UnaryOperatorType::LogicalNot)
     PARSE_UNARY_OPERATOR(Symbol::Tilde, AST::UnaryOperatorType::BitwiseNot)
 #undef PARSE_UNARY_OPERATOR
@@ -1466,11 +1466,11 @@ unique_ptr<AST::Expression> Parser::TryParseExpr5()
     for(;;)
     {
         const PlaceInCode place = GetCurrentTokenPlace();
-        if(TryParseSymbol(Symbol::Mul))
+        if(TryParseSymbol(Symbol::Asterisk))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Mul, TryParseExpr3)
-        else if(TryParseSymbol(Symbol::Div))
+        else if(TryParseSymbol(Symbol::Slash))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Div, TryParseExpr3)
-        else if(TryParseSymbol(Symbol::Mod))
+        else if(TryParseSymbol(Symbol::Percent))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Mod, TryParseExpr3)
         else
             break;
@@ -1487,9 +1487,9 @@ unique_ptr<AST::Expression> Parser::TryParseExpr6()
     for(;;)
     {
         const PlaceInCode place = GetCurrentTokenPlace();
-        if(TryParseSymbol(Symbol::Add))
+        if(TryParseSymbol(Symbol::Plus))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Add, TryParseExpr5)
-        else if(TryParseSymbol(Symbol::Sub))
+        else if(TryParseSymbol(Symbol::Dash))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Sub, TryParseExpr5)
         else
             break;
@@ -1506,9 +1506,9 @@ unique_ptr<AST::Expression> Parser::TryParseExpr7()
     for(;;)
     {
         const PlaceInCode place = GetCurrentTokenPlace();
-        if(TryParseSymbol(Symbol::ShiftLeft))
+        if(TryParseSymbol(Symbol::DoubleLess))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::ShiftLeft, TryParseExpr6)
-        else if(TryParseSymbol(Symbol::ShiftRight))
+        else if(TryParseSymbol(Symbol::DoubleGreater))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::ShiftRight, TryParseExpr6)
         else
             break;
@@ -1527,11 +1527,11 @@ unique_ptr<AST::Expression> Parser::TryParseExpr9()
         const PlaceInCode place = GetCurrentTokenPlace();
         if(TryParseSymbol(Symbol::Less))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Less, TryParseExpr7)
-        else if(TryParseSymbol(Symbol::LessEqual))
+        else if(TryParseSymbol(Symbol::LessEquals))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::LessEqual, TryParseExpr7)
         else if(TryParseSymbol(Symbol::Greater))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Greater, TryParseExpr7)
-        else if(TryParseSymbol(Symbol::GreaterEqual))
+        else if(TryParseSymbol(Symbol::GreaterEquals))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::GreaterEqual, TryParseExpr7)
         else
             break;
@@ -1548,9 +1548,9 @@ unique_ptr<AST::Expression> Parser::TryParseExpr10()
     for(;;)
     {
         const PlaceInCode place = GetCurrentTokenPlace();
-        if(TryParseSymbol(Symbol::Equal))
+        if(TryParseSymbol(Symbol::DoubleEquals))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Equal, TryParseExpr9)
-        else if(TryParseSymbol(Symbol::NotEqual))
+        else if(TryParseSymbol(Symbol::ExclamationEquals))
             PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::NotEqual, TryParseExpr9)
         else
             break;
@@ -1658,7 +1658,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr16()
         return op;
     }
     // Assignment: Expr15 = Expr16
-    if(TryParseSymbol(Symbol::Assign))
+    if(TryParseSymbol(Symbol::Equals))
     {
         unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(GetCurrentTokenPlace(), AST::BinaryOperatorType::Assignment);
         op->Operands[0] = std::move(expr);
