@@ -164,4 +164,10 @@ TEST_CASE("Basic")
         REQUIRE(env.GetOutput() == "101\n102\n201\n"
             "301\n302\n401\n");
     }
+    SECTION("Comma operator")
+    {
+        const char* code = "a=(1,2,4); print(a, 3, 5); print((a, 3, 5));";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "4\n3\n5\n5\n");
+    }
 }

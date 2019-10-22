@@ -505,6 +505,7 @@ enum class BinaryOperatorType
     Mul, Div, Mod, Add, Sub, ShiftLeft, ShiftRight, Assignment,
     Less, Greater, LessEqual, GreaterEqual, Equal, NotEqual,
     BitwiseAnd, BitwiseXor, BitwiseOr, LogicalAnd, LogicalOr,
+    Comma,
 };
 
 struct BinaryOperator : Operator
@@ -586,7 +587,7 @@ private:
     unique_ptr<AST::Expression> TryParseExpr14();
     unique_ptr<AST::Expression> TryParseExpr15();
     unique_ptr<AST::Expression> TryParseExpr16();
-    unique_ptr<AST::Expression> TryParseExpr17() { return TryParseExpr16(); }
+    unique_ptr<AST::Expression> TryParseExpr17();
     bool TryParseSymbol(Symbol symbol);
     const PlaceInCode& GetCurrentTokenPlace() const { return m_Tokens[m_TokenIndex].Place; }
 };
@@ -1048,7 +1049,8 @@ void BinaryOperator::DebugPrint(uint32_t indentLevel) const
     static const char* BINARY_OPERATOR_TYPE_NAMES[] = {
         "Mul", "Div", "Mod", "Add", "Sub", "Shift left", "Shift right", "Assignment",
         "Less", "Greater", "LessEqual", "GreaterEqual", "Equal", "NotEqual",
-        "BitwiseAnd", "BitwiseXor", "BitwiseOr", "LogicalAnd", "LogicalOr", };
+        "BitwiseAnd", "BitwiseXor", "BitwiseOr", "LogicalAnd", "LogicalOr",
+        "Comma", };
     printf(DEBUG_PRINT_FORMAT_STR_BEG "BinaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, BINARY_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
     ++indentLevel;
     Operands[0]->DebugPrint(indentLevel);
@@ -1063,6 +1065,13 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
         LValue lhs = Operands[0]->GetLValue(ctx);
         Value rhs = Operands[1]->Evaluate(ctx);
         return Assignment(lhs, std::move(rhs));
+    }
+    
+    // This operator is special, discards result of left operand.
+    if(Type == BinaryOperatorType::Comma)
+    {
+        Operands[0]->Execute(ctx);
+        return Operands[1]->Evaluate(ctx);
     }
 
     // Remaining operators use r-values.
@@ -1657,6 +1666,22 @@ unique_ptr<AST::Expression> Parser::TryParseExpr16()
         return op;
     }
     // Just Expr15
+    return expr;
+}
+
+unique_ptr<AST::Expression> Parser::TryParseExpr17()
+{
+    unique_ptr<AST::Expression> expr = TryParseExpr16();
+    if(!expr)
+        return unique_ptr<AST::Expression>{};
+    for(;;)
+    {
+        const PlaceInCode place = GetCurrentTokenPlace();
+        if(TryParseSymbol(Symbol::Comma))
+            PARSE_BINARY_OPERATOR(AST::BinaryOperatorType::Comma, TryParseExpr16)
+        else
+            break;
+    }
     return expr;
 }
 
