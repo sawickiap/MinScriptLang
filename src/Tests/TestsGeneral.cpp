@@ -170,4 +170,10 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "4\n3\n5\n5\n");
     }
+    SECTION("Legit for loop")
+    {
+        const char* code = "for(i=0; i<5; ++i) print(i);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n1\n2\n3\n4\n");
+    }
 }
