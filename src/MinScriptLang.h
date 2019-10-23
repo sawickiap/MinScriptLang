@@ -227,6 +227,7 @@ struct Token
 };
 
 static inline bool IsDecimalNumber(char ch) { return ch >= '0' && ch <= '9'; }
+static inline bool IsHexadecimalNumber(char ch) { return ch >= '0' && ch <= '9' || ch >= 'A' && ch <= 'F' || ch >= 'a' && ch <= 'f'; }
 static inline bool IsAlpha(char ch) { return ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_'; }
 static inline bool IsAlphaNumeric(char ch) { return ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_'; }
 
@@ -310,11 +311,10 @@ public:
     void GetNextToken(Token& out);
 
 private:
-    static double ParseNumber(const char* s, size_t sLen);
- 
     CodeReader m_Code;
 
     void SkipSpacesAndComments();
+    bool ParseNumber(Token& out);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -699,19 +699,8 @@ void Tokenizer::GetNextToken(Token& out)
         }
     }
     // Number
-    if(IsDecimalNumber(currentCode[0]))
-    {
-        size_t tokenLen = 1;
-        while(tokenLen < currentCodeLen && IsDecimalNumber(currentCode[tokenLen]))
-            ++tokenLen;
-        // Letters straight after number are invalid.
-        if(tokenLen < currentCodeLen && IsAlpha(currentCode[tokenLen]))
-            throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_NUMBER);
-        out.Type = TokenType_::Number;
-        out.Number = ParseNumber(currentCode, tokenLen);
-        m_Code.MoveChars(tokenLen);
+    if(ParseNumber(out))
         return;
-    }
     // Identifier or keyword
     if(IsAlpha(currentCode[0]))
     {
@@ -737,15 +726,6 @@ void Tokenizer::GetNextToken(Token& out)
         return;
     }
     throw ParsingError(out.Place, ERROR_MESSAGE_UNRECOGNIZED_TOKEN);
-}
-
-double Tokenizer::ParseNumber(const char* s, size_t sLen)
-{
-    char sz[32];
-    assert(sLen < 32);
-    memcpy(sz, s, sLen);
-    sz[sLen] = 0;
-    return atof(sz);
 }
 
 void Tokenizer::SkipSpacesAndComments()
@@ -779,6 +759,76 @@ void Tokenizer::SkipSpacesAndComments()
         else
             break;
     }
+}
+
+bool Tokenizer::ParseNumber(Token& out)
+{
+    const char* const currentCode = m_Code.GetCurrentCode();
+    const size_t currentCodeLen = m_Code.GetCurrentLen();
+    if(!IsDecimalNumber(currentCode[0]) && currentCode[0] != '.')
+        return false;
+    size_t tokenLen = 0;
+    // Hexadecimal: 0xHHHH...
+    if(currentCode[0] == '0' && currentCodeLen >= 2 && (currentCode[1] == 'x' || currentCode[1] == 'X'))
+    {
+        tokenLen = 2;
+        while(tokenLen < currentCodeLen && IsHexadecimalNumber(currentCode[tokenLen]))
+            ++tokenLen;
+        if(tokenLen < 3)
+            throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_NUMBER);
+        uint64_t n = 0;
+        for(size_t i = 2; i < tokenLen; ++i)
+        {
+            const char ch = currentCode[i];
+            if(ch >= '0' && ch <= '9')
+                n = (n << 4) | (uint8_t)(ch - '0');
+            else if(ch >= 'a' && ch <= 'f')
+                n = (n << 4) | (uint8_t)(ch - 'a' + 10);
+            else //(ch >= 'A' && ch <= 'F')
+                n = (n << 4) | (uint8_t)(ch - 'A' + 10);
+        }
+        out.Number = (double)n;
+    }
+    else
+    {
+        while(tokenLen < currentCodeLen && IsDecimalNumber(currentCode[tokenLen]))
+            ++tokenLen;
+        const size_t digitsBeforeDecimalPoint = tokenLen;
+        size_t digitsAfterDecimalPoint = 0;
+        if(tokenLen < currentCodeLen && currentCode[tokenLen] == '.')
+        {
+            ++tokenLen;
+            while(tokenLen < currentCodeLen && IsDecimalNumber(currentCode[tokenLen]))
+                ++tokenLen;
+            digitsAfterDecimalPoint = tokenLen - digitsBeforeDecimalPoint - 1;
+        }
+        // Only dot '.' with no digits around: not a number token.
+        if(digitsBeforeDecimalPoint + digitsAfterDecimalPoint == 0)
+            return false;
+        if(tokenLen < currentCodeLen && (currentCode[tokenLen] == 'e' || currentCode[tokenLen] == 'E'))
+        {
+            ++tokenLen;
+            if(tokenLen < currentCodeLen && (currentCode[tokenLen] == '+' || currentCode[tokenLen] == '-'))
+                ++tokenLen;
+            const size_t tokenLenBeforeExponent = tokenLen;
+            while(tokenLen < currentCodeLen && IsDecimalNumber(currentCode[tokenLen]))
+                ++tokenLen;
+            if(tokenLen - tokenLenBeforeExponent == 0)
+                throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_NUMBER);
+        }
+        char sz[128];
+        if(tokenLen >= _countof(sz))
+            throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_NUMBER);
+        memcpy(sz, currentCode, tokenLen);
+        sz[tokenLen] = 0;
+        out.Number = atof(sz);
+    }
+    // Letters straight after number are invalid.
+    if(tokenLen < currentCodeLen && IsAlpha(currentCode[tokenLen]))
+        throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_NUMBER);
+    out.Type = TokenType_::Number;
+    m_Code.MoveChars(tokenLen);
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

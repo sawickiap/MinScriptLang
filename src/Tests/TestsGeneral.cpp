@@ -18,6 +18,28 @@ TEST_CASE("Basic")
         const char* code = "/* foo";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
     }
+    SECTION("Number formats")
+    {
+        const char* code = "print(123); print(-00444); print(+0xaF250); print(-0xFF); print(0xAA00FF5544CD);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "123\n-444\n717392\n-255\n1.86921e+14\n");
+    }
+    SECTION("Floating point number variants")
+    {
+        const char* code = "print(01.00); print(10.5); print(23.); print(.25); print(1e3); print(1e+2); print(.001e-1); print(3.E+0);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n10.5\n23\n0.25\n1000\n100\n0.0001\n3\n");
+    }
+    SECTION("Invalid floating point number variant 1")
+    {
+        const char* code = "print(.);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+    }
+    SECTION("Invalid floating point number variant 2")
+    {
+        const char* code = "print(2.0e);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+    }
     SECTION("Characters after number")
     {
         const char* code = "123print(1);";
@@ -87,6 +109,12 @@ TEST_CASE("Basic")
         const char* code = "a=1; print(a); b=a+1; print(b); c=d=b*b; print(b, c, d);";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n2\n2\n4\n4\n");
+    }
+    SECTION("Variable name")
+    {
+        const char* code = "a1234_3252saczf434=1; print(a1234_3252saczf434+1);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "2\n");
     }
     SECTION("while loop")
     {
