@@ -201,4 +201,12 @@ TEST_CASE("Basic")
         const char* code = "if(true) { do { print(1); }while(false); break; }";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
+    SECTION("Postincrementation postdecrementation")
+    {
+        const char* code = "for(i=0; i<3; i++) print(i); print(i++); print(i); print(i--); print(i);"
+            "";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n1\n2\n3\n4\n4\n3\n");
+    }
+
 }

@@ -496,6 +496,8 @@ enum class UnaryOperatorType
 {
     Preincrementation,
     Predecrementation,
+    Postincrementation,
+    Postdecrementation,
     Plus,
     Minus,
     LogicalNot,
@@ -1078,7 +1080,8 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
 void UnaryOperator::DebugPrint(uint32_t indentLevel) const
 {
     static const char* UNARY_OPERATOR_TYPE_NAMES[] = {
-        "Preincrementation", "Predecrementation", "Plus", "Minus", "Logical NOT", "Bitwise NOT" };
+        "Preincrementation", "Predecrementation", "Postincrementation", "Postdecrementation",
+        "Plus", "Minus", "Logical NOT", "Bitwise NOT" };
     printf(DEBUG_PRINT_FORMAT_STR_BEG "UnaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, UNARY_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
     ++indentLevel;
     Operand->DebugPrint(indentLevel);
@@ -1086,8 +1089,11 @@ void UnaryOperator::DebugPrint(uint32_t indentLevel) const
 
 Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
 {
+    // Those require l-value.
     if(Type == UnaryOperatorType::Preincrementation ||
-        Type == UnaryOperatorType::Predecrementation)
+        Type == UnaryOperatorType::Predecrementation ||
+        Type == UnaryOperatorType::Postincrementation ||
+        Type == UnaryOperatorType::Postdecrementation)
     {
         LValue lval = Operand->GetLValue(ctx);
         Value* val = lval.Obj.TryGetValue(lval.Key);
@@ -1097,13 +1103,25 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
             throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_EXPECTED_NUMBER));
         switch(Type)
         {
-        case UnaryOperatorType::Preincrementation: val->SetNumber(val->GetNumber() + 1.0); break;
-        case UnaryOperatorType::Predecrementation: val->SetNumber(val->GetNumber() - 1.0); break;
+        case UnaryOperatorType::Preincrementation: val->SetNumber(val->GetNumber() + 1.0); return *val;
+        case UnaryOperatorType::Predecrementation: val->SetNumber(val->GetNumber() - 1.0); return *val;
+        case UnaryOperatorType::Postincrementation:
+        {
+            Value result = *val;
+            val->SetNumber(val->GetNumber() + 1.0);
+            return std::move(result);
+        }
+        case UnaryOperatorType::Postdecrementation:
+        {
+            Value result = *val;
+            val->SetNumber(val->GetNumber() - 1.0);
+            return std::move(result);
+        }
         default: assert(0); return Value{};
         }
-        return *val;
     }
-    else if(Type == UnaryOperatorType::Plus ||
+    // Those use r-value.
+    if(Type == UnaryOperatorType::Plus ||
         Type == UnaryOperatorType::Minus ||
         Type == UnaryOperatorType::LogicalNot ||
         Type == UnaryOperatorType::BitwiseNot)
@@ -1499,28 +1517,41 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
     unique_ptr<AST::Expression> expr = TryParseExpr0();
     if(!expr)
         return unique_ptr<AST::Expression>{};
-
     const PlaceInCode place = GetCurrentTokenPlace();
+    // Postincrementation: Expr0 '++'
+    if(TryParseSymbol(Symbol::DoublePlus))
+    {
+        unique_ptr<AST::UnaryOperator> op = std::make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Postincrementation);
+        op->Operand = std::move(expr);
+        return op;
+    }
+    // Postdecrementation: Expr0 '--'
+    if(TryParseSymbol(Symbol::DoubleDash))
+    {
+        unique_ptr<AST::UnaryOperator> op = std::make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Postdecrementation);
+        op->Operand = std::move(expr);
+        return op;
+    }
     // Call: Expr0 '(' [ Expr16 ( ',' Expr16 )* ')'
     if(TryParseSymbol(Symbol::RoundBracketOpen))
     {
-        unique_ptr<AST::MultiOperator> multiOperator = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
+        unique_ptr<AST::MultiOperator> op = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
         // Callee
-        multiOperator->Operands.push_back(std::move(expr));
+        op->Operands.push_back(std::move(expr));
         // First argument
         expr = TryParseExpr16();
         if(expr)
         {
-            multiOperator->Operands.push_back(std::move(expr));
+            op->Operands.push_back(std::move(expr));
             // Further arguments
             while(TryParseSymbol(Symbol::Comma))
             {
                 MUST_PARSE( expr = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-                multiOperator->Operands.push_back(std::move(expr));
+                op->Operands.push_back(std::move(expr));
             }
         }
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
-        return multiOperator;
+        return op;
     }
     // #TODO Indexing: Expr0 '[' Expr17 ']'
     // #TODO Member access: Expr0 '.' TOKEN_IDENTIFIER
