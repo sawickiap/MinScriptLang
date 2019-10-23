@@ -208,5 +208,15 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "0\n1\n2\n3\n4\n4\n3\n");
     }
+    SECTION("Compound assignment")
+    {
+        const char* code = "a=1; a+=3; print(a); a-=10; print(a); a*=-2; print(a); a/=4; print(a); a%=2; print(a); a<<=2; print(a); a>>=1; print(a);"
+            "a=6; a|=8; print(a); a&=3; print(a); a^=3; print(a);"
+            "a=1; b=2; b*=a+=7;  print(a);  print(b);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "4\n-6\n12\n3\n1\n4\n2\n"
+            "14\n2\n1\n"
+            "8\n16\n");
+    }
 
 }

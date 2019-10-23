@@ -184,6 +184,16 @@ enum class Symbol
     // Multiple character symbols
     DoublePlus,        // ++
     DoubleDash,        // --
+    PlusEquals,        // +=
+    DashEquals,        // -=
+    AsteriskEquals,    // *=
+    SlashEquals,       // /=
+    PercentEquals,     // %=
+    DoubleLessEquals,  // <<=
+    DoubleGreaterEquals, // >>=
+    AmperstandEquals,  // &=
+    CaretEquals,       // ^=
+    PipeEquals,        // |=
     DoubleLess,        // <<
     DoubleGreater,     // >>
     LessEquals,        // <=
@@ -199,7 +209,7 @@ static const char* SYMBOL_STR[] = {
     // Symbols
     ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", "&", "^", "|",
     // Multiple character symbols
-    "++", "--", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
+    "++", "--", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
     // Keywords
     "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue",
 };
@@ -519,7 +529,9 @@ private:
 
 enum class BinaryOperatorType
 {
-    Mul, Div, Mod, Add, Sub, ShiftLeft, ShiftRight, Assignment,
+    Mul, Div, Mod, Add, Sub, ShiftLeft, ShiftRight,
+    Assignment, AssignmentAdd, AssignmentSub, AssignmentMul, AssignmentDiv, AssignmentMod, AssignmentShiftLeft, AssignmentShiftRight,
+    AssignmentBitwiseAnd, AssignmentBitwiseXor, AssignmentBitwiseOr,
     Less, Greater, LessEqual, GreaterEqual, Equal, NotEqual,
     BitwiseAnd, BitwiseXor, BitwiseOr, LogicalAnd, LogicalOr,
     Comma,
@@ -534,8 +546,8 @@ struct BinaryOperator : Operator
     virtual Value Evaluate(ExecuteContext& ctx) const;
     
 private:
-    Value ShiftLeft(Value&& lhs, Value&& rhs) const;
-    Value ShiftRight(Value&& lhs, Value&& rhs) const;
+    Value ShiftLeft(const Value& lhs, const Value& rhs) const;
+    Value ShiftRight(const Value& lhs, const Value& rhs) const;
     Value Assignment(const LValue& lhs, Value&& rhs) const;
 };
 
@@ -1163,8 +1175,12 @@ void BinaryOperator::DebugPrint(uint32_t indentLevel) const
 
 Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
 {
-    // This operator is special, requires l-value.
-    if(Type == BinaryOperatorType::Assignment)
+    // Operators that require l-value.
+    if(Type == BinaryOperatorType::Assignment ||
+        Type == BinaryOperatorType::AssignmentAdd || Type == BinaryOperatorType::AssignmentSub ||
+        Type == BinaryOperatorType::AssignmentMul || Type == BinaryOperatorType::AssignmentDiv || Type == BinaryOperatorType::AssignmentMod ||
+        Type == BinaryOperatorType::AssignmentShiftLeft || Type == BinaryOperatorType::AssignmentShiftRight ||
+        Type == BinaryOperatorType::AssignmentBitwiseAnd || Type == BinaryOperatorType::AssignmentBitwiseXor || Type == BinaryOperatorType::AssignmentBitwiseOr)
     {
         LValue lhs = Operands[0]->GetLValue(ctx);
         Value rhs = Operands[1]->Evaluate(ctx);
@@ -1223,7 +1239,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     assert(0); return Value{};
 }
 
-Value BinaryOperator::ShiftLeft(Value&& lhs, Value&& rhs) const
+Value BinaryOperator::ShiftLeft(const Value& lhs, const Value& rhs) const
 {
     const int64_t lhsInt = (int64_t)lhs.GetNumber();
     const int64_t rhsInt = (int64_t)rhs.GetNumber();
@@ -1231,7 +1247,7 @@ Value BinaryOperator::ShiftLeft(Value&& lhs, Value&& rhs) const
     return Value{(double)resultInt};
 }
 
-Value BinaryOperator::ShiftRight(Value&& lhs, Value&& rhs) const
+Value BinaryOperator::ShiftRight(const Value& lhs, const Value& rhs) const
 {
     const int64_t lhsInt = (int64_t)lhs.GetNumber();
     const int64_t rhsInt = (int64_t)rhs.GetNumber();
@@ -1241,9 +1257,39 @@ Value BinaryOperator::ShiftRight(Value&& lhs, Value&& rhs) const
 
 Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
 {
-    Value& valRef = lhs.Obj.GetOrCreateValue(lhs.Key);
-    valRef = std::move(rhs);
-    return valRef;
+    // This one is able to create new value.
+    if(Type == BinaryOperatorType::Assignment)
+    {
+        Value& lhsValRef = lhs.Obj.GetOrCreateValue(lhs.Key);
+        lhsValRef = std::move(rhs);
+        return lhsValRef;
+    }
+
+    // These ones require existing value.
+    Value* lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
+    if(lhsValPtr == nullptr)
+        throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_VARIABLE_DOESNT_EXIST));
+    if(lhsValPtr->GetType() != Value::Type::Number)
+        throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_EXPECTED_NUMBER));
+    if(rhs.GetType() != Value::Type::Number)
+        throw ExecutionError(Operands[1]->GetPlace(), string(ERROR_MESSAGE_EXPECTED_NUMBER));
+    switch(Type)
+    {
+    case BinaryOperatorType::AssignmentAdd: lhsValPtr->SetNumber(lhsValPtr->GetNumber() + rhs.GetNumber()); break;
+    case BinaryOperatorType::AssignmentSub: lhsValPtr->SetNumber(lhsValPtr->GetNumber() - rhs.GetNumber()); break;
+    case BinaryOperatorType::AssignmentMul: lhsValPtr->SetNumber(lhsValPtr->GetNumber() * rhs.GetNumber()); break;
+    case BinaryOperatorType::AssignmentDiv: lhsValPtr->SetNumber(lhsValPtr->GetNumber() / rhs.GetNumber()); break;
+    case BinaryOperatorType::AssignmentMod: lhsValPtr->SetNumber(fmod(lhsValPtr->GetNumber(), rhs.GetNumber())); break;
+    case BinaryOperatorType::AssignmentShiftLeft:  *lhsValPtr = ShiftLeft (*lhsValPtr, rhs); break;
+    case BinaryOperatorType::AssignmentShiftRight: *lhsValPtr = ShiftRight(*lhsValPtr, rhs); break;
+    case BinaryOperatorType::AssignmentBitwiseAnd: lhsValPtr->SetNumber( (double)( (int64_t)lhsValPtr->GetNumber() & (int64_t)rhs.GetNumber() ) ); break;
+    case BinaryOperatorType::AssignmentBitwiseXor: lhsValPtr->SetNumber( (double)( (int64_t)lhsValPtr->GetNumber() ^ (int64_t)rhs.GetNumber() ) ); break;
+    case BinaryOperatorType::AssignmentBitwiseOr:  lhsValPtr->SetNumber( (double)( (int64_t)lhsValPtr->GetNumber() | (int64_t)rhs.GetNumber() ) ); break;
+    default:
+        assert(0);
+    }
+
+    return *lhsValPtr;
 }
 
 void TernaryOperator::DebugPrint(uint32_t indentLevel) const
@@ -1788,14 +1834,27 @@ unique_ptr<AST::Expression> Parser::TryParseExpr16()
         MUST_PARSE( op->Operands[2] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
         return op;
     }
-    // Assignment: Expr15 = Expr16
-    if(TryParseSymbol(Symbol::Equals))
-    {
-        unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(GetCurrentTokenPlace(), AST::BinaryOperatorType::Assignment);
-        op->Operands[0] = std::move(expr);
-        MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-        return op;
+    // Assignment: Expr15 = Expr16, and variants like += -=
+#define TRY_PARSE_ASSIGNMENT(symbol, binaryOperatorType) \
+    if(TryParseSymbol(symbol)) \
+    { \
+        unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(GetCurrentTokenPlace(), (binaryOperatorType)); \
+        op->Operands[0] = std::move(expr); \
+        MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION ); \
+        return op; \
     }
+    TRY_PARSE_ASSIGNMENT(Symbol::Equals, AST::BinaryOperatorType::Assignment)
+    TRY_PARSE_ASSIGNMENT(Symbol::PlusEquals, AST::BinaryOperatorType::AssignmentAdd)
+    TRY_PARSE_ASSIGNMENT(Symbol::DashEquals, AST::BinaryOperatorType::AssignmentSub)
+    TRY_PARSE_ASSIGNMENT(Symbol::AsteriskEquals, AST::BinaryOperatorType::AssignmentMul)
+    TRY_PARSE_ASSIGNMENT(Symbol::SlashEquals, AST::BinaryOperatorType::AssignmentDiv)
+    TRY_PARSE_ASSIGNMENT(Symbol::PercentEquals, AST::BinaryOperatorType::AssignmentMod)
+    TRY_PARSE_ASSIGNMENT(Symbol::DoubleLessEquals, AST::BinaryOperatorType::AssignmentShiftLeft)
+    TRY_PARSE_ASSIGNMENT(Symbol::DoubleGreaterEquals, AST::BinaryOperatorType::AssignmentShiftRight)
+    TRY_PARSE_ASSIGNMENT(Symbol::AmperstandEquals, AST::BinaryOperatorType::AssignmentBitwiseAnd)
+    TRY_PARSE_ASSIGNMENT(Symbol::CaretEquals, AST::BinaryOperatorType::AssignmentBitwiseXor)
+    TRY_PARSE_ASSIGNMENT(Symbol::PipeEquals, AST::BinaryOperatorType::AssignmentBitwiseOr)
+#undef TRY_PARSE_ASSIGNMENT
     // Just Expr15
     return expr;
 }
