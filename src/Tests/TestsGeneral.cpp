@@ -250,10 +250,10 @@ TEST_CASE("Basic")
     }
     SECTION("String")
     {
-        const char* code = "\"aaa\"; 'bbb\n"
-            "ccc';";
+        const char* code = "a=\"aaa\"; b='bbb\n"
+            "ccc'; print(a, a?1:0); empty=''; print(empty?1:0);";
         env.Execute(code, strlen(code));
-        REQUIRE(env.GetOutput() == "");
+        REQUIRE(env.GetOutput() == "aaa\n1\n0\n");
     }
 
 }

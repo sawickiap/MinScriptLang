@@ -839,6 +839,8 @@ bool Tokenizer::ParseString(Token& out)
     const char delimiterCh = currCode[0];
     if(delimiterCh != '"' && delimiterCh != '\'')
         return false;
+    out.Symbol = Symbol::String;
+    out.String.clear();
     size_t tokenLen = 1;
     for(;;)
     {
@@ -852,8 +854,6 @@ bool Tokenizer::ParseString(Token& out)
     // Letters straight after string are invalid.
     if(tokenLen < currCodeLen && IsAlpha(currCode[tokenLen]))
         throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_STRING);
-    out.Symbol = Symbol::String;
-    out.String.clear();
     m_Code.MoveChars(tokenLen);
     return true;
 }
@@ -1469,7 +1469,7 @@ void Parser::ParseScript(AST::Script& outScript)
     if(m_Tokens[m_TokenIndex].Symbol != Symbol::End)
         throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_PARSING_ERROR);
 
-    //outScript.DebugPrint(0); // #DELME
+    outScript.DebugPrint(0); // #DELME
 }
 
 void Parser::ParseBlock(AST::Block& outBlock)
