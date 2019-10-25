@@ -151,14 +151,13 @@ private:
     string m_String;
 };
 
-// Name with underscore because f***g Windows.h defines TokenType as macro!
-enum class TokenType_
-{
-    None, Symbol, Identifier, Number, End
-};
-
 enum class Symbol
 {
+    // Token types
+    None,
+    Identifier,
+    Number,
+    End,
     // Symbols
     Comma,             // ,
     QuestionMark,      // ?
@@ -206,6 +205,8 @@ enum class Symbol
     Null, False, True, If, Else, While, Do, For, Break, Continue, Count
 };
 static const char* SYMBOL_STR[] = {
+    // Token types
+    "", "", "", "",
     // Symbols
     ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", "&", "^", "|",
     // Multiple character symbols
@@ -217,13 +218,9 @@ static const char* SYMBOL_STR[] = {
 struct Token
 {
     PlaceInCode Place;
-    TokenType_ Type;
-    union
-    {
-        Symbol Symbol; // Only when Type == TokenType_::Symbol
-        double Number; // Only when Type == TokenType_::Number
-    };
-    string String; // Only when Type == TokenType::Identifier
+    Symbol Symbol;
+    double Number; // Only when Symbol == Symbol::Number
+    string String; // Only when Symbol == Symbol::Identifier
 };
 
 static inline bool IsDecimalNumber(char ch) { return ch >= '0' && ch <= '9'; }
@@ -666,10 +663,11 @@ void Tokenizer::GetNextToken(Token& out)
     // End of input
     if(m_Code.IsEnd())
     {
-        out.Type = TokenType_::End;
+        out.Symbol = Symbol::End;
         return;
     }
 
+    constexpr Symbol firstSingleCharSymbol = Symbol::Comma;
     constexpr Symbol firstMultiCharSymbol = Symbol::DoublePlus;
     constexpr Symbol firstKeywordSymbol = Symbol::Null;
 
@@ -681,18 +679,16 @@ void Tokenizer::GetNextToken(Token& out)
         const size_t symbolLen = strlen(SYMBOL_STR[i]);
         if(currentCodeLen >= symbolLen && memcmp(SYMBOL_STR[i], currentCode, symbolLen) == 0)
         {
-            out.Type = TokenType_::Symbol;
             out.Symbol = (Symbol)i;
             m_Code.MoveChars(symbolLen);
             return;
         }
     }
     // Symbol
-    for(size_t i = 0; i < (size_t)firstMultiCharSymbol; ++i)
+    for(size_t i = (size_t)firstSingleCharSymbol; i < (size_t)firstMultiCharSymbol; ++i)
     {
         if(currentCode[0] == SYMBOL_STR[i][0])
         {
-            out.Type = TokenType_::Symbol;
             out.Symbol = (Symbol)i;
             m_Code.MoveOneChar();
             return;
@@ -713,14 +709,13 @@ void Tokenizer::GetNextToken(Token& out)
             const size_t keywordLen = strlen(SYMBOL_STR[i]);
             if(keywordLen == tokenLen && memcmp(SYMBOL_STR[i], currentCode, tokenLen) == 0)
             {
-                out.Type = TokenType_::Symbol;
                 out.Symbol = (Symbol)i;
                 m_Code.MoveChars(keywordLen);
                 return;
             }
         }
         // Identifier
-        out.Type = TokenType_::Identifier;
+        out.Symbol = Symbol::Identifier;
         out.String = string{currentCode, currentCode + tokenLen};
         m_Code.MoveChars(tokenLen);
         return;
@@ -826,7 +821,7 @@ bool Tokenizer::ParseNumber(Token& out)
     // Letters straight after number are invalid.
     if(tokenLen < currentCodeLen && IsAlpha(currentCode[tokenLen]))
         throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_NUMBER);
-    out.Type = TokenType_::Number;
+    out.Symbol = Symbol::Number;
     m_Code.MoveChars(tokenLen);
     return true;
 }
@@ -1434,12 +1429,12 @@ void Parser::ParseScript(AST::Script& outScript)
         Token token;
         m_Tokenizer.GetNextToken(token);
         m_Tokens.push_back(std::move(token));
-        if(token.Type == TokenType_::End)
+        if(token.Symbol == Symbol::End)
             break;
     }
 
     ParseBlock(outScript);
-    if(m_Tokens[m_TokenIndex].Type != TokenType_::End)
+    if(m_Tokens[m_TokenIndex].Symbol != Symbol::End)
         throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_PARSING_ERROR);
 
     //outScript.DebugPrint(0); // #DELME
@@ -1447,7 +1442,7 @@ void Parser::ParseScript(AST::Script& outScript)
 
 void Parser::ParseBlock(AST::Block& outBlock)
 {
-    while(m_Tokens[m_TokenIndex].Type != TokenType_::End)
+    while(m_Tokens[m_TokenIndex].Symbol != Symbol::End)
     {
         unique_ptr<AST::Statement> stmt = TryParseStatement();
         if(!stmt)
@@ -1562,28 +1557,23 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
 unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
 {
     const Token& t = m_Tokens[m_TokenIndex];
-    switch(t.Type)
+    switch(t.Symbol)
     {
-    case TokenType_::Number:
+    case Symbol::Number:
         ++m_TokenIndex;
         return make_unique<AST::ConstantValue>(t.Place, Value{t.Number});
-    case TokenType_::Identifier:
+    case Symbol::Identifier:
         ++m_TokenIndex;
         return make_unique<AST::Identifier>(t.Place, string(t.String));
-    case TokenType_::Symbol:
-        switch(t.Symbol)
-        {
-        case Symbol::Null:
-            ++m_TokenIndex;
-            return make_unique<AST::ConstantValue>(t.Place, Value{});
-        case Symbol::False:
-            ++m_TokenIndex;
-            return make_unique<AST::ConstantValue>(t.Place, Value{0.0});
-        case Symbol::True:
-            ++m_TokenIndex;
-            return make_unique<AST::ConstantValue>(t.Place, Value{1.0});
-        }
-        break;
+    case Symbol::Null:
+        ++m_TokenIndex;
+        return make_unique<AST::ConstantValue>(t.Place, Value{});
+    case Symbol::False:
+        ++m_TokenIndex;
+        return make_unique<AST::ConstantValue>(t.Place, Value{0.0});
+    case Symbol::True:
+        ++m_TokenIndex;
+        return make_unique<AST::ConstantValue>(t.Place, Value{1.0});
     }
     return unique_ptr<AST::ConstantExpression>{};
 }
@@ -1927,8 +1917,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr17()
 
 bool Parser::TryParseSymbol(Symbol symbol)
 {
-    if(m_Tokens[m_TokenIndex].Type == TokenType_::Symbol &&
-        m_Tokens[m_TokenIndex].Symbol == symbol)
+    if(m_Tokens[m_TokenIndex].Symbol == symbol)
     {
         ++m_TokenIndex;
         return true;

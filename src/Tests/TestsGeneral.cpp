@@ -9,7 +9,9 @@ TEST_CASE("Basic")
     Environment env;
     SECTION("Comments empty statements")
     {
-        const char* code = "// Single line comment\n/* multi line comment \n*/ ;;;; \n";
+        const char* code = "// Single line comment\n"
+            "/* multi line comment \n"
+            "*/ ;;;; \n";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput().empty());
     }
