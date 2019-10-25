@@ -248,5 +248,12 @@ TEST_CASE("Basic")
             "14\n2\n1\n"
             "8\n16\n");
     }
+    SECTION("String")
+    {
+        const char* code = "\"aaa\"; 'bbb\n"
+            "ccc';";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "");
+    }
 
 }

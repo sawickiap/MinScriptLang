@@ -116,8 +116,10 @@ namespace MinScriptLang {
 
 static const char* const ERROR_MESSAGE_PARSING_ERROR = "Parsing error.";
 static const char* const ERROR_MESSAGE_INVALID_NUMBER = "Invalid number.";
+static const char* const ERROR_MESSAGE_INVALID_STRING = "Invalid string.";
 static const char* const ERROR_MESSAGE_UNRECOGNIZED_TOKEN = "Unrecognized token.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT = "Unexpected end of file inside multiline comment.";
+static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING = "Unexpected end of file inside string.";
 static const char* const ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expression.";
 static const char* const ERROR_MESSAGE_EXPECTED_STATEMENT = "Expected statement.";
 static const char* const ERROR_MESSAGE_EXPECTED_LVALUE = "Expected l-value.";
@@ -157,6 +159,7 @@ enum class Symbol
     None,
     Identifier,
     Number,
+    String,
     End,
     // Symbols
     Comma,             // ,
@@ -206,7 +209,7 @@ enum class Symbol
 };
 static const char* SYMBOL_STR[] = {
     // Token types
-    "", "", "", "",
+    "", "", "", "", "",
     // Symbols
     ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", "&", "^", "|",
     // Multiple character symbols
@@ -220,7 +223,7 @@ struct Token
     PlaceInCode Place;
     Symbol Symbol;
     double Number; // Only when Symbol == Symbol::Number
-    string String; // Only when Symbol == Symbol::Identifier
+    string String; // Only when Symbol == Symbol::Identifier or String
 };
 
 static inline bool IsDecimalNumber(char ch) { return ch >= '0' && ch <= '9'; }
@@ -312,6 +315,7 @@ private:
 
     void SkipSpacesAndComments();
     bool ParseNumber(Token& out);
+    bool ParseString(Token& out);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -673,6 +677,9 @@ void Tokenizer::GetNextToken(Token& out)
 
     const char* const currentCode = m_Code.GetCurrentCode();
     const size_t currentCodeLen = m_Code.GetCurrentLen();
+
+    if(ParseString(out))
+        return;
     // Multi char symbol
     for(size_t i = (size_t)firstMultiCharSymbol; i < (size_t)firstKeywordSymbol; ++i)
     {
@@ -694,7 +701,6 @@ void Tokenizer::GetNextToken(Token& out)
             return;
         }
     }
-    // Number
     if(ParseNumber(out))
         return;
     // Identifier or keyword
@@ -822,6 +828,32 @@ bool Tokenizer::ParseNumber(Token& out)
     if(tokenLen < currentCodeLen && IsAlpha(currentCode[tokenLen]))
         throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_NUMBER);
     out.Symbol = Symbol::Number;
+    m_Code.MoveChars(tokenLen);
+    return true;
+}
+
+bool Tokenizer::ParseString(Token& out)
+{
+    const char* const currCode = m_Code.GetCurrentCode();
+    const size_t currCodeLen = m_Code.GetCurrentLen();
+    const char delimiterCh = currCode[0];
+    if(delimiterCh != '"' && delimiterCh != '\'')
+        return false;
+    size_t tokenLen = 1;
+    for(;;)
+    {
+        if(tokenLen == currCodeLen)
+            throw ParsingError(out.Place, ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING);
+        if(currCode[tokenLen] == delimiterCh)
+            break;
+        out.String += currCode[tokenLen++];
+    }
+    ++tokenLen;
+    // Letters straight after string are invalid.
+    if(tokenLen < currCodeLen && IsAlpha(currCode[tokenLen]))
+        throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_STRING);
+    out.Symbol = Symbol::String;
+    out.String.clear();
     m_Code.MoveChars(tokenLen);
     return true;
 }
@@ -1565,6 +1597,9 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
     case Symbol::Identifier:
         ++m_TokenIndex;
         return make_unique<AST::Identifier>(t.Place, string(t.String));
+    case Symbol::String:
+        ++m_TokenIndex;
+        return make_unique<AST::ConstantValue>(t.Place, string(t.String));
     case Symbol::Null:
         ++m_TokenIndex;
         return make_unique<AST::ConstantValue>(t.Place, Value{});
