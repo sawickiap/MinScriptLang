@@ -264,9 +264,10 @@ TEST_CASE("Basic")
     SECTION("String")
     {
         const char* code = "a=\"aaa\"; b='bbb\n"
-            "ccc'; print(a, a?1:0); empty=''; print(empty?1:0);";
+            "ccc'; print(a, a?1:0); empty=''; print(empty?1:0); \n"
+            "print('aa' 'bb' /* comment */ \"cc\");";
         env.Execute(code, strlen(code));
-        REQUIRE(env.GetOutput() == "aaa\n1\n0\n");
+        REQUIRE(env.GetOutput() == "aaa\n1\n0\naabbcc\n");
     }
     SECTION("String escape sequences")
     {

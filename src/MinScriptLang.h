@@ -337,6 +337,7 @@ public:
 
     Type GetType() const { return m_Type; }
     double GetNumber() const { assert(m_Type == Type::Number); return m_Number; }
+    string& GetString() { assert(m_Type == Type::String); return m_String; }
     const string& GetString() const { assert(m_Type == Type::String); return m_String; }
 
     bool IsTrue() const
@@ -1706,8 +1707,13 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
         ++m_TokenIndex;
         return make_unique<AST::Identifier>(t.Place, string(t.String));
     case Symbol::String:
+    {
         ++m_TokenIndex;
-        return make_unique<AST::ConstantValue>(t.Place, string(t.String));
+        unique_ptr<AST::ConstantValue> expr = make_unique<AST::ConstantValue>(t.Place, string(t.String));
+        while(m_Tokens[m_TokenIndex].Symbol == Symbol::String)
+            expr->Val.GetString() += m_Tokens[m_TokenIndex++].String;
+        return expr;
+    }
     case Symbol::Null:
         ++m_TokenIndex;
         return make_unique<AST::ConstantValue>(t.Place, Value{});
