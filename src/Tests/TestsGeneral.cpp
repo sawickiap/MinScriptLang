@@ -4,6 +4,19 @@
 
 using namespace MinScriptLang;
 
+static void WriteDataToFile(const char* filePath, const char* data, size_t byteCount)
+{
+    FILE* f = nullptr;
+    errno_t err = fopen_s(&f, filePath, "wb");
+    if(err == 0)
+    {
+        fwrite(data, 1, byteCount, f);
+        fclose(f);
+    }
+    else
+        assert(err == 0);
+}
+
 TEST_CASE("Basic")
 {
     Environment env;
@@ -254,6 +267,29 @@ TEST_CASE("Basic")
             "ccc'; print(a, a?1:0); empty=''; print(empty?1:0);";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "aaa\n1\n0\n");
+    }
+    SECTION("String escape sequences")
+    {
+        const char* code = "print('\\\\ \\\" \\' \\b \\f \\n \\r \\t \\? \\a \\v \\/');";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "\\ \" ' \b \f \n \r \t \? \a \v /\n");
+    }
+    SECTION("String escape sequences numeric")
+    {
+        const char* code = "print('\\xA5 \\xa5');";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "\xa5 \xa5\n");
+    }
+    SECTION("String escape sequences wrong")
+    {
+        const char* code = " '\\256' ;";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+        code = " '\\Z' ;";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+        code = " '\\xZ' ;";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+        code = " '\\x1' ;";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
     }
 
 }

@@ -117,6 +117,7 @@ namespace MinScriptLang {
 static const char* const ERROR_MESSAGE_PARSING_ERROR = "Parsing error.";
 static const char* const ERROR_MESSAGE_INVALID_NUMBER = "Invalid number.";
 static const char* const ERROR_MESSAGE_INVALID_STRING = "Invalid string.";
+static const char* const ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE = "Invalid escape sequence in a string.";
 static const char* const ERROR_MESSAGE_UNRECOGNIZED_TOKEN = "Unrecognized token.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT = "Unexpected end of file inside multiline comment.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING = "Unexpected end of file inside string.";
@@ -311,6 +312,9 @@ public:
     void GetNextToken(Token& out);
 
 private:
+    static bool ParseCharHex(uint8_t& out, char ch);
+    static bool Parse2CharsHex(uint8_t& out, const char* chars);
+
     CodeReader m_Code;
 
     void SkipSpacesAndComments();
@@ -729,6 +733,28 @@ void Tokenizer::GetNextToken(Token& out)
     throw ParsingError(out.Place, ERROR_MESSAGE_UNRECOGNIZED_TOKEN);
 }
 
+bool Tokenizer::ParseCharHex(uint8_t& out, char ch)
+{
+    if(ch >= '0' && ch <= '9')
+        out = (uint8_t)(ch - '0');
+    else if(ch >= 'a' && ch <= 'f')
+        out = (uint8_t)(ch - 'a' + 10);
+    else if(ch >= 'A' && ch <= 'F')
+        out = (uint8_t)(ch - 'A' + 10);
+    else
+        return false;
+    return true;
+}
+
+bool Tokenizer::Parse2CharsHex(uint8_t& out, const char* chars)
+{
+    uint8_t val0 = 0, val1 = 0;
+    if(!ParseCharHex(val1, chars[0]) || !ParseCharHex(val0, chars[1]))
+        return false;
+    out = (val1 << 4) | val0;
+    return true;
+}
+
 void Tokenizer::SkipSpacesAndComments()
 {
     while(!m_Code.IsEnd())
@@ -780,13 +806,9 @@ bool Tokenizer::ParseNumber(Token& out)
         uint64_t n = 0;
         for(size_t i = 2; i < tokenLen; ++i)
         {
-            const char ch = currentCode[i];
-            if(ch >= '0' && ch <= '9')
-                n = (n << 4) | (uint8_t)(ch - '0');
-            else if(ch >= 'a' && ch <= 'f')
-                n = (n << 4) | (uint8_t)(ch - 'a' + 10);
-            else //(ch >= 'A' && ch <= 'F')
-                n = (n << 4) | (uint8_t)(ch - 'A' + 10);
+            uint8_t val = 0;
+            ParseCharHex(val, currentCode[i]);
+            n = (n << 4) | val;
         }
         out.Number = (double)n;
     }
@@ -848,7 +870,41 @@ bool Tokenizer::ParseString(Token& out)
             throw ParsingError(out.Place, ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING);
         if(currCode[tokenLen] == delimiterCh)
             break;
-        out.String += currCode[tokenLen++];
+        if(currCode[tokenLen] == '\\')
+        {
+            ++tokenLen;
+            if(tokenLen == currCodeLen)
+                throw ParsingError(out.Place, ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING);
+            switch(currCode[tokenLen])
+            {
+            case '\\': out.String += '\\'; ++tokenLen; break;
+            case '/': out.String += '/'; ++tokenLen; break;
+            case '"': out.String += '"'; ++tokenLen; break;
+            case '\'': out.String += '\''; ++tokenLen; break;
+            case '?': out.String += '?'; ++tokenLen; break;
+            case 'a': out.String += '\a'; ++tokenLen; break;
+            case 'b': out.String += '\b'; ++tokenLen; break;
+            case 'f': out.String += '\f'; ++tokenLen; break;
+            case 'n': out.String += '\n'; ++tokenLen; break;
+            case 'r': out.String += '\r'; ++tokenLen; break;
+            case 't': out.String += '\t'; ++tokenLen; break;
+            case 'v': out.String += '\v'; ++tokenLen; break;
+            case '0': out.String += '\0'; ++tokenLen; break;
+            case 'x':
+            {
+                uint8_t val = 0;
+                if(tokenLen + 2 >= currCodeLen || !Parse2CharsHex(val, currCode + tokenLen + 1))
+                    throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE);
+                out.String += (char)val;
+                tokenLen += 3;
+                break;
+            }
+            default:
+                throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE);
+            }
+        }
+        else
+            out.String += currCode[tokenLen++];
     }
     ++tokenLen;
     // Letters straight after string are invalid.
@@ -1469,7 +1525,7 @@ void Parser::ParseScript(AST::Script& outScript)
     if(m_Tokens[m_TokenIndex].Symbol != Symbol::End)
         throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_PARSING_ERROR);
 
-    outScript.DebugPrint(0); // #DELME
+    //outScript.DebugPrint(0); // #DELME
 }
 
 void Parser::ParseBlock(AST::Block& outBlock)
