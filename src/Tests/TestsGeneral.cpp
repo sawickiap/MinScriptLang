@@ -280,6 +280,12 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "\xa5 \xa5\n");
     }
+    SECTION("String escape sequences Unicode")
+    {
+        const char* code = "print('\\u0104 \\U00000104');";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "\xC4\x84 \xC4\x84\n");
+    }
     SECTION("String escape sequences wrong")
     {
         const char* code = " '\\256' ;";
@@ -289,6 +295,10 @@ TEST_CASE("Basic")
         code = " '\\xZ' ;";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
         code = " '\\x1' ;";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+        code = " '\\u01";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+        code = " '\\U0000010G';";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
     }
 

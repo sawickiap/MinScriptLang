@@ -313,7 +313,8 @@ public:
 
 private:
     static bool ParseCharHex(uint8_t& out, char ch);
-    static bool Parse2CharsHex(uint8_t& out, const char* chars);
+    static bool ParseCharsHex(uint32_t& out, const char* chars, uint8_t charCount);
+    static bool AppendUtf8Char(string& inout, uint32_t charVal);
 
     CodeReader m_Code;
 
@@ -746,12 +747,43 @@ bool Tokenizer::ParseCharHex(uint8_t& out, char ch)
     return true;
 }
 
-bool Tokenizer::Parse2CharsHex(uint8_t& out, const char* chars)
+bool Tokenizer::ParseCharsHex(uint32_t& out, const char* chars, uint8_t charCount)
 {
-    uint8_t val0 = 0, val1 = 0;
-    if(!ParseCharHex(val1, chars[0]) || !ParseCharHex(val0, chars[1]))
+    out = 0;
+    for(uint8_t i = 0; i < charCount; ++i)
+    {
+        uint8_t charVal = 0;
+        if(!ParseCharHex(charVal, chars[i]))
+            return false;
+        out = (out << 4) | charVal;
+    }
+    return true;
+}
+
+bool Tokenizer::AppendUtf8Char(string& inout, uint32_t charVal)
+{
+    if(charVal <= 0x7F)
+        inout += (char)(uint8_t)charVal;
+    else if(charVal <= 0x7FF)
+    {
+        inout += (char)(uint8_t)(0b11000000 | (charVal >> 6));
+        inout += (char)(uint8_t)(0b10000000 | (charVal & 0b111111));
+    }
+    else if(charVal <= 0xFFFF)
+    {
+        inout += (char)(uint8_t)(0b11100000 | (charVal >> 12));
+        inout += (char)(uint8_t)(0b10000000 | ((charVal >> 6) & 0b111111));
+        inout += (char)(uint8_t)(0b10000000 | ( charVal       & 0b111111));
+    }
+    else if(charVal <= 0x10FFFF)
+    {
+        inout += (char)(uint8_t)(0b11110000 | (charVal >> 18));
+        inout += (char)(uint8_t)(0b10000000 | ((charVal >> 12) & 0b111111));
+        inout += (char)(uint8_t)(0b10000000 | ((charVal >>  6) & 0b111111));
+        inout += (char)(uint8_t)(0b10000000 | ( charVal        & 0b111111));
+    }
+    else
         return false;
-    out = (val1 << 4) | val0;
     return true;
 }
 
@@ -892,11 +924,31 @@ bool Tokenizer::ParseString(Token& out)
             case '0': out.String += '\0'; ++tokenLen; break;
             case 'x':
             {
-                uint8_t val = 0;
-                if(tokenLen + 2 >= currCodeLen || !Parse2CharsHex(val, currCode + tokenLen + 1))
+                uint32_t val = 0;
+                if(tokenLen + 2 >= currCodeLen || !ParseCharsHex(val, currCode + tokenLen + 1, 2))
                     throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE);
-                out.String += (char)val;
+                out.String += (char)(uint8_t)val;
                 tokenLen += 3;
+                break;
+            }
+            case 'u':
+            {
+                uint32_t val = 0;
+                if(tokenLen + 4 >= currCodeLen || !ParseCharsHex(val, currCode + tokenLen + 1, 4))
+                    throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE);
+                if(!AppendUtf8Char(out.String, val))
+                    throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE);
+                tokenLen += 5;
+                break;
+            }
+            case 'U':
+            {
+                uint32_t val = 0;
+                if(tokenLen + 8 >= currCodeLen || !ParseCharsHex(val, currCode + tokenLen + 1, 8))
+                    throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE);
+                if(!AppendUtf8Char(out.String, val))
+                    throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE);
+                tokenLen += 9;
                 break;
             }
             default:
