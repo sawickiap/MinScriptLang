@@ -51,6 +51,11 @@ private:
     const std::string m_Message;
 };
 
+#define EXECUTION_CHECK(condition, errorMessage) \
+    do { if(!(condition)) throw ExecutionError(GetPlace(), (errorMessage)); } while(false)
+#define EXECUTION_CHECK_PLACE(condition, place, errorMessage) \
+    do { if(!(condition)) throw ExecutionError((place), (errorMessage)); } while(false)
+
 class EnvironmentPimpl;
 
 class Environment
@@ -610,8 +615,7 @@ private:
 
 static inline void CheckNumberOperand(const AST::Expression* operand, const Value& value)
 {
-    if(value.GetType() != Value::Type::Number)
-        throw ExecutionError(operand->GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER);
+    EXECUTION_CHECK_PLACE( value.GetType() == Value::Type::Number, operand->GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1264,7 +1268,7 @@ void Script::Execute(ExecuteContext& ctx) const
 
 LValue Expression::GetLValue(ExecuteContext& ctx) const
 {
-    throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_EXPECTED_LVALUE));
+    EXECUTION_CHECK( false, ERROR_MESSAGE_EXPECTED_LVALUE );
 }
 
 void ConstantValue::DebugPrint(uint32_t indentLevel) const
@@ -1288,7 +1292,7 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
     Value* val = ctx.GlobalContext.TryGetValue(S);
     if(val)
         return *val;
-    throw ExecutionError(GetPlace(), string("Variable \"") + S + "\" doesn't exist.");
+    EXECUTION_CHECK( false, string("Variable \"") + S + "\" doesn't exist." );
 }
 
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
@@ -1316,13 +1320,10 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         Type == UnaryOperatorType::Postdecrementation)
     {
         LValue lval = Operand->GetLValue(ctx);
-        if(lval.HasIndex())
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_LVALUE);
+        EXECUTION_CHECK( !lval.HasIndex(), ERROR_MESSAGE_INVALID_LVALUE );
         Value* val = lval.Obj.TryGetValue(lval.Key);
-        if(val == nullptr)
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_VARIABLE_DOESNT_EXIST);
-        if(val->GetType() != Value::Type::Number)
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER);
+        EXECUTION_CHECK( val != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
+        EXECUTION_CHECK( val->GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
         {
         case UnaryOperatorType::Preincrementation: val->SetNumber(val->GetNumber() + 1.0); return *val;
@@ -1349,8 +1350,7 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         Type == UnaryOperatorType::BitwiseNot)
     {
         Value val = Operand->Evaluate(ctx);
-        if(val.GetType() != Value::Type::Number)
-            throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_EXPECTED_NUMBER));
+        EXECUTION_CHECK( val.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
         {
         case UnaryOperatorType::Plus: return val;
@@ -1442,7 +1442,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
         else if(lhsType == Value::Type::String && rhsType == Value::Type::String)
             return Value{lhs.GetString() + rhs.GetString()};
         else
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
+            EXECUTION_CHECK( false, ERROR_MESSAGE_INCOMPATIBLE_TYPES );
     }
     if(Type == BinaryOperatorType::Equal)
     {
@@ -1454,7 +1454,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
             else if(lhsType == Value::Type::String)
                 result = lhs.GetString() == rhs.GetString();
             else
-                throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
+                EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
         }
         return Value{result ? 1.0 : 0.0};
     }
@@ -1468,7 +1468,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
             else if(lhsType == Value::Type::String)
                 result = lhs.GetString() != rhs.GetString();
             else
-                throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
+                EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
         }
         return Value{result ? 1.0 : 0.0};
     }
@@ -1476,8 +1476,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
         Type == BinaryOperatorType::Greater || Type == BinaryOperatorType::GreaterEqual)
     {
         bool result = false;
-        if(lhsType != rhsType)
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
+        EXECUTION_CHECK( lhsType == rhsType, ERROR_MESSAGE_INCOMPATIBLE_TYPES );
         if(lhsType == Value::Type::Number)
         {
             switch(Type)
@@ -1501,18 +1500,15 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
             }
         }
         else
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
+            EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
         return Value{result ? 1.0 : 0.0};
     }
     if(Type == BinaryOperatorType::Indexing)
     {
-        if(lhsType != Value::Type::String || rhsType != Value::Type::Number)
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
+        EXECUTION_CHECK( lhsType == Value::Type::String && rhsType == Value::Type::Number, ERROR_MESSAGE_INVALID_TYPE );
         size_t index = 0;
-        if(!NumberToIndex(index, rhs.GetNumber()))
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_INDEX);
-        if(index >= lhs.GetString().length())
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
+        EXECUTION_CHECK( NumberToIndex(index, rhs.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
+        EXECUTION_CHECK( index < lhs.GetString().length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
         return Value{string(1, lhs.GetString()[index])};
     }
 
@@ -1542,10 +1538,8 @@ LValue BinaryOperator::GetLValue(ExecuteContext& ctx) const
     {
         LValue lval = Operands[0]->GetLValue(ctx);
         const Value indexVal = Operands[1]->Evaluate(ctx);
-        if(indexVal.GetType() != Value::Type::Number)
-            throw ExecutionError(Operands[1]->GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER);
-        if(!NumberToIndex(lval.Index, indexVal.GetNumber()))
-            throw ExecutionError(Operands[1]->GetPlace(), ERROR_MESSAGE_INVALID_INDEX);
+        EXECUTION_CHECK( indexVal.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+        EXECUTION_CHECK( NumberToIndex(lval.Index, indexVal.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
         return lval;
     }
     return __super::GetLValue(ctx);
@@ -1572,17 +1566,12 @@ Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
     // Indexing: string[index] = newChar
     if(lhs.HasIndex())
     {
-        if(Type != BinaryOperatorType::Assignment)
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_LVALUE);
+        EXECUTION_CHECK( Type == BinaryOperatorType::Assignment, ERROR_MESSAGE_INVALID_LVALUE );
         Value* const lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
-        if(lhsValPtr == nullptr)
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_VARIABLE_DOESNT_EXIST);
-        if(lhsValPtr->GetType() != Value::Type::String || rhs.GetType() != Value::Type::String)
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_EXPECTED_STRING);
-        if(lhs.Index >= lhsValPtr->GetString().length())
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
-        if(rhs.GetString().length() != 1)
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING);
+        EXECUTION_CHECK( lhsValPtr != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
+        EXECUTION_CHECK( lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
+        EXECUTION_CHECK( lhs.Index < lhsValPtr->GetString().length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
+        EXECUTION_CHECK( rhs.GetString().length() == 1, ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING );
         lhsValPtr->GetString()[lhs.Index] = rhs.GetString()[0];
         return *lhsValPtr;
     }
@@ -1597,8 +1586,7 @@ Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
 
     // These ones require existing value.
     Value* const lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
-    if(lhsValPtr == nullptr)
-        throw ExecutionError(GetPlace(), ERROR_MESSAGE_VARIABLE_DOESNT_EXIST);
+    EXECUTION_CHECK( lhsValPtr != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
 
     if(Type == BinaryOperatorType::AssignmentAdd)
     {
@@ -1607,15 +1595,13 @@ Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
         else if(lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String)
             lhsValPtr->GetString() += rhs.GetString();
         else
-            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
+            EXECUTION_CHECK( false, ERROR_MESSAGE_INCOMPATIBLE_TYPES );
         return *lhsValPtr;
     }
 
     // Remaining ones work on numbers only.
-    if(lhsValPtr->GetType() != Value::Type::Number)
-        throw ExecutionError(GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER);
-    if(rhs.GetType() != Value::Type::Number)
-        throw ExecutionError(Operands[1]->GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER);
+    EXECUTION_CHECK( lhsValPtr->GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+    EXECUTION_CHECK( rhs.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER);
     switch(Type)
     {
     case BinaryOperatorType::AssignmentSub: lhsValPtr->SetNumber(lhsValPtr->GetNumber() - rhs.GetNumber()); break;
@@ -1704,7 +1690,7 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
     if(calleeIdentifier->S == "print")
         return BuiltInFunction_Print(ctx, values.data(), values.size());
     else
-        throw ExecutionError(GetPlace(), string("Unknown function: ") + calleeIdentifier->S);
+        EXECUTION_CHECK( false, string("Unknown function: ") + calleeIdentifier->S );
 }
 
 } // namespace AST
