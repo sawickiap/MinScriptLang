@@ -302,5 +302,28 @@ TEST_CASE("Basic")
         code = " '\\U0000010G';";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
     }
+    SECTION("String concatenation and appending")
+    {
+        const char* code = "s='aa' + 'bb'; s += 'cc'; s += s; print(s);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "aabbccaabbcc\n");
+    }
+    SECTION("Mixed types in conditional operator")
+    {
+        const char* code = "b=true; v=b?123:'aaa'; print(v);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "123\n");
+    }
+    SECTION("Type mismatch in operators")
+    {
+        const char* code = "print('aaa' + 123);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "v='aaa'; v += 1;";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "v=1 ^ 'aaa';";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "v='bbb' - 'aaa';";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
 
 }

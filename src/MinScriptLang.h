@@ -1482,6 +1482,8 @@ Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
             lhsValPtr->SetNumber(lhsValPtr->GetNumber() + rhs.GetNumber());
         else if(lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String)
             lhsValPtr->AppendString(rhs.GetString());
+        else
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
         return *lhsValPtr;
     }
 
