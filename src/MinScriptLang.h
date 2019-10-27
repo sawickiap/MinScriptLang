@@ -131,6 +131,7 @@ static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMME
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING = "Unexpected end of file inside string.";
 static const char* const ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expression.";
 static const char* const ERROR_MESSAGE_EXPECTED_STATEMENT = "Expected statement.";
+static const char* const ERROR_MESSAGE_EXPECTED_CONSTANT_VALUE = "Expected constant value.";
 static const char* const ERROR_MESSAGE_EXPECTED_LVALUE = "Expected l-value.";
 static const char* const ERROR_MESSAGE_EXPECTED_NUMBER = "Expected number.";
 static const char* const ERROR_MESSAGE_EXPECTED_STRING = "Expected string.";
@@ -140,6 +141,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_COLON               = "Ex
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Expected symbol ';'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN  = "Expected symbol '('.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Expected symbol ')'.";
+static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN  = "Expected symbol '{'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE = "Expected symbol ']'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
@@ -221,7 +223,7 @@ enum class Symbol
     DoubleAmperstand,  // &&
     DoublePipe,        // ||
     // Keywords
-    Null, False, True, If, Else, While, Do, For, Break, Continue, Count
+    Null, False, True, If, Else, While, Do, For, Break, Continue, Switch, Case, Default, Count
 };
 static const char* SYMBOL_STR[] = {
     // Token types
@@ -231,7 +233,7 @@ static const char* SYMBOL_STR[] = {
     // Multiple character symbols
     "++", "--", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
     // Keywords
-    "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue",
+    "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue", "switch", "case", "default",
 };
 
 struct Token
@@ -363,6 +365,33 @@ public:
     string& GetString() { assert(m_Type == Type::String); return m_String; }
     const string& GetString() const { assert(m_Type == Type::String); return m_String; }
 
+    bool operator==(const Value& rhs) const
+    {
+        if(m_Type == rhs.m_Type)
+        {
+            switch(m_Type)
+            {
+            case Type::Number: return m_Number == rhs.m_Number;
+            case Type::String: return m_String == rhs.m_String;
+            default: assert(0);
+            }
+        }
+        return false;
+    }
+    bool operator!=(const Value& rhs) const
+    {
+        if(m_Type == rhs.m_Type)
+        {
+            switch(m_Type)
+            {
+            case Type::Number: return m_Number != rhs.m_Number;
+            case Type::String: return m_String != rhs.m_String;
+            default: assert(0);
+            }
+        }
+        return true;
+    }
+
     bool IsTrue() const
     {
         switch(m_Type)
@@ -489,6 +518,18 @@ struct Block : public Statement
 {
     explicit Block(const PlaceInCode& place) : Statement{place} { }
     vector<unique_ptr<Statement>> Statements;
+    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void Execute(ExecuteContext& ctx) const;
+};
+
+struct ConstantValue;
+
+struct SwitchStatement : public Statement
+{
+    unique_ptr<Expression> Condition;
+    vector<unique_ptr<AST::ConstantValue>> ItemValues; // null means default block.
+    vector<unique_ptr<AST::Block>> ItemBlocks; // Can be null if empty.
+    explicit SwitchStatement(const PlaceInCode& place) : Statement{place} { }
     virtual void DebugPrint(uint32_t indentLevel) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
@@ -633,7 +674,9 @@ private:
     size_t m_TokenIndex = 0;
 
     void ParseBlock(AST::Block& outBlock);
+    bool TryParseSwitchItem(AST::SwitchStatement& switchStatement);
     unique_ptr<AST::Statement> TryParseStatement();
+    unique_ptr<AST::ConstantValue> TryParseConstantValue();
     unique_ptr<AST::ConstantExpression> TryParseConstantExpr();
     unique_ptr<AST::Expression> TryParseExpr0();
     unique_ptr<AST::Expression> TryParseExpr2();
@@ -1250,6 +1293,57 @@ void Block::Execute(ExecuteContext& ctx) const
         stmtPtr->Execute(ctx);
 }
 
+void SwitchStatement::DebugPrint(uint32_t indentLevel) const
+{
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "switch\n", DEBUG_PRINT_ARGS_BEG);
+    ++indentLevel;
+    Condition->DebugPrint(indentLevel);
+    for(size_t i = 0; i < ItemValues.size(); ++i)
+    {
+        if(ItemValues[i])
+            ItemValues[i]->DebugPrint(indentLevel);
+        else
+            printf(DEBUG_PRINT_FORMAT_STR_BEG "default\n", DEBUG_PRINT_ARGS_BEG);
+        if(ItemBlocks[i])
+            ItemBlocks[i]->DebugPrint(indentLevel);
+        else
+            printf(DEBUG_PRINT_FORMAT_STR_BEG "(empty block)\n", DEBUG_PRINT_ARGS_BEG);
+    }
+}
+
+void SwitchStatement::Execute(ExecuteContext& ctx) const
+{
+    const Value condVal = Condition->Evaluate(ctx);
+    size_t itemIndex, defaultItemIndex = SIZE_MAX;
+    const size_t itemCount = ItemValues.size();
+    for(itemIndex = 0; itemIndex < itemCount; ++itemIndex)
+    {
+        if(ItemValues[itemIndex])
+        {
+            if(ItemValues[itemIndex]->Val == condVal)
+                break;
+        }
+        else
+            defaultItemIndex = itemIndex;
+    }
+    if(itemIndex == itemCount && defaultItemIndex != SIZE_MAX)
+        itemIndex = defaultItemIndex;
+    if(itemIndex != itemCount)
+    {
+        for(; itemIndex < itemCount; ++itemIndex)
+        {
+            try
+            {
+                ItemBlocks[itemIndex]->Execute(ctx);
+            }
+            catch(BreakException)
+            {
+                break;
+            }
+        }
+    }
+}
+
 void Script::Execute(ExecuteContext& ctx) const
 {
     try
@@ -1446,31 +1540,11 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     }
     if(Type == BinaryOperatorType::Equal)
     {
-        bool result = false;
-        if(lhsType == rhsType)
-        {
-            if(lhsType == Value::Type::Number)
-                result = lhs.GetNumber() == rhs.GetNumber();
-            else if(lhsType == Value::Type::String)
-                result = lhs.GetString() == rhs.GetString();
-            else
-                EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
-        }
-        return Value{result ? 1.0 : 0.0};
+        return Value{lhs == rhs ? 1.0 : 0.0};
     }
     if(Type == BinaryOperatorType::NotEqual)
     {
-        bool result = true;
-        if(lhsType == rhsType)
-        {
-            if(lhsType == Value::Type::Number)
-                result = lhs.GetNumber() != rhs.GetNumber();
-            else if(lhsType == Value::Type::String)
-                result = lhs.GetString() != rhs.GetString();
-            else
-                EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
-        }
-        return Value{result ? 1.0 : 0.0};
+        return Value{lhs != rhs ? 1.0 : 0.0};
     }
     if(Type == BinaryOperatorType::Less || Type == BinaryOperatorType::LessEqual ||
         Type == BinaryOperatorType::Greater || Type == BinaryOperatorType::GreaterEqual)
@@ -1740,6 +1814,32 @@ void Parser::ParseBlock(AST::Block& outBlock)
     }
 }
 
+bool Parser::TryParseSwitchItem(AST::SwitchStatement& switchStatement)
+{
+    const PlaceInCode place = GetCurrentTokenPlace();
+    // 'default' ':' Block
+    if(TryParseSymbol(Symbol::Default))
+    {
+        MUST_PARSE( TryParseSymbol(Symbol::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON );
+        switchStatement.ItemValues.push_back(unique_ptr<AST::ConstantValue>{});
+        switchStatement.ItemBlocks.push_back(std::make_unique<AST::Block>(place));
+        ParseBlock(*switchStatement.ItemBlocks.back());
+        return true;
+    }
+    // 'case' ConstantExpr ':' Block
+    if(TryParseSymbol(Symbol::Case))
+    {
+        unique_ptr<AST::ConstantValue> constVal;
+        MUST_PARSE( constVal = TryParseConstantValue(), ERROR_MESSAGE_EXPECTED_CONSTANT_VALUE );
+        switchStatement.ItemValues.push_back(std::move(constVal));
+        MUST_PARSE( TryParseSymbol(Symbol::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON );
+        switchStatement.ItemBlocks.push_back(std::make_unique<AST::Block>(place));
+        ParseBlock(*switchStatement.ItemBlocks.back());
+        return true;
+    }
+    return false;
+}
+
 unique_ptr<AST::Statement> Parser::TryParseStatement()
 {
     const PlaceInCode place = GetCurrentTokenPlace();
@@ -1832,6 +1932,19 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
         return make_unique<AST::LoopBreakStatement>(place, AST::LoopBreakType::Continue);
     }
 
+    // 'switch' '(' Expr17 ')' '{' SwitchItem+ '}'
+    if(TryParseSymbol(Symbol::Switch))
+    {
+        unique_ptr<AST::SwitchStatement> stmt = std::make_unique<AST::SwitchStatement>(place);
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
+        MUST_PARSE( stmt->Condition = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
+        MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN );
+        while(TryParseSwitchItem(*stmt)) { }
+        MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
+        return stmt;
+    }
+
     // Expression as statement: Expr17 ';'
     unique_ptr<AST::Expression> expr = TryParseExpr17();
     if(expr)
@@ -1843,7 +1956,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     return unique_ptr<AST::Statement>{};
 }
 
-unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
+unique_ptr<AST::ConstantValue> Parser::TryParseConstantValue()
 {
     const Token& t = m_Tokens[m_TokenIndex];
     switch(t.Symbol)
@@ -1851,9 +1964,6 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
     case Symbol::Number:
         ++m_TokenIndex;
         return make_unique<AST::ConstantValue>(t.Place, Value{t.Number});
-    case Symbol::Identifier:
-        ++m_TokenIndex;
-        return make_unique<AST::Identifier>(t.Place, string(t.String));
     case Symbol::String:
     {
         ++m_TokenIndex;
@@ -1872,7 +1982,18 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
         ++m_TokenIndex;
         return make_unique<AST::ConstantValue>(t.Place, Value{1.0});
     }
-    return unique_ptr<AST::ConstantExpression>{};
+    return unique_ptr<AST::ConstantValue>{};
+}
+
+unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
+{
+    const Token& t = m_Tokens[m_TokenIndex];
+    if(t.Symbol == Symbol::Identifier)
+    {
+        ++m_TokenIndex;
+        return make_unique<AST::Identifier>(t.Place, string(t.String));
+    }
+    return TryParseConstantValue();
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr0()

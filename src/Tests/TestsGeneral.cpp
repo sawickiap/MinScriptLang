@@ -381,5 +381,35 @@ TEST_CASE("Basic")
         code = "s='ABCDEF'; s['x']='a';";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
+    SECTION("Switch basic")
+    {
+        const char* code = "switch(123) { case 1: print(1); case 'a': print('a'); case 123: print(123); default: print('Boo!'); }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "123\nBoo!\n");
+    }
+    SECTION("Switch with break")
+    {
+        const char* code = "switch(123) { case 1: print(1);break; case 'a': print('a');break; case 123: print(123);break; default: print('Boo!');break; }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "123\n");
+    }
+    SECTION("Switch with default active")
+    {
+        const char* code = "switch(124) { default: print('Boo!');break; case 1: print(1);break; case 'a': print('a');break; case 123: print(123);break; }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "Boo!\n");
+    }
+    SECTION("Switch with nothing active")
+    {
+        const char* code = "switch(124) { case 1: print(1);break; case 'a': print('a');break; case 123: print(123);break; }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "");
+    }
+    SECTION("Switch inside a loop")
+    {
+        const char* code = "for(i=0; i<5; ++i) { switch(i) { case 0:print(0);break; case 1:print('1');continue; case 2:print(2);break; case 3:default:print('Other'); } }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n1\n2\nOther\nOther\n");
+    }
 
 }
