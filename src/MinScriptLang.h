@@ -118,6 +118,7 @@ static const char* const ERROR_MESSAGE_PARSING_ERROR = "Parsing error.";
 static const char* const ERROR_MESSAGE_INVALID_NUMBER = "Invalid number.";
 static const char* const ERROR_MESSAGE_INVALID_STRING = "Invalid string.";
 static const char* const ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE = "Invalid escape sequence in a string.";
+static const char* const ERROR_MESSAGE_INVALID_TYPE = "Invalid type.";
 static const char* const ERROR_MESSAGE_UNRECOGNIZED_TOKEN = "Unrecognized token.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT = "Unexpected end of file inside multiline comment.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING = "Unexpected end of file inside string.";
@@ -1409,14 +1410,46 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     // Remaining operators use both operands as r-values.
     Value rhs = Operands[1]->Evaluate(ctx);
 
+    const Value::Type lhsType = lhs.GetType();
+    const Value::Type rhsType = rhs.GetType();
+
+    // These ones support various types.
     if(Type == BinaryOperatorType::Add)
     {
-        if(lhs.GetType() == Value::Type::Number && rhs.GetType() == Value::Type::Number)
+        if(lhsType == Value::Type::Number && rhsType == Value::Type::Number)
             return Value{lhs.GetNumber() + rhs.GetNumber()};
-        else if(lhs.GetType() == Value::Type::String && rhs.GetType() == Value::Type::String)
+        else if(lhsType == Value::Type::String && rhsType == Value::Type::String)
             return Value{lhs.GetString() + rhs.GetString()};
         else
             throw ExecutionError(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
+    }
+    else if(Type == BinaryOperatorType::Equal)
+    {
+        bool result = false;
+        if(lhsType == rhsType)
+        {
+            if(lhsType == Value::Type::Number)
+                result = lhs.GetNumber() == rhs.GetNumber();
+            else if(lhsType == Value::Type::String)
+                result = lhs.GetString() == rhs.GetString();
+            else
+                throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
+        }
+        return Value{result ? 1.0 : 0.0};
+    }
+    else if(Type == BinaryOperatorType::NotEqual)
+    {
+        bool result = true;
+        if(lhsType == rhsType)
+        {
+            if(lhsType == Value::Type::Number)
+                result = lhs.GetNumber() != rhs.GetNumber();
+            else if(lhsType == Value::Type::String)
+                result = lhs.GetString() != rhs.GetString();
+            else
+                throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
+        }
+        return Value{result ? 1.0 : 0.0};
     }
 
     // Remaining operators require numbers.
@@ -1435,8 +1468,6 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     case BinaryOperatorType::LessEqual:    return Value{lhs.GetNumber() <= rhs.GetNumber() ? 1.0 : 0.0};
     case BinaryOperatorType::Greater:      return Value{lhs.GetNumber() >  rhs.GetNumber() ? 1.0 : 0.0};
     case BinaryOperatorType::GreaterEqual: return Value{lhs.GetNumber() >= rhs.GetNumber() ? 1.0 : 0.0};
-    case BinaryOperatorType::Equal:        return Value{lhs.GetNumber() == rhs.GetNumber() ? 1.0 : 0.0};
-    case BinaryOperatorType::NotEqual:     return Value{lhs.GetNumber() != rhs.GetNumber() ? 1.0 : 0.0};
     case BinaryOperatorType::BitwiseAnd:   return Value{ (double)( (int64_t)lhs.GetNumber() & (int64_t)rhs.GetNumber() ) };
     case BinaryOperatorType::BitwiseXor:   return Value{ (double)( (int64_t)lhs.GetNumber() ^ (int64_t)rhs.GetNumber() ) };
     case BinaryOperatorType::BitwiseOr:    return Value{ (double)( (int64_t)lhs.GetNumber() | (int64_t)rhs.GetNumber() ) };
