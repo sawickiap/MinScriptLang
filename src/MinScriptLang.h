@@ -119,6 +119,7 @@ static const char* const ERROR_MESSAGE_INVALID_NUMBER = "Invalid number.";
 static const char* const ERROR_MESSAGE_INVALID_STRING = "Invalid string.";
 static const char* const ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE = "Invalid escape sequence in a string.";
 static const char* const ERROR_MESSAGE_INVALID_TYPE = "Invalid type.";
+static const char* const ERROR_MESSAGE_INVALID_INDEX = "Invalid index.";
 static const char* const ERROR_MESSAGE_UNRECOGNIZED_TOKEN = "Unrecognized token.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT = "Unexpected end of file inside multiline comment.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING = "Unexpected end of file inside string.";
@@ -132,6 +133,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Ex
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN  = "Expected symbol '('.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Expected symbol ')'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
+static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE = "Expected symbol ']'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
 static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
 static const char* const ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
@@ -171,6 +173,8 @@ enum class Symbol
     Semicolon,         // ;
     RoundBracketOpen,  // (
     RoundBracketClose, // )
+    SquareBracketOpen, // [
+    SquareBracketClose, // ]
     CurlyBracketOpen,  // {
     CurlyBracketClose, // }
     Asterisk,          // *
@@ -214,7 +218,7 @@ static const char* SYMBOL_STR[] = {
     // Token types
     "", "", "", "", "",
     // Symbols
-    ",", "?", ":", ";", "(", ")", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", "&", "^", "|",
+    ",", "?", ":", ";", "(", ")", "[", "]", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", "&", "^", "|",
     // Multiple character symbols
     "++", "--", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
     // Keywords
@@ -259,6 +263,14 @@ static void Format(string& str, const char* format, ...)
     va_start(argList, format);
     VFormat(str, format, argList);
     va_end(argList);
+}
+
+static bool NumberToIndex(size_t& outIndex, double number)
+{
+    if(!isfinite(number) || number < 0.f)
+        return false;
+    outIndex = (size_t)number;
+    return (double)outIndex == number;
 }
 
 class BreakException { };
@@ -544,7 +556,7 @@ enum class BinaryOperatorType
     AssignmentBitwiseAnd, AssignmentBitwiseXor, AssignmentBitwiseOr,
     Less, Greater, LessEqual, GreaterEqual, Equal, NotEqual,
     BitwiseAnd, BitwiseXor, BitwiseOr, LogicalAnd, LogicalOr,
-    Comma,
+    Comma, Indexing,
 };
 
 struct BinaryOperator : Operator
@@ -1355,7 +1367,7 @@ void BinaryOperator::DebugPrint(uint32_t indentLevel) const
         "Mul", "Div", "Mod", "Add", "Sub", "Shift left", "Shift right", "Assignment",
         "Less", "Greater", "LessEqual", "GreaterEqual", "Equal", "NotEqual",
         "BitwiseAnd", "BitwiseXor", "BitwiseOr", "LogicalAnd", "LogicalOr",
-        "Comma", };
+        "Comma", "Indexing", };
     printf(DEBUG_PRINT_FORMAT_STR_BEG "BinaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, BINARY_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
     ++indentLevel;
     Operands[0]->DebugPrint(indentLevel);
@@ -1364,6 +1376,13 @@ void BinaryOperator::DebugPrint(uint32_t indentLevel) const
 
 Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
 {
+    // This operator is special, discards result of left operand.
+    if(Type == BinaryOperatorType::Comma)
+    {
+        Operands[0]->Execute(ctx);
+        return Operands[1]->Evaluate(ctx);
+    }
+    
     // Operators that require l-value.
     switch(Type)
     {
@@ -1385,13 +1404,6 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     }
     }
     
-    // This operator is special, discards result of left operand.
-    if(Type == BinaryOperatorType::Comma)
-    {
-        Operands[0]->Execute(ctx);
-        return Operands[1]->Evaluate(ctx);
-    }
-
     // Remaining operators use r-values.
     Value lhs = Operands[0]->Evaluate(ctx);
 
@@ -1482,6 +1494,15 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
         else
             throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
         return Value{result ? 1.0 : 0.0};
+    }
+    if(Type == BinaryOperatorType::Indexing)
+    {
+        if(lhsType != Value::Type::String || rhsType != Value::Type::Number)
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
+        size_t index = 0;
+        if(!NumberToIndex(index, rhs.GetNumber()))
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_INDEX);
+        return Value{string(1, lhs.GetString()[index])};
     }
 
     // Remaining operators require numbers.
@@ -1879,7 +1900,15 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
         return op;
     }
-    // #TODO Indexing: Expr0 '[' Expr17 ']'
+    // Indexing: Expr0 '[' Expr17 ']'
+    if(TryParseSymbol(Symbol::SquareBracketOpen))
+    {
+        unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Indexing);
+        op->Operands[0] = std::move(expr);
+        MUST_PARSE( op->Operands[1] = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        MUST_PARSE( TryParseSymbol(Symbol::SquareBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE );
+        return op;
+    }
     // #TODO Member access: Expr0 '.' TOKEN_IDENTIFIER
     // Just Expr0
     return expr;

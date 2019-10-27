@@ -341,5 +341,11 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n0\n1\n1\n0\n");
     }
+    SECTION("String indexing")
+    {
+        const char* code = "s='ABCDEF'; print(s[1]); i=3; t=s[i-1]; print(t + t);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "B\nCC\n");
+    }
 
 }
