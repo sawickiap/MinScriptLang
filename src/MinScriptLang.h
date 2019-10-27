@@ -136,6 +136,7 @@ static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't
 static const char* const ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
 static const char* const ERROR_MESSAGE_BREAK_WITHOUT_LOOP = "Break without a loop.";
 static const char* const ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP = "Continue without a loop.";
+static const char* const ERROR_MESSAGE_INCOMPATIBLE_TYPES = "Incompatible types.";
 
 struct Constant
 {
@@ -352,6 +353,7 @@ public:
 
     void SetNumber(double number) { m_Type = Type::Number; m_Number = number; m_String.clear(); }
     void SetString(string&& str) { m_Type = Type::String; m_String = std::move(str); }
+    void AppendString(const string& src) { assert(m_Type == Type::String); m_String += src; }
 
 private:
     Type m_Type = Type::Number;
@@ -1362,15 +1364,24 @@ void BinaryOperator::DebugPrint(uint32_t indentLevel) const
 Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
 {
     // Operators that require l-value.
-    if(Type == BinaryOperatorType::Assignment ||
-        Type == BinaryOperatorType::AssignmentAdd || Type == BinaryOperatorType::AssignmentSub ||
-        Type == BinaryOperatorType::AssignmentMul || Type == BinaryOperatorType::AssignmentDiv || Type == BinaryOperatorType::AssignmentMod ||
-        Type == BinaryOperatorType::AssignmentShiftLeft || Type == BinaryOperatorType::AssignmentShiftRight ||
-        Type == BinaryOperatorType::AssignmentBitwiseAnd || Type == BinaryOperatorType::AssignmentBitwiseXor || Type == BinaryOperatorType::AssignmentBitwiseOr)
+    switch(Type)
+    {
+    case BinaryOperatorType::Assignment:
+    case BinaryOperatorType::AssignmentAdd:
+    case BinaryOperatorType::AssignmentSub:
+    case BinaryOperatorType::AssignmentMul:
+    case BinaryOperatorType::AssignmentDiv:
+    case BinaryOperatorType::AssignmentMod:
+    case BinaryOperatorType::AssignmentShiftLeft:
+    case BinaryOperatorType::AssignmentShiftRight:
+    case BinaryOperatorType::AssignmentBitwiseAnd:
+    case BinaryOperatorType::AssignmentBitwiseXor:
+    case BinaryOperatorType::AssignmentBitwiseOr:
     {
         LValue lhs = Operands[0]->GetLValue(ctx);
         Value rhs = Operands[1]->Evaluate(ctx);
         return Assignment(lhs, std::move(rhs));
+    }
     }
     
     // This operator is special, discards result of left operand.
@@ -1398,6 +1409,16 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     // Remaining operators use both operands as r-values.
     Value rhs = Operands[1]->Evaluate(ctx);
 
+    if(Type == BinaryOperatorType::Add)
+    {
+        if(lhs.GetType() == Value::Type::Number && rhs.GetType() == Value::Type::Number)
+            return Value{lhs.GetNumber() + rhs.GetNumber()};
+        else if(lhs.GetType() == Value::Type::String && rhs.GetType() == Value::Type::String)
+            return Value{lhs.GetString() + rhs.GetString()};
+        else
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
+    }
+
     // Remaining operators require numbers.
     CheckNumberOperand(Operands[0].get(), lhs);
     CheckNumberOperand(Operands[1].get(), rhs);
@@ -1407,7 +1428,6 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     case BinaryOperatorType::Mul:          return Value{lhs.GetNumber() * rhs.GetNumber()};
     case BinaryOperatorType::Div:          return Value{lhs.GetNumber() / rhs.GetNumber()};
     case BinaryOperatorType::Mod:          return Value{fmod(lhs.GetNumber(), rhs.GetNumber())};
-    case BinaryOperatorType::Add:          return Value{lhs.GetNumber() + rhs.GetNumber()};
     case BinaryOperatorType::Sub:          return Value{lhs.GetNumber() - rhs.GetNumber()};
     case BinaryOperatorType::ShiftLeft:    return ShiftLeft(std::move(lhs), std::move(rhs));
     case BinaryOperatorType::ShiftRight:   return ShiftRight(std::move(lhs), std::move(rhs));
@@ -1455,13 +1475,23 @@ Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
     Value* lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
     if(lhsValPtr == nullptr)
         throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_VARIABLE_DOESNT_EXIST));
+
+    if(Type == BinaryOperatorType::AssignmentAdd)
+    {
+        if(lhsValPtr->GetType() == Value::Type::Number && rhs.GetType() == Value::Type::Number)
+            lhsValPtr->SetNumber(lhsValPtr->GetNumber() + rhs.GetNumber());
+        else if(lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String)
+            lhsValPtr->AppendString(rhs.GetString());
+        return *lhsValPtr;
+    }
+
+    // Remaining ones work on numbers only.
     if(lhsValPtr->GetType() != Value::Type::Number)
         throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_EXPECTED_NUMBER));
     if(rhs.GetType() != Value::Type::Number)
         throw ExecutionError(Operands[1]->GetPlace(), string(ERROR_MESSAGE_EXPECTED_NUMBER));
     switch(Type)
     {
-    case BinaryOperatorType::AssignmentAdd: lhsValPtr->SetNumber(lhsValPtr->GetNumber() + rhs.GetNumber()); break;
     case BinaryOperatorType::AssignmentSub: lhsValPtr->SetNumber(lhsValPtr->GetNumber() - rhs.GetNumber()); break;
     case BinaryOperatorType::AssignmentMul: lhsValPtr->SetNumber(lhsValPtr->GetNumber() * rhs.GetNumber()); break;
     case BinaryOperatorType::AssignmentDiv: lhsValPtr->SetNumber(lhsValPtr->GetNumber() / rhs.GetNumber()); break;
