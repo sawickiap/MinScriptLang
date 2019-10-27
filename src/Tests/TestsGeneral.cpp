@@ -324,13 +324,22 @@ TEST_CASE("Basic")
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
         code = "v='bbb' - 'aaa';";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "v='bbb' < null;";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
-    SECTION("String comparisons")
+    SECTION("String comparisons equality")
     {
         const char* code = "a='aa'; b='bb'; n=1; \n"
             "print(a==a); print(a==b); print(b!=b); print(b!=a); print(a==n); print(n!=b);";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n0\n0\n1\n0\n1\n");
+    }
+    SECTION("String comparisons inequality")
+    {
+        const char* code = "a='aa'; b='bb'; \n"
+            "print(a<b); print(a<a); print(a<=a); print(b>=a); print(b>b);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n0\n1\n1\n0\n");
     }
 
 }

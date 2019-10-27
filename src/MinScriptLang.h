@@ -1423,7 +1423,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
         else
             throw ExecutionError(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
     }
-    else if(Type == BinaryOperatorType::Equal)
+    if(Type == BinaryOperatorType::Equal)
     {
         bool result = false;
         if(lhsType == rhsType)
@@ -1437,7 +1437,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
         }
         return Value{result ? 1.0 : 0.0};
     }
-    else if(Type == BinaryOperatorType::NotEqual)
+    if(Type == BinaryOperatorType::NotEqual)
     {
         bool result = true;
         if(lhsType == rhsType)
@@ -1449,6 +1449,38 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
             else
                 throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
         }
+        return Value{result ? 1.0 : 0.0};
+    }
+    if(Type == BinaryOperatorType::Less || Type == BinaryOperatorType::LessEqual ||
+        Type == BinaryOperatorType::Greater || Type == BinaryOperatorType::GreaterEqual)
+    {
+        bool result = false;
+        if(lhsType != rhsType)
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
+        if(lhsType == Value::Type::Number)
+        {
+            switch(Type)
+            {
+            case BinaryOperatorType::Less:         result = lhs.GetNumber() <  rhs.GetNumber(); break;
+            case BinaryOperatorType::LessEqual:    result = lhs.GetNumber() <= rhs.GetNumber(); break;
+            case BinaryOperatorType::Greater:      result = lhs.GetNumber() >  rhs.GetNumber(); break;
+            case BinaryOperatorType::GreaterEqual: result = lhs.GetNumber() >= rhs.GetNumber(); break;
+            default: assert(0);
+            }
+        }
+        else if(lhsType == Value::Type::String)
+        {
+            switch(Type)
+            {
+            case BinaryOperatorType::Less:         result = lhs.GetString() <  rhs.GetString(); break;
+            case BinaryOperatorType::LessEqual:    result = lhs.GetString() <= rhs.GetString(); break;
+            case BinaryOperatorType::Greater:      result = lhs.GetString() >  rhs.GetString(); break;
+            case BinaryOperatorType::GreaterEqual: result = lhs.GetString() >= rhs.GetString(); break;
+            default: assert(0);
+            }
+        }
+        else
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
         return Value{result ? 1.0 : 0.0};
     }
 
@@ -1464,10 +1496,6 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     case BinaryOperatorType::Sub:          return Value{lhs.GetNumber() - rhs.GetNumber()};
     case BinaryOperatorType::ShiftLeft:    return ShiftLeft(std::move(lhs), std::move(rhs));
     case BinaryOperatorType::ShiftRight:   return ShiftRight(std::move(lhs), std::move(rhs));
-    case BinaryOperatorType::Less:         return Value{lhs.GetNumber() <  rhs.GetNumber() ? 1.0 : 0.0};
-    case BinaryOperatorType::LessEqual:    return Value{lhs.GetNumber() <= rhs.GetNumber() ? 1.0 : 0.0};
-    case BinaryOperatorType::Greater:      return Value{lhs.GetNumber() >  rhs.GetNumber() ? 1.0 : 0.0};
-    case BinaryOperatorType::GreaterEqual: return Value{lhs.GetNumber() >= rhs.GetNumber() ? 1.0 : 0.0};
     case BinaryOperatorType::BitwiseAnd:   return Value{ (double)( (int64_t)lhs.GetNumber() & (int64_t)rhs.GetNumber() ) };
     case BinaryOperatorType::BitwiseXor:   return Value{ (double)( (int64_t)lhs.GetNumber() ^ (int64_t)rhs.GetNumber() ) };
     case BinaryOperatorType::BitwiseOr:    return Value{ (double)( (int64_t)lhs.GetNumber() | (int64_t)rhs.GetNumber() ) };
