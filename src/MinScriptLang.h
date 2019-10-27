@@ -140,6 +140,7 @@ static const char* const ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
 static const char* const ERROR_MESSAGE_BREAK_WITHOUT_LOOP = "Break without a loop.";
 static const char* const ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP = "Continue without a loop.";
 static const char* const ERROR_MESSAGE_INCOMPATIBLE_TYPES = "Incompatible types.";
+static const char* const ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS = "Index out of bounds.";
 
 struct Constant
 {
@@ -1502,6 +1503,8 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
         size_t index = 0;
         if(!NumberToIndex(index, rhs.GetNumber()))
             throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_INDEX);
+        if(index >= lhs.GetString().length())
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
         return Value{string(1, lhs.GetString()[index])};
     }
 
@@ -2208,6 +2211,8 @@ EnvironmentPimpl::~EnvironmentPimpl()
 
 void EnvironmentPimpl::Execute(const char* code, size_t codeLen)
 {
+    m_Script.Statements.clear();
+
     {
         Tokenizer tokenizer{code, codeLen};
         Parser parser{tokenizer};

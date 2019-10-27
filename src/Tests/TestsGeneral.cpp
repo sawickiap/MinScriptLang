@@ -347,5 +347,18 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "B\nCC\n");
     }
+    SECTION("Invalid string indexing")
+    {
+        const char* code = "s='ABCDEF'; print(s[-1]);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "s='ABCDEF'; print(s[2.5]);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "s='ABCDEF'; print(s['a']);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "s='ABCDEF'; b='aaa'; print(s[b]);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "s='ABCDEF'; print(s[10]);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
 
 }
