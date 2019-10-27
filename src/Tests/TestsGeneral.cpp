@@ -360,5 +360,11 @@ TEST_CASE("Basic")
         code = "s='ABCDEF'; print(s[10]);";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
+    SECTION("String indexing as l_value")
+    {
+        const char* code = "s='ABCDEF'; print(s); s[0]='a'; print(s); s[5]='z'; i=2; s[i*i]='w'; print(s);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "ABCDEF\naBCDEF\naBCDwz\n");
+    }
 
 }

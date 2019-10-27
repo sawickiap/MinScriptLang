@@ -120,6 +120,7 @@ static const char* const ERROR_MESSAGE_INVALID_STRING = "Invalid string.";
 static const char* const ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE = "Invalid escape sequence in a string.";
 static const char* const ERROR_MESSAGE_INVALID_TYPE = "Invalid type.";
 static const char* const ERROR_MESSAGE_INVALID_INDEX = "Invalid index.";
+static const char* const ERROR_MESSAGE_INVALID_LVALUE = "Invalid l-value.";
 static const char* const ERROR_MESSAGE_UNRECOGNIZED_TOKEN = "Unrecognized token.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT = "Unexpected end of file inside multiline comment.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING = "Unexpected end of file inside string.";
@@ -127,6 +128,8 @@ static const char* const ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expressio
 static const char* const ERROR_MESSAGE_EXPECTED_STATEMENT = "Expected statement.";
 static const char* const ERROR_MESSAGE_EXPECTED_LVALUE = "Expected l-value.";
 static const char* const ERROR_MESSAGE_EXPECTED_NUMBER = "Expected number.";
+static const char* const ERROR_MESSAGE_EXPECTED_STRING = "Expected string.";
+static const char* const ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING = "Expected single character string.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL                     = "Expected symbol.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_COLON               = "Expected symbol ':'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Expected symbol ';'.";
@@ -400,6 +403,9 @@ struct LValue
 {
     Object& Obj;
     Constant Key;
+    size_t Index; // SIZE_MAX if not indexing single character.
+    
+    bool HasIndex() const { return Index != SIZE_MAX; }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -567,7 +573,8 @@ struct BinaryOperator : Operator
     BinaryOperator(const PlaceInCode& place, BinaryOperatorType type) : Operator{place}, Type(type) { }
     virtual void DebugPrint(uint32_t indentLevel) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
-    
+    virtual LValue GetLValue(ExecuteContext& ctx) const;
+
 private:
     Value ShiftLeft(const Value& lhs, const Value& rhs) const;
     Value ShiftRight(const Value& lhs, const Value& rhs) const;
@@ -1288,7 +1295,7 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
 {
     // #TODO local, this, then global
-    return LValue{ctx.GlobalContext, Constant{string(S)}};
+    return LValue{ctx.GlobalContext, Constant{string(S)}, SIZE_MAX};
 }
 
 void UnaryOperator::DebugPrint(uint32_t indentLevel) const
@@ -1310,11 +1317,13 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         Type == UnaryOperatorType::Postdecrementation)
     {
         LValue lval = Operand->GetLValue(ctx);
+        if(lval.HasIndex())
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_LVALUE);
         Value* val = lval.Obj.TryGetValue(lval.Key);
         if(val == nullptr)
-            throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_VARIABLE_DOESNT_EXIST));
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_VARIABLE_DOESNT_EXIST);
         if(val->GetType() != Value::Type::Number)
-            throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_EXPECTED_NUMBER));
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER);
         switch(Type)
         {
         case UnaryOperatorType::Preincrementation: val->SetNumber(val->GetNumber() + 1.0); return *val;
@@ -1528,6 +1537,21 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     assert(0); return Value{};
 }
 
+LValue BinaryOperator::GetLValue(ExecuteContext& ctx) const
+{
+    if(Type == BinaryOperatorType::Indexing)
+    {
+        LValue lval = Operands[0]->GetLValue(ctx);
+        const Value indexVal = Operands[1]->Evaluate(ctx);
+        if(indexVal.GetType() != Value::Type::Number)
+            throw ExecutionError(Operands[1]->GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER);
+        if(!NumberToIndex(lval.Index, indexVal.GetNumber()))
+            throw ExecutionError(Operands[1]->GetPlace(), ERROR_MESSAGE_INVALID_INDEX);
+        return lval;
+    }
+    return __super::GetLValue(ctx);
+}
+
 Value BinaryOperator::ShiftLeft(const Value& lhs, const Value& rhs) const
 {
     const int64_t lhsInt = (int64_t)lhs.GetNumber();
@@ -1546,6 +1570,24 @@ Value BinaryOperator::ShiftRight(const Value& lhs, const Value& rhs) const
 
 Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
 {
+    // Indexing: string[index] = newChar
+    if(lhs.HasIndex())
+    {
+        if(Type != BinaryOperatorType::Assignment)
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INVALID_LVALUE);
+        Value* const lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
+        if(lhsValPtr == nullptr)
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_VARIABLE_DOESNT_EXIST);
+        if(lhsValPtr->GetType() != Value::Type::String || rhs.GetType() != Value::Type::String)
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_EXPECTED_STRING);
+        if(lhs.Index >= lhsValPtr->GetString().length())
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
+        if(rhs.GetString().length() != 1)
+            throw ExecutionError(GetPlace(), ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING);
+        lhsValPtr->GetString()[lhs.Index] = rhs.GetString()[0];
+        return *lhsValPtr;
+    }
+
     // This one is able to create new value.
     if(Type == BinaryOperatorType::Assignment)
     {
@@ -1555,9 +1597,9 @@ Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
     }
 
     // These ones require existing value.
-    Value* lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
+    Value* const lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
     if(lhsValPtr == nullptr)
-        throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_VARIABLE_DOESNT_EXIST));
+        throw ExecutionError(GetPlace(), ERROR_MESSAGE_VARIABLE_DOESNT_EXIST);
 
     if(Type == BinaryOperatorType::AssignmentAdd)
     {
@@ -1572,9 +1614,9 @@ Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
 
     // Remaining ones work on numbers only.
     if(lhsValPtr->GetType() != Value::Type::Number)
-        throw ExecutionError(GetPlace(), string(ERROR_MESSAGE_EXPECTED_NUMBER));
+        throw ExecutionError(GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER);
     if(rhs.GetType() != Value::Type::Number)
-        throw ExecutionError(Operands[1]->GetPlace(), string(ERROR_MESSAGE_EXPECTED_NUMBER));
+        throw ExecutionError(Operands[1]->GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER);
     switch(Type)
     {
     case BinaryOperatorType::AssignmentSub: lhsValPtr->SetNumber(lhsValPtr->GetNumber() - rhs.GetNumber()); break;
