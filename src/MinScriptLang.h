@@ -145,6 +145,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN  = "Ex
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE = "Expected symbol ']'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
+static const char* const ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT = "Expected unique constant.";
 static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
 static const char* const ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
 static const char* const ERROR_MESSAGE_BREAK_WITHOUT_LOOP = "Break without a loop.";
@@ -1942,6 +1943,23 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
         MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN );
         while(TryParseSwitchItem(*stmt)) { }
         MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
+        // Check uniqueness. Warning: O(n^2) complexity!
+        for(size_t i = 0, count = stmt->ItemValues.size(); i < count; ++i)
+        {
+            for(size_t j = i + 1; j < count; ++j)
+            {
+                if(j != i)
+                {
+                    if(!stmt->ItemValues[i] && !stmt->ItemValues[j]) // 2x default
+                        throw ParsingError(place, ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT);
+                    if(stmt->ItemValues[i] && stmt->ItemValues[j])
+                    {
+                        if(stmt->ItemValues[i]->Val == stmt->ItemValues[j]->Val)
+                            throw ParsingError(stmt->ItemValues[j]->GetPlace(), ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT);
+                    }
+                }
+            }
+        }
         return stmt;
     }
 

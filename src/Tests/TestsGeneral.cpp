@@ -411,5 +411,14 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "0\n1\n2\nOther\nOther\n");
     }
+    SECTION("Invalid switch")
+    {
+        const char* code = "switch(1) { case 2+2: }";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+        code = "i=1; switch(1) { case i: }";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+        code = "switch(1) { case 1: case 1: }";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+    }
 
 }
