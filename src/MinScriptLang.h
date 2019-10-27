@@ -370,7 +370,6 @@ public:
 
     void SetNumber(double number) { m_Type = Type::Number; m_Number = number; m_String.clear(); }
     void SetString(string&& str) { m_Type = Type::String; m_String = std::move(str); }
-    void AppendString(const string& src) { assert(m_Type == Type::String); m_String += src; }
 
 private:
     Type m_Type = Type::Number;
@@ -1606,7 +1605,7 @@ Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
         if(lhsValPtr->GetType() == Value::Type::Number && rhs.GetType() == Value::Type::Number)
             lhsValPtr->SetNumber(lhsValPtr->GetNumber() + rhs.GetNumber());
         else if(lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String)
-            lhsValPtr->AppendString(rhs.GetString());
+            lhsValPtr->GetString() += rhs.GetString();
         else
             throw ExecutionError(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
         return *lhsValPtr;

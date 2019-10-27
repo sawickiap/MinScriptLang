@@ -366,5 +366,18 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "ABCDEF\naBCDEF\naBCDwz\n");
     }
+    SECTION("Invalid string indexing as l-value")
+    {
+        const char* code = "'ABCDEF'[0] = 'a';";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "s='ABCDEF'; s[-1]='a';";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "s='ABCDEF'; s[0.5]='a';";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "s='ABCDEF'; s[10]='a';";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "s='ABCDEF'; s['x']='a';";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
 
 }
