@@ -1656,12 +1656,18 @@ Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t 
         const Value& val = args[i];
         switch(val.GetType())
         {
-        case Value::Type::Number: Format(s, "%g\n", val.GetNumber()); break;
-        case Value::Type::String: Format(s, "%s\n", val.GetString().c_str()); break;
+        case Value::Type::Number:
+            Format(s, "%g\n", val.GetNumber());
+            ctx.Env.Print(s.data(), s.length());
+            break;
+        case Value::Type::String:
+            if(!val.GetString().empty())
+                ctx.Env.Print(val.GetString().data(), val.GetString().length());
+            ctx.Env.Print("\n", 1);
+            break;
         default: assert(0);
         }
-        if(!s.empty())
-            ctx.Env.Print(s.data(), s.length());
+            
     }
     return Value{};
 }

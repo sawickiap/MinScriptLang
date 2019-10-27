@@ -271,9 +271,11 @@ TEST_CASE("Basic")
     }
     SECTION("String escape sequences")
     {
-        const char* code = "print('\\\\ \\\" \\' \\b \\f \\n \\r \\t \\? \\a \\v \\/');";
+        const char* code = "print('\\\\ \\\" \\' \\b \\f \\n \\r \\t \\? \\a \\v \\/ \\0a');";
         env.Execute(code, strlen(code));
-        REQUIRE(env.GetOutput() == "\\ \" ' \b \f \n \r \t \? \a \v /\n");
+        const char expectedOutput[] = "\\ \" ' \b \f \n \r \t \? \a \v / \0a\n";
+        REQUIRE((env.GetOutput().length() == _countof(expectedOutput) - 1 &&
+            memcmp(env.GetOutput().data(), expectedOutput, _countof(expectedOutput) - 1) == 0));
     }
     SECTION("String escape sequences numeric")
     {
