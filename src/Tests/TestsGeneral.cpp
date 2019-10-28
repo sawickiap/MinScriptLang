@@ -422,3 +422,14 @@ TEST_CASE("Basic")
     }
 
 }
+
+TEST_CASE("Functions")
+{
+    Environment env;
+    SECTION("Basic function")
+    {
+        const char* code = "f = function(a, b, c) { print('Foo'); };\n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput().empty());
+    }
+}

@@ -132,6 +132,7 @@ static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING = "Unexp
 static const char* const ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expression.";
 static const char* const ERROR_MESSAGE_EXPECTED_STATEMENT = "Expected statement.";
 static const char* const ERROR_MESSAGE_EXPECTED_CONSTANT_VALUE = "Expected constant value.";
+static const char* const ERROR_MESSAGE_EXPECTED_IDENTIFIER = "Expected identifier.";
 static const char* const ERROR_MESSAGE_EXPECTED_LVALUE = "Expected l-value.";
 static const char* const ERROR_MESSAGE_EXPECTED_NUMBER = "Expected number.";
 static const char* const ERROR_MESSAGE_EXPECTED_STRING = "Expected string.";
@@ -224,7 +225,7 @@ enum class Symbol
     DoubleAmperstand,  // &&
     DoublePipe,        // ||
     // Keywords
-    Null, False, True, If, Else, While, Do, For, Break, Continue, Switch, Case, Default, Count
+    Null, False, True, If, Else, While, Do, For, Break, Continue, Switch, Case, Default, Function, Count
 };
 static const char* SYMBOL_STR[] = {
     // Token types
@@ -234,7 +235,7 @@ static const char* SYMBOL_STR[] = {
     // Multiple character symbols
     "++", "--", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
     // Keywords
-    "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue", "switch", "case", "default",
+    "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue", "switch", "case", "default", "function",
 };
 
 struct Token
@@ -352,19 +353,23 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // class Value definition
 
+namespace AST { struct FunctionDefinition; }
+
 class Value
 {
 public:
-    enum class Type { Number, String };
+    enum class Type { Number, String, Function };
 
-    Value() { }
-    Value(double number) : m_Number(number) { }
+    Value() : m_Number(0.0) { }
+    Value(double number) : m_Type(Type::Number), m_Number(number) { }
     Value(string&& str) : m_Type(Type::String), m_String(std::move(str)) { }
+    Value(const AST::FunctionDefinition* func) : m_Type{Type::Function}, m_Function{func} { }
 
     Type GetType() const { return m_Type; }
     double GetNumber() const { assert(m_Type == Type::Number); return m_Number; }
     string& GetString() { assert(m_Type == Type::String); return m_String; }
     const string& GetString() const { assert(m_Type == Type::String); return m_String; }
+    const AST::FunctionDefinition* GetFunction() const { assert(m_Type == Type::Function && m_Function); return m_Function; }
 
     bool operator==(const Value& rhs) const
     {
@@ -408,7 +413,11 @@ public:
 
 private:
     Type m_Type = Type::Number;
-    double m_Number = 0.0;
+    union
+    {
+        double m_Number;
+        const AST::FunctionDefinition* m_Function;
+    };
     string m_String;
 };
 
@@ -651,6 +660,15 @@ struct MultiOperator : Operator
 
 private:
     Value Call(ExecuteContext& ctx) const;
+};
+
+struct FunctionDefinition : public Expression
+{
+    vector<string> Parameters;
+    Block Body;
+    FunctionDefinition(const PlaceInCode& place) : Expression{place}, Body{place} { }
+    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
 } // namespace AST
@@ -1718,6 +1736,24 @@ void MultiOperator::DebugPrint(uint32_t indentLevel) const
         exprPtr->DebugPrint(indentLevel);
 }
 
+void FunctionDefinition::DebugPrint(uint32_t indentLevel) const
+{
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "Function(", DEBUG_PRINT_ARGS_BEG);
+    if(!Parameters.empty())
+    {
+        printf("%s", Parameters[0].c_str());
+        for(size_t i = 1, count = Parameters.size(); i < count; ++i)
+            printf(", %s", Parameters[i].c_str());
+    }
+    printf(")\n");
+    Body.DebugPrint(indentLevel + 1);
+}
+
+Value FunctionDefinition::Evaluate(ExecuteContext& ctx) const
+{
+    return Value{this};
+}
+
 } // namespace AST
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2016,6 +2052,8 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
 
 unique_ptr<AST::Expression> Parser::TryParseExpr0()
 {
+    const PlaceInCode place = GetCurrentTokenPlace();
+    
     // '(' Expr17 ')'
     if(TryParseSymbol(Symbol::RoundBracketOpen))
     {
@@ -2024,13 +2062,33 @@ unique_ptr<AST::Expression> Parser::TryParseExpr0()
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
         return expr;
     }
-    else
+
+    // 'function' '(' [ TOKEN_IDENTIFIER ( ',' TOKE_IDENTIFIER )* ] ')' '{' Block '}'
+    if(TryParseSymbol(Symbol::Function))
     {
-        // Constant
-        unique_ptr<AST::ConstantExpression> constant = TryParseConstantExpr();
-        if(constant)
-            return constant;
+        unique_ptr<AST::FunctionDefinition> func = std::make_unique<AST::FunctionDefinition>(place);
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
+        if(m_Tokens[m_TokenIndex].Symbol == Symbol::Identifier)
+        {
+            func->Parameters.push_back(m_Tokens[m_TokenIndex++].String);
+            while(TryParseSymbol(Symbol::Comma))
+            {
+                MUST_PARSE( m_Tokens[m_TokenIndex].Symbol == Symbol::Identifier, ERROR_MESSAGE_EXPECTED_IDENTIFIER );
+                func->Parameters.push_back(m_Tokens[m_TokenIndex++].String);
+            }
+        }
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
+        MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN );
+        ParseBlock(func->Body);
+        MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
+        return func;
     }
+
+    // Constant
+    unique_ptr<AST::ConstantExpression> constant = TryParseConstantExpr();
+    if(constant)
+        return constant;
+
     return unique_ptr<AST::Expression>{};
 }
 
