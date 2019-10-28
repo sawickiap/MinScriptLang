@@ -472,6 +472,15 @@ struct ExecuteContext
 {
     EnvironmentPimpl& Env;
     Object& GlobalContext;
+    vector<Object*> LocalContexts;
+
+    struct LocalContextPush
+    {
+        LocalContextPush(ExecuteContext& ctx, Object* localObj) : m_Ctx{ctx} { ctx.LocalContexts.push_back(localObj); }
+        ~LocalContextPush() { m_Ctx.LocalContexts.pop_back(); }
+    private:
+        ExecuteContext& m_Ctx;
+    };
 };
 
 struct Statement
@@ -1411,22 +1420,51 @@ void Identifier::DebugPrint(uint32_t indentLevel) const
 
 Value Identifier::Evaluate(ExecuteContext& ctx) const
 {
-    // #TODO local, this, then global
+    Object* const localObj = ctx.LocalContexts.empty() ? nullptr : ctx.LocalContexts.back();
+
+    // Local variable
+    if(localObj)
+    {
+        Value* val = localObj->TryGetValue(S);
+        if(val)
+            return *val;
+    }
+    
+    // #TODO this
+    
+    // Global variable
     Value* val = ctx.GlobalContext.TryGetValue(S);
     if(val)
         return *val;
 
+    // System function
     for(size_t i = 0, count = (size_t)SystemFunction::Count; i < count; ++i)
         if(S == SYSTEM_FUNCTION_NAMES[i])
             return Value{(SystemFunction)i};
 
+    // Not found
     EXECUTION_CHECK( false, string("Variable \"") + S + "\" doesn't exist." );
 }
 
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
 {
-    // #TODO local, this, then global
-    return LValue{ctx.GlobalContext, Constant{string(S)}, SIZE_MAX};
+    Object* const localObj = ctx.LocalContexts.empty() ? nullptr : ctx.LocalContexts.back();
+
+    // Local variable
+    if(localObj && localObj->HasKey(S))
+        return LValue{*localObj, Constant{string(S)}, SIZE_MAX};
+    
+    // #TODO this
+    
+    // Global variable
+    if(ctx.GlobalContext.HasKey(S))
+        return LValue{ctx.GlobalContext, Constant{string(S)}, SIZE_MAX};
+
+    // Not found: return reference to smallest scope.
+    if(localObj)
+        return LValue{*localObj, Constant{string(S)}, SIZE_MAX};
+    else
+        return LValue{ctx.GlobalContext, Constant{string(S)}, SIZE_MAX};
 }
 
 void UnaryOperator::DebugPrint(uint32_t indentLevel) const
@@ -1744,7 +1782,7 @@ Value TernaryOperator::Evaluate(ExecuteContext& ctx) const
 
 void MultiOperator::DebugPrint(uint32_t indentLevel) const
 {
-    static const char* MULTI_OPERATOR_TYPE_NAMES[] = { "None", "Call" };
+    static const char* MULTI_OPERATOR_TYPE_NAMES[] = { "Call" };
     printf(DEBUG_PRINT_FORMAT_STR_BEG "MultiOperator %s\n", DEBUG_PRINT_ARGS_BEG, MULTI_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
     ++indentLevel;
     for(const auto& exprPtr : Operands)
@@ -1822,6 +1860,8 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
 
     if(callee.GetType() == Value::Type::Function)
     {
+        Object localContext;
+        ExecuteContext::LocalContextPush localContextPush{ctx, &localContext};
         callee.GetFunction()->Body.Execute(ctx);
         return Value{}; // TODO returning from a function call.
     }

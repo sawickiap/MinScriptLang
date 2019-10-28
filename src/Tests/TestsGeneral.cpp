@@ -420,7 +420,6 @@ TEST_CASE("Basic")
         code = "switch(1) { case 1: case 1: }";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
     }
-
 }
 
 TEST_CASE("Functions")
@@ -432,5 +431,17 @@ TEST_CASE("Functions")
             "f(); f();";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "Foo\nFoo\n");
+    }
+    SECTION("Local variables")
+    {
+        const char* code = "a=1; print(a); f=function(){ b=2; print(b); print(a); a=10; print(a); };\n"
+            "f(); print(a);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n2\n1\n10\n10\n");
+    }
+    SECTION("Local variables invalid")
+    {
+        const char* code = "f=function(){ a=1; print(a); }; f(); print(a);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
 }
