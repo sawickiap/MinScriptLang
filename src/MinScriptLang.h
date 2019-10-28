@@ -126,6 +126,7 @@ static const char* const ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE = "Invalid escape
 static const char* const ERROR_MESSAGE_INVALID_TYPE = "Invalid type.";
 static const char* const ERROR_MESSAGE_INVALID_INDEX = "Invalid index.";
 static const char* const ERROR_MESSAGE_INVALID_LVALUE = "Invalid l-value.";
+static const char* const ERROR_MESSAGE_INVALID_FUNCTION = "Invalid function.";
 static const char* const ERROR_MESSAGE_UNRECOGNIZED_TOKEN = "Unrecognized token.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT = "Unexpected end of file inside multiline comment.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING = "Unexpected end of file inside string.";
@@ -355,21 +356,30 @@ private:
 
 namespace AST { struct FunctionDefinition; }
 
+enum class SystemFunction {
+    Print, Count
+};
+static const char* SYSTEM_FUNCTION_NAMES[] = {
+    "print",
+};
+
 class Value
 {
 public:
-    enum class Type { Number, String, Function };
+    enum class Type { Number, String, Function, SystemFunction };
 
     Value() : m_Number(0.0) { }
     Value(double number) : m_Type(Type::Number), m_Number(number) { }
     Value(string&& str) : m_Type(Type::String), m_String(std::move(str)) { }
     Value(const AST::FunctionDefinition* func) : m_Type{Type::Function}, m_Function{func} { }
+    Value(SystemFunction func) : m_Type{Type::SystemFunction}, m_SystemFunction{func} { }
 
     Type GetType() const { return m_Type; }
     double GetNumber() const { assert(m_Type == Type::Number); return m_Number; }
     string& GetString() { assert(m_Type == Type::String); return m_String; }
     const string& GetString() const { assert(m_Type == Type::String); return m_String; }
     const AST::FunctionDefinition* GetFunction() const { assert(m_Type == Type::Function && m_Function); return m_Function; }
+    SystemFunction GetSystemFunction() const { assert(m_Type == Type::SystemFunction); return m_SystemFunction; }
 
     bool operator==(const Value& rhs) const
     {
@@ -417,6 +427,7 @@ private:
     {
         double m_Number;
         const AST::FunctionDefinition* m_Function;
+        SystemFunction m_SystemFunction;
     };
     string m_String;
 };
@@ -646,7 +657,6 @@ struct TernaryOperator : Operator
 
 enum class MultiOperatorType
 {
-    None,
     Call,
 };
 
@@ -1405,6 +1415,11 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
     Value* val = ctx.GlobalContext.TryGetValue(S);
     if(val)
         return *val;
+
+    for(size_t i = 0, count = (size_t)SystemFunction::Count; i < count; ++i)
+        if(S == SYSTEM_FUNCTION_NAMES[i])
+            return Value{(SystemFunction)i};
+
     EXECUTION_CHECK( false, string("Variable \"") + S + "\" doesn't exist." );
 }
 
@@ -1799,15 +1814,30 @@ Value MultiOperator::Evaluate(ExecuteContext& ctx) const
 
 Value MultiOperator::Call(ExecuteContext& ctx) const
 {
-    Identifier* calleeIdentifier = dynamic_cast<Identifier*>(Operands[0].get()); assert(calleeIdentifier); // #TODO make it flexible!
+    Value callee = Operands[0]->Evaluate(ctx);
     const size_t argCount = Operands.size() - 1;
-    vector<Value> values(argCount);
+    vector<Value> arguments(argCount);
     for(size_t i = 0; i < argCount; ++i)
-        values[i] = Operands[i + 1]->Evaluate(ctx);
-    if(calleeIdentifier->S == "print")
-        return BuiltInFunction_Print(ctx, values.data(), values.size());
-    else
-        EXECUTION_CHECK( false, string("Unknown function: ") + calleeIdentifier->S );
+        arguments[i] = Operands[i + 1]->Evaluate(ctx);
+
+    if(callee.GetType() == Value::Type::Function)
+    {
+        callee.GetFunction()->Body.Execute(ctx);
+        return Value{}; // TODO returning from a function call.
+    }
+
+    if(callee.GetType() == Value::Type::SystemFunction)
+    {
+        switch(callee.GetSystemFunction())
+        {
+        case SystemFunction::Print:
+            return BuiltInFunction_Print(ctx, arguments.data(), arguments.size());
+        default:
+            assert(0); return Value{};
+        }
+    }
+
+    EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_FUNCTION );
 }
 
 } // namespace AST
