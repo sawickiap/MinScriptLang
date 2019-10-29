@@ -484,4 +484,13 @@ TEST_CASE("Functions")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n6\n24\n");
     }
+    SECTION("Break without loop in function")
+    {
+        const char* code = "function Bad() { break; } \n"
+            "for(i=0; i<10; ++i) { Bad(); }";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "function Bad() { continue; } \n"
+            "for(i=0; i<10; ++i) { Bad(); }";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
 }

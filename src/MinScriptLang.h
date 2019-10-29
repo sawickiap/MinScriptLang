@@ -1919,6 +1919,14 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
         {
             return std::move(returnEx.ThrownValue);
         }
+        catch(BreakException)
+        {
+            EXECUTION_CHECK( false, ERROR_MESSAGE_BREAK_WITHOUT_LOOP );
+        }
+        catch(ContinueException)
+        {
+            EXECUTION_CHECK( false, ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP );
+        }
         return Value{};
     }
 
