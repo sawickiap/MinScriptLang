@@ -472,4 +472,9 @@ TEST_CASE("Functions")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "7\n");
     }
+    SECTION("Parameters not unique")
+    {
+        const char* code = "function f(a, a) { }";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+    }
 }

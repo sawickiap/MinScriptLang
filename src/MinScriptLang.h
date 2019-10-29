@@ -156,6 +156,7 @@ static const char* const ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP = "Continue without
 static const char* const ERROR_MESSAGE_RETURN_WITHOUT_FUNCTION = "Return without a function.";
 static const char* const ERROR_MESSAGE_INCOMPATIBLE_TYPES = "Incompatible types.";
 static const char* const ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS = "Index out of bounds.";
+static const char* const ERROR_MESSAGE_PARAMETER_NAMES_MUST_BE_UNIQUE = "Parameter naems must be unique.";
 
 struct Constant
 {
@@ -708,7 +709,8 @@ struct FunctionDefinition : public Expression
     Block Body;
     FunctionDefinition(const PlaceInCode& place) : Expression{place}, Body{place} { }
     virtual void DebugPrint(uint32_t indentLevel) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{this}; }
+    bool AreParameterNamesUnique() const;
 };
 
 } // namespace AST
@@ -1839,9 +1841,14 @@ void FunctionDefinition::DebugPrint(uint32_t indentLevel) const
     Body.DebugPrint(indentLevel + 1);
 }
 
-Value FunctionDefinition::Evaluate(ExecuteContext& ctx) const
+bool FunctionDefinition::AreParameterNamesUnique() const
 {
-    return Value{this};
+    // Warning! O(n^2) algorithm.
+    for(size_t i = 0, count = Parameters.size(); i < count; ++i)
+        for(size_t j = i + 1; j < count; ++j)
+            if(Parameters[i] == Parameters[j])
+                return false;
+    return true;
 }
 
 } // namespace AST
@@ -2008,6 +2015,7 @@ void Parser::ParseFunctionDefinition(AST::FunctionDefinition& funcDef)
             funcDef.Parameters.push_back(m_Tokens[m_TokenIndex++].String);
         }
     }
+    MUST_PARSE( funcDef.AreParameterNamesUnique(), ERROR_MESSAGE_PARAMETER_NAMES_MUST_BE_UNIQUE );
     MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
     MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN );
     ParseBlock(funcDef.Body);
