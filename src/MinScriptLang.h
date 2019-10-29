@@ -502,7 +502,7 @@ struct Statement
     explicit Statement(const PlaceInCode& place) : m_Place{place} { }
     virtual ~Statement() { }
     const PlaceInCode& GetPlace() const { return m_Place; }
-    virtual void DebugPrint(uint32_t indentLevel) const = 0;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const = 0;
     virtual void Execute(ExecuteContext& ctx) const = 0;
 private:
     const PlaceInCode m_Place;
@@ -511,7 +511,7 @@ private:
 struct EmptyStatement : public Statement
 {
     explicit EmptyStatement(const PlaceInCode& place) : Statement{place} { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual void Execute(ExecuteContext& ctx) const { }
 };
 
@@ -522,7 +522,7 @@ struct Condition : public Statement
     unique_ptr<Expression> ConditionExpression;
     unique_ptr<Statement> Statements[2]; // [0] executed if true, [1] executed if false, optional.
     explicit Condition(const PlaceInCode& place) : Statement{place} { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -534,7 +534,7 @@ struct WhileLoop : public Statement
     unique_ptr<Expression> ConditionExpression;
     unique_ptr<Statement> Body;
     explicit WhileLoop(const PlaceInCode& place, WhileLoopType type) : Statement{place}, Type{type} { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -545,16 +545,16 @@ struct ForLoop : public Statement
     unique_ptr<Expression> IterationExpression; // Optional
     unique_ptr<Statement> Body;
     explicit ForLoop(const PlaceInCode& place) : Statement{place} { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
-enum class LoopBreakType { Break, Continue };
+enum class LoopBreakType { Break, Continue, Count };
 struct LoopBreakStatement : public Statement
 {
     LoopBreakType Type;
     explicit LoopBreakStatement(const PlaceInCode& place, LoopBreakType type) : Statement{place}, Type{type} { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -562,7 +562,7 @@ struct ReturnStatement : public Statement
 {
     unique_ptr<Expression> ReturnedValue; // Can be null.
     explicit ReturnStatement(const PlaceInCode& place) : Statement{place} { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -570,7 +570,7 @@ struct Block : public Statement
 {
     explicit Block(const PlaceInCode& place) : Statement{place} { }
     vector<unique_ptr<Statement>> Statements;
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -582,7 +582,7 @@ struct SwitchStatement : public Statement
     vector<unique_ptr<AST::ConstantValue>> ItemValues; // null means default block.
     vector<unique_ptr<AST::Block>> ItemBlocks; // Can be null if empty.
     explicit SwitchStatement(const PlaceInCode& place) : Statement{place} { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -610,7 +610,7 @@ struct ConstantValue : ConstantExpression
 {
     Value Val;
     ConstantValue(const PlaceInCode& place, Value&& val) : ConstantExpression{place}, Val{std::move(val)} { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const { return Val; }
 };
 
@@ -618,7 +618,7 @@ struct Identifier : ConstantExpression
 {
     string S;
     Identifier(const PlaceInCode& place, string&& s) : ConstantExpression{place}, S(std::move(s)) { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
 };
@@ -630,15 +630,8 @@ struct Operator : Expression
 
 enum class UnaryOperatorType
 {
-    Preincrementation,
-    Predecrementation,
-    Postincrementation,
-    Postdecrementation,
-    Plus,
-    Minus,
-    LogicalNot,
-    BitwiseNot,
-    None,
+    Preincrementation, Predecrementation, Postincrementation, Postdecrementation,
+    Plus, Minus, LogicalNot, BitwiseNot, Count,
 };
 
 struct UnaryOperator : Operator
@@ -646,7 +639,7 @@ struct UnaryOperator : Operator
     UnaryOperatorType Type;
     unique_ptr<Expression> Operand;
     UnaryOperator(const PlaceInCode& place, UnaryOperatorType type) : Operator{place}, Type(type) { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
 
 private:
@@ -660,7 +653,7 @@ enum class BinaryOperatorType
     AssignmentBitwiseAnd, AssignmentBitwiseXor, AssignmentBitwiseOr,
     Less, Greater, LessEqual, GreaterEqual, Equal, NotEqual,
     BitwiseAnd, BitwiseXor, BitwiseOr, LogicalAnd, LogicalOr,
-    Comma, Indexing,
+    Comma, Indexing, Count
 };
 
 struct BinaryOperator : Operator
@@ -668,7 +661,7 @@ struct BinaryOperator : Operator
     BinaryOperatorType Type;
     unique_ptr<Expression> Operands[2];
     BinaryOperator(const PlaceInCode& place, BinaryOperatorType type) : Operator{place}, Type(type) { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
 
@@ -682,13 +675,13 @@ struct TernaryOperator : Operator
 {
     unique_ptr<Expression> Operands[3];
     explicit TernaryOperator(const PlaceInCode& place) : Operator{place} { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
 enum class MultiOperatorType
 {
-    Call,
+    Call, Count
 };
 
 struct MultiOperator : Operator
@@ -696,7 +689,7 @@ struct MultiOperator : Operator
     MultiOperatorType Type;
     vector<unique_ptr<Expression>> Operands;
     MultiOperator(const PlaceInCode& place, MultiOperatorType type) : Operator{place}, Type(type) { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
 
 private:
@@ -708,7 +701,7 @@ struct FunctionDefinition : public Expression
     vector<string> Parameters;
     Block Body;
     FunctionDefinition(const PlaceInCode& place) : Expression{place}, Body{place} { }
-    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const { return Value{this}; }
     bool AreParameterNamesUnique() const;
 };
@@ -1197,22 +1190,22 @@ bool Object::Remove(const Constant& key)
 
 namespace AST {
 
-#define DEBUG_PRINT_FORMAT_STR_BEG "(%u,%u) %s"
-#define DEBUG_PRINT_ARGS_BEG GetPlace().Row, GetPlace().Column, GetDebugPrintIndent(indentLevel)
+#define DEBUG_PRINT_FORMAT_STR_BEG "(%u,%u) %s%s"
+#define DEBUG_PRINT_ARGS_BEG GetPlace().Row, GetPlace().Column, GetDebugPrintIndent(indentLevel), prefix
 
-void EmptyStatement::DebugPrint(uint32_t indentLevel) const
+void EmptyStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Empty\n", DEBUG_PRINT_ARGS_BEG);
 }
 
-void Condition::DebugPrint(uint32_t indentLevel) const
+void Condition::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
-    printf(DEBUG_PRINT_FORMAT_STR_BEG "Condition\n", DEBUG_PRINT_ARGS_BEG);
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "If\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
-    ConditionExpression->DebugPrint(indentLevel);
-    Statements[0]->DebugPrint(indentLevel);
+    ConditionExpression->DebugPrint(indentLevel, "ConditionExpression: ");
+    Statements[0]->DebugPrint(indentLevel, "TrueStatement: ");
     if(Statements[1])
-        Statements[1]->DebugPrint(indentLevel);
+        Statements[1]->DebugPrint(indentLevel, "FalseStatement: ");
 }
 
 void Condition::Execute(ExecuteContext& ctx) const
@@ -1223,7 +1216,7 @@ void Condition::Execute(ExecuteContext& ctx) const
         Statements[1]->Execute(ctx);
 }
 
-void WhileLoop::DebugPrint(uint32_t indentLevel) const
+void WhileLoop::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     const char* name = nullptr;
     switch(Type)
@@ -1234,8 +1227,8 @@ void WhileLoop::DebugPrint(uint32_t indentLevel) const
     }
     printf(DEBUG_PRINT_FORMAT_STR_BEG "%s\n", DEBUG_PRINT_ARGS_BEG, name);
     ++indentLevel;
-    ConditionExpression->DebugPrint(indentLevel);
-    Body->DebugPrint(indentLevel);
+    ConditionExpression->DebugPrint(indentLevel, "ConditionExpression: ");
+    Body->DebugPrint(indentLevel, "Body: ");
 }
 
 void WhileLoop::Execute(ExecuteContext& ctx) const
@@ -1281,23 +1274,23 @@ void WhileLoop::Execute(ExecuteContext& ctx) const
     }
 }
 
-void ForLoop::DebugPrint(uint32_t indentLevel) const
+void ForLoop::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "For\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
     if(InitExpression)
-        InitExpression->DebugPrint(indentLevel);
+        InitExpression->DebugPrint(indentLevel, "InitExpression: ");
     else
         printf(DEBUG_PRINT_FORMAT_STR_BEG "(Init expression empty)\n", DEBUG_PRINT_ARGS_BEG);
     if(ConditionExpression)
-        ConditionExpression->DebugPrint(indentLevel);
+        ConditionExpression->DebugPrint(indentLevel, "ConditionExpression: ");
     else
         printf(DEBUG_PRINT_FORMAT_STR_BEG "(Condition expression empty)\n", DEBUG_PRINT_ARGS_BEG);
     if(IterationExpression)
-        IterationExpression->DebugPrint(indentLevel);
+        IterationExpression->DebugPrint(indentLevel, "IterationExpression: ");
     else
         printf(DEBUG_PRINT_FORMAT_STR_BEG "(Iteration expression empty)\n", DEBUG_PRINT_ARGS_BEG);
-    Body->DebugPrint(indentLevel);
+    Body->DebugPrint(indentLevel, "Body: ");
 }
 
 void ForLoop::Execute(ExecuteContext& ctx) const
@@ -1322,10 +1315,11 @@ void ForLoop::Execute(ExecuteContext& ctx) const
     }
 }
 
-void LoopBreakStatement::DebugPrint(uint32_t indentLevel) const
+void LoopBreakStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
-    static const char* TYPE_NAMES[] = { "Break", "Continue" };
-    printf(DEBUG_PRINT_FORMAT_STR_BEG "%s\n", DEBUG_PRINT_ARGS_BEG, TYPE_NAMES[(size_t)Type]);
+    static const char* LOOP_BREAK_TYPE_NAMES[] = { "Break", "Continue" };
+    static_assert(_countof(LOOP_BREAK_TYPE_NAMES) == (size_t)LoopBreakType::Count, "TYPE_NAMES is invalid.");
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "%s\n", DEBUG_PRINT_ARGS_BEG, LOOP_BREAK_TYPE_NAMES[(size_t)Type]);
 }
 
 void LoopBreakStatement::Execute(ExecuteContext& ctx) const
@@ -1341,11 +1335,11 @@ void LoopBreakStatement::Execute(ExecuteContext& ctx) const
     }
 }
 
-void ReturnStatement::DebugPrint(uint32_t indentLevel) const
+void ReturnStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "return\n", DEBUG_PRINT_ARGS_BEG);
     if(ReturnedValue)
-        ReturnedValue->DebugPrint(indentLevel + 1);
+        ReturnedValue->DebugPrint(indentLevel + 1, "ReturnedValue: ");
 }
 
 void ReturnStatement::Execute(ExecuteContext& ctx) const
@@ -1356,12 +1350,12 @@ void ReturnStatement::Execute(ExecuteContext& ctx) const
         throw ReturnException{GetPlace(), Value{}};
 }
 
-void Block::DebugPrint(uint32_t indentLevel) const
+void Block::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Block\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
     for(const auto& stmtPtr : Statements)
-        stmtPtr->DebugPrint(indentLevel);
+        stmtPtr->DebugPrint(indentLevel, "");
 }
 
 void Block::Execute(ExecuteContext& ctx) const
@@ -1370,21 +1364,21 @@ void Block::Execute(ExecuteContext& ctx) const
         stmtPtr->Execute(ctx);
 }
 
-void SwitchStatement::DebugPrint(uint32_t indentLevel) const
+void SwitchStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "switch\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
-    Condition->DebugPrint(indentLevel);
+    Condition->DebugPrint(indentLevel, "Condition: ");
     for(size_t i = 0; i < ItemValues.size(); ++i)
     {
         if(ItemValues[i])
-            ItemValues[i]->DebugPrint(indentLevel);
+            ItemValues[i]->DebugPrint(indentLevel, "ItemValue: ");
         else
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "default\n", DEBUG_PRINT_ARGS_BEG);
+            printf(DEBUG_PRINT_FORMAT_STR_BEG "Default\n", DEBUG_PRINT_ARGS_BEG);
         if(ItemBlocks[i])
-            ItemBlocks[i]->DebugPrint(indentLevel);
+            ItemBlocks[i]->DebugPrint(indentLevel, "ItemBlock: ");
         else
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "(empty block)\n", DEBUG_PRINT_ARGS_BEG);
+            printf(DEBUG_PRINT_FORMAT_STR_BEG "(Empty block)\n", DEBUG_PRINT_ARGS_BEG);
     }
 }
 
@@ -1442,7 +1436,7 @@ LValue Expression::GetLValue(ExecuteContext& ctx) const
     EXECUTION_CHECK( false, ERROR_MESSAGE_EXPECTED_LVALUE );
 }
 
-void ConstantValue::DebugPrint(uint32_t indentLevel) const
+void ConstantValue::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     switch(Val.GetType())
     {
@@ -1452,7 +1446,7 @@ void ConstantValue::DebugPrint(uint32_t indentLevel) const
     }
 }
 
-void Identifier::DebugPrint(uint32_t indentLevel) const
+void Identifier::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier: %s\n", DEBUG_PRINT_ARGS_BEG, S.c_str());
 }
@@ -1506,14 +1500,15 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
         return LValue{ctx.GlobalContext, Constant{string(S)}, SIZE_MAX};
 }
 
-void UnaryOperator::DebugPrint(uint32_t indentLevel) const
+void UnaryOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     static const char* UNARY_OPERATOR_TYPE_NAMES[] = {
         "Preincrementation", "Predecrementation", "Postincrementation", "Postdecrementation",
         "Plus", "Minus", "Logical NOT", "Bitwise NOT" };
+    static_assert(_countof(UNARY_OPERATOR_TYPE_NAMES) == (size_t)UnaryOperatorType::Count, "UNARY_OPERATOR_TYPE_NAMES is invalid.");
     printf(DEBUG_PRINT_FORMAT_STR_BEG "UnaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, UNARY_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
     ++indentLevel;
-    Operand->DebugPrint(indentLevel);
+    Operand->DebugPrint(indentLevel, "Operand: ");
 }
 
 Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
@@ -1575,17 +1570,20 @@ Value UnaryOperator::BitwiseNot(Value&& operand) const
     return Value{(double)resultInt};
 }
 
-void BinaryOperator::DebugPrint(uint32_t indentLevel) const
+void BinaryOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     static const char* BINARY_OPERATOR_TYPE_NAMES[] = {
-        "Mul", "Div", "Mod", "Add", "Sub", "Shift left", "Shift right", "Assignment",
+        "Mul", "Div", "Mod", "Add", "Sub", "Shift left", "Shift right",
+        "Assignment", "AssignmentAdd", "AssignmentSub", "AssignmentMul", "AssignmentDiv", "AssignmentMod", "AssignmentShiftLeft", "AssignmentShiftRight",
+        "AssignmentBitwiseAnd", "AssignmentBitwiseXor", "AssignmentBitwiseOr",
         "Less", "Greater", "LessEqual", "GreaterEqual", "Equal", "NotEqual",
         "BitwiseAnd", "BitwiseXor", "BitwiseOr", "LogicalAnd", "LogicalOr",
         "Comma", "Indexing", };
+    static_assert(_countof(BINARY_OPERATOR_TYPE_NAMES) == (size_t)BinaryOperatorType::Count, "BINARY_OPERATOR_TYPE_NAMES is invalid.");
     printf(DEBUG_PRINT_FORMAT_STR_BEG "BinaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, BINARY_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
     ++indentLevel;
-    Operands[0]->DebugPrint(indentLevel);
-    Operands[1]->DebugPrint(indentLevel);
+    Operands[0]->DebugPrint(indentLevel, "LeftOperand: ");
+    Operands[1]->DebugPrint(indentLevel, "RightOperand: ");
 }
 
 Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
@@ -1805,13 +1803,13 @@ Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
     return *lhsValPtr;
 }
 
-void TernaryOperator::DebugPrint(uint32_t indentLevel) const
+void TernaryOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "TernaryOperator\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
-    Operands[0]->DebugPrint(indentLevel);
-    Operands[1]->DebugPrint(indentLevel);
-    Operands[2]->DebugPrint(indentLevel);
+    Operands[0]->DebugPrint(indentLevel, "ConditionExpression: ");
+    Operands[1]->DebugPrint(indentLevel, "TrueExpression: ");
+    Operands[2]->DebugPrint(indentLevel, "FalseExpression: ");
 }
 
 Value TernaryOperator::Evaluate(ExecuteContext& ctx) const
@@ -1819,16 +1817,18 @@ Value TernaryOperator::Evaluate(ExecuteContext& ctx) const
     return Operands[0]->Evaluate(ctx).IsTrue() ? Operands[1]->Evaluate(ctx) : Operands[2]->Evaluate(ctx);
 }
 
-void MultiOperator::DebugPrint(uint32_t indentLevel) const
+void MultiOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     static const char* MULTI_OPERATOR_TYPE_NAMES[] = { "Call" };
+    static_assert(_countof(MULTI_OPERATOR_TYPE_NAMES) == (size_t)MultiOperatorType::Count, "MULTI_OPERATOR_TYPE_NAMES is invalid.");
     printf(DEBUG_PRINT_FORMAT_STR_BEG "MultiOperator %s\n", DEBUG_PRINT_ARGS_BEG, MULTI_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
     ++indentLevel;
-    for(const auto& exprPtr : Operands)
-        exprPtr->DebugPrint(indentLevel);
+    Operands[0]->DebugPrint(indentLevel, "Callee: ");
+    for(size_t i = 1, count = Operands.size(); i < count; ++i)
+        Operands[i]->DebugPrint(indentLevel, "Argument: ");
 }
 
-void FunctionDefinition::DebugPrint(uint32_t indentLevel) const
+void FunctionDefinition::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Function(", DEBUG_PRINT_ARGS_BEG);
     if(!Parameters.empty())
@@ -1838,7 +1838,7 @@ void FunctionDefinition::DebugPrint(uint32_t indentLevel) const
             printf(", %s", Parameters[i].c_str());
     }
     printf(")\n");
-    Body.DebugPrint(indentLevel + 1);
+    Body.DebugPrint(indentLevel + 1, "Body: ");
 }
 
 bool FunctionDefinition::AreParameterNamesUnique() const
@@ -1971,7 +1971,7 @@ void Parser::ParseScript(AST::Script& outScript)
     if(m_Tokens[m_TokenIndex].Symbol != Symbol::End)
         throw ParsingError(GetCurrentTokenPlace(), ERROR_MESSAGE_PARSING_ERROR);
 
-    //outScript.DebugPrint(0); // #DELME
+    //outScript.DebugPrint(0, "Script: "); // #DELME
 }
 
 void Parser::ParseBlock(AST::Block& outBlock)
