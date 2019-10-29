@@ -427,7 +427,7 @@ TEST_CASE("Functions")
     Environment env;
     SECTION("Basic function")
     {
-        const char* code = "f = function(a, b, c) { print('Foo'); };\n"
+        const char* code = "f = function() { print('Foo'); };\n"
             "f(); f();";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "Foo\nFoo\n");
@@ -443,5 +443,12 @@ TEST_CASE("Functions")
     {
         const char* code = "f=function(){ a=1; print(a); }; f(); print(a);";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Parameters")
+    {
+        const char* code = "f=function(a, b){ a='['+a+'] ['+b+']'; print(a); }; \n"
+            "f('AAA', 'BBB'); f('CCC', 'DDD');";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "[AAA] [BBB]\n[CCC] [DDD]\n");
     }
 }

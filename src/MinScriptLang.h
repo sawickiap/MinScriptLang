@@ -127,6 +127,7 @@ static const char* const ERROR_MESSAGE_INVALID_TYPE = "Invalid type.";
 static const char* const ERROR_MESSAGE_INVALID_INDEX = "Invalid index.";
 static const char* const ERROR_MESSAGE_INVALID_LVALUE = "Invalid l-value.";
 static const char* const ERROR_MESSAGE_INVALID_FUNCTION = "Invalid function.";
+static const char* const ERROR_MESSAGE_INVALID_NUMBER_OF_ARGUMENTS = "Invalid number of arguments.";
 static const char* const ERROR_MESSAGE_UNRECOGNIZED_TOKEN = "Unrecognized token.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT = "Unexpected end of file inside multiline comment.";
 static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING = "Unexpected end of file inside string.";
@@ -1860,10 +1861,15 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
 
     if(callee.GetType() == Value::Type::Function)
     {
+        const AST::FunctionDefinition* const funcDef = callee.GetFunction();
+        EXECUTION_CHECK( argCount == funcDef->Parameters.size(), ERROR_MESSAGE_INVALID_NUMBER_OF_ARGUMENTS );
         Object localContext;
+        // Setup parameters
+        for(size_t argIndex = 0; argIndex != argCount; ++argIndex)
+            localContext.GetOrCreateValue(funcDef->Parameters[argIndex]) = std::move(arguments[argIndex]);
         ExecuteContext::LocalContextPush localContextPush{ctx, &localContext};
         callee.GetFunction()->Body.Execute(ctx);
-        return Value{}; // TODO returning from a function call.
+        return Value{}; // #TODO returning from a function call.
     }
 
     if(callee.GetType() == Value::Type::SystemFunction)
