@@ -153,6 +153,7 @@ static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't
 static const char* const ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
 static const char* const ERROR_MESSAGE_BREAK_WITHOUT_LOOP = "Break without a loop.";
 static const char* const ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP = "Continue without a loop.";
+static const char* const ERROR_MESSAGE_RETURN_WITHOUT_FUNCTION = "Return without a function.";
 static const char* const ERROR_MESSAGE_INCOMPATIBLE_TYPES = "Incompatible types.";
 static const char* const ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS = "Index out of bounds.";
 
@@ -227,7 +228,8 @@ enum class Symbol
     DoubleAmperstand,  // &&
     DoublePipe,        // ||
     // Keywords
-    Null, False, True, If, Else, While, Do, For, Break, Continue, Switch, Case, Default, Function, Count
+    Null, False, True, If, Else, While, Do, For, Break, Continue,
+    Switch, Case, Default, Function, Return, Count
 };
 static const char* SYMBOL_STR[] = {
     // Token types
@@ -237,7 +239,8 @@ static const char* SYMBOL_STR[] = {
     // Multiple character symbols
     "++", "--", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
     // Keywords
-    "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue", "switch", "case", "default", "function",
+    "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue",
+    "switch", "case", "default", "function", "return",
 };
 
 struct Token
@@ -288,8 +291,8 @@ static bool NumberToIndex(size_t& outIndex, double number)
     return (double)outIndex == number;
 }
 
-class BreakException { };
-class ContinueException { };
+struct BreakException { };
+struct ContinueException { };
 
 ////////////////////////////////////////////////////////////////////////////////
 // class CodeReader definition
@@ -464,6 +467,15 @@ struct LValue
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+// struct ReturnException definition
+
+struct ReturnException
+{
+    const PlaceInCode Place;
+    Value ThrownValue;
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // Abstract Syntax Tree definitions
 
 namespace AST
@@ -541,6 +553,14 @@ struct LoopBreakStatement : public Statement
 {
     LoopBreakType Type;
     explicit LoopBreakStatement(const PlaceInCode& place, LoopBreakType type) : Statement{place}, Type{type} { }
+    virtual void DebugPrint(uint32_t indentLevel) const;
+    virtual void Execute(ExecuteContext& ctx) const;
+};
+
+struct ReturnStatement : public Statement
+{
+    unique_ptr<Expression> ReturnedValue; // Can be null.
+    explicit ReturnStatement(const PlaceInCode& place) : Statement{place} { }
     virtual void DebugPrint(uint32_t indentLevel) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
@@ -1318,6 +1338,21 @@ void LoopBreakStatement::Execute(ExecuteContext& ctx) const
     }
 }
 
+void ReturnStatement::DebugPrint(uint32_t indentLevel) const
+{
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "return\n", DEBUG_PRINT_ARGS_BEG);
+    if(ReturnedValue)
+        ReturnedValue->DebugPrint(indentLevel + 1);
+}
+
+void ReturnStatement::Execute(ExecuteContext& ctx) const
+{
+    if(ReturnedValue)
+        throw ReturnException{GetPlace(), ReturnedValue->Evaluate(ctx)};
+    else
+        throw ReturnException{GetPlace(), Value{}};
+}
+
 void Block::DebugPrint(uint32_t indentLevel) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Block\n", DEBUG_PRINT_ARGS_BEG);
@@ -1868,8 +1903,15 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
         for(size_t argIndex = 0; argIndex != argCount; ++argIndex)
             localContext.GetOrCreateValue(funcDef->Parameters[argIndex]) = std::move(arguments[argIndex]);
         ExecuteContext::LocalContextPush localContextPush{ctx, &localContext};
-        callee.GetFunction()->Body.Execute(ctx);
-        return Value{}; // #TODO returning from a function call.
+        try
+        {
+            callee.GetFunction()->Body.Execute(ctx);
+        }
+        catch(ReturnException& returnEx)
+        {
+            return std::move(returnEx.ThrownValue);
+        }
+        return Value{};
     }
 
     if(callee.GetType() == Value::Type::SystemFunction)
@@ -2043,6 +2085,15 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     {
         MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
         return make_unique<AST::LoopBreakStatement>(place, AST::LoopBreakType::Continue);
+    }
+
+    // 'return' [ Expr17 ] ';'
+    if(TryParseSymbol(Symbol::Return))
+    {
+        unique_ptr<AST::ReturnStatement> stmt = std::make_unique<AST::ReturnStatement>(place);
+        stmt->ReturnedValue = TryParseExpr17();
+        MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
+        return stmt;
     }
 
     // 'switch' '(' Expr17 ')' '{' SwitchItem+ '}'
@@ -2526,7 +2577,14 @@ void EnvironmentPimpl::Execute(const char* code, size_t codeLen)
     }
 
     AST::ExecuteContext executeContext{*this, m_GlobalContext};
-    m_Script.Execute(executeContext);
+    try
+    {
+        m_Script.Execute(executeContext);
+    }
+    catch(const ReturnException& returnEx)
+    {
+        throw ExecutionError(returnEx.Place, ERROR_MESSAGE_RETURN_WITHOUT_FUNCTION);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

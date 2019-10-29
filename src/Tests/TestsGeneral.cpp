@@ -451,4 +451,18 @@ TEST_CASE("Functions")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "[AAA] [BBB]\n[CCC] [DDD]\n");
     }
+    SECTION("Return")
+    {
+        const char* code = "functionNotReturning = function(){ print('functionNotReturning'); }; \n"
+            "functionReturningNull = function(){ print('functionReturningNull'); return; print('DUPA'); }; \n"
+            "functionReturningSomething = function(){ print('functionReturningSomething'); return 123; print('DUPA'); }; \n"
+            "print(functionNotReturning()); print(functionReturningNull()); print(functionReturningSomething());";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "functionNotReturning\n0\nfunctionReturningNull\n0\nfunctionReturningSomething\n123\n");
+    }
+    SECTION("Return without function")
+    {
+        const char* code = "return 2;";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
 }
