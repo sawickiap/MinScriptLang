@@ -465,4 +465,11 @@ TEST_CASE("Functions")
         const char* code = "return 2;";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
+    SECTION("Syntactic sugar")
+    {
+        const char* code = "function add(a, b){ return a+b; }\n"
+            "print(add(2, 5));";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "7\n");
+    }
 }

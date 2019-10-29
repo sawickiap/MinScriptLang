@@ -734,6 +734,7 @@ private:
 
     void ParseBlock(AST::Block& outBlock);
     bool TryParseSwitchItem(AST::SwitchStatement& switchStatement);
+    void ParseFunctionDefinition(AST::FunctionDefinition& funcDef);
     unique_ptr<AST::Statement> TryParseStatement();
     unique_ptr<AST::ConstantValue> TryParseConstantValue();
     unique_ptr<AST::ConstantExpression> TryParseConstantExpr();
@@ -1995,6 +1996,24 @@ bool Parser::TryParseSwitchItem(AST::SwitchStatement& switchStatement)
     return false;
 }
 
+void Parser::ParseFunctionDefinition(AST::FunctionDefinition& funcDef)
+{
+    MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
+    if(m_Tokens[m_TokenIndex].Symbol == Symbol::Identifier)
+    {
+        funcDef.Parameters.push_back(m_Tokens[m_TokenIndex++].String);
+        while(TryParseSymbol(Symbol::Comma))
+        {
+            MUST_PARSE( m_Tokens[m_TokenIndex].Symbol == Symbol::Identifier, ERROR_MESSAGE_EXPECTED_IDENTIFIER );
+            funcDef.Parameters.push_back(m_Tokens[m_TokenIndex++].String);
+        }
+    }
+    MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
+    MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN );
+    ParseBlock(funcDef.Body);
+    MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
+}
+
 unique_ptr<AST::Statement> Parser::TryParseStatement()
 {
     const PlaceInCode place = GetCurrentTokenPlace();
@@ -2133,6 +2152,20 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
         MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
         return expr;
     }
+
+    // Syntactic sugar for functions:
+    // 'function' TOKEN_IDENTIFIER '(' [ TOKEN_IDENTIFIER ( ',' TOKE_IDENTIFIER )* ] ')' '{' Block '}'
+    if(m_Tokens[m_TokenIndex].Symbol == Symbol::Function && m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Identifier)
+    {
+        ++m_TokenIndex;
+        unique_ptr<AST::BinaryOperator> assignmentOp = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Assignment);
+        assignmentOp->Operands[0] = make_unique<AST::Identifier>(GetCurrentTokenPlace(), string(m_Tokens[m_TokenIndex].String));
+        ++m_TokenIndex;
+        unique_ptr<AST::FunctionDefinition> funcDef = make_unique<AST::FunctionDefinition>(place);
+        ParseFunctionDefinition(*funcDef);
+        assignmentOp->Operands[1] = std::move(funcDef);
+        return assignmentOp;
+    }
     
     return unique_ptr<AST::Statement>{};
 }
@@ -2191,23 +2224,11 @@ unique_ptr<AST::Expression> Parser::TryParseExpr0()
     }
 
     // 'function' '(' [ TOKEN_IDENTIFIER ( ',' TOKE_IDENTIFIER )* ] ')' '{' Block '}'
-    if(TryParseSymbol(Symbol::Function))
+    if(m_Tokens[m_TokenIndex].Symbol == Symbol::Function && m_Tokens[m_TokenIndex + 1].Symbol == Symbol::RoundBracketOpen)
     {
+        ++m_TokenIndex;
         unique_ptr<AST::FunctionDefinition> func = std::make_unique<AST::FunctionDefinition>(place);
-        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
-        if(m_Tokens[m_TokenIndex].Symbol == Symbol::Identifier)
-        {
-            func->Parameters.push_back(m_Tokens[m_TokenIndex++].String);
-            while(TryParseSymbol(Symbol::Comma))
-            {
-                MUST_PARSE( m_Tokens[m_TokenIndex].Symbol == Symbol::Identifier, ERROR_MESSAGE_EXPECTED_IDENTIFIER );
-                func->Parameters.push_back(m_Tokens[m_TokenIndex++].String);
-            }
-        }
-        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
-        MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN );
-        ParseBlock(func->Body);
-        MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
+        ParseFunctionDefinition(*func);
         return func;
     }
 
