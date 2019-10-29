@@ -477,4 +477,11 @@ TEST_CASE("Functions")
         const char* code = "function f(a, a) { }";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
     }
+    SECTION("Recursion")
+    {
+        const char* code = "function factorial(n){ if(n==0) return 1; return n*factorial(n-1); } \n"
+            "print(factorial(0)); print(factorial(3)); print(factorial(4));";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n6\n24\n");
+    }
 }
