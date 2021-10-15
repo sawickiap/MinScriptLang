@@ -434,6 +434,11 @@ TEST_CASE("Basic")
         code = "switch(1) { case 1: case 1: }";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
     }
+}
+
+TEST_CASE("Null")
+{
+    Environment env;
     SECTION("Null assignment")
     {
         const char* code = 
@@ -443,6 +448,56 @@ TEST_CASE("Basic")
             "a='A'; print(a);";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "null\n1\nnull\nA\n");
+    }
+    SECTION("Null in operators")
+    {
+        const char* code = "print(null + 1);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "print(a / 2);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "print('AAA' + a);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "print(null < 5);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "print(a & 0xFF);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Null in comparison")
+    {
+        const char* code =
+            "        print(a == a); print(a != a); print(a == null); print(null != a);"
+            "a=1;    print(a == a); print(a != a); print(a == null); print(null != a);"
+            "a=null; print(a == a); print(a != a); print(a == null); print(null != a);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() ==
+            "1\n0\n1\n0\n"
+            "1\n0\n0\n1\n"
+            "1\n0\n1\n0\n");
+    }
+    SECTION("Passing null to function")
+    {
+        const char* code = "function f(a) { print(a); print(a != null); }"
+            "f(1); f(x); f(null);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n1\n" "null\n0\n" "null\n0\n");
+    }
+    SECTION("Returning null from function")
+    {
+        const char* code = "function f(){return;} function g(){return null;}"
+            "x=1; print(x); x=f(); print(x);"
+            "x=1; print(x); x=g(); print(x);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\nnull\n1\nnull\n");
+    }
+    SECTION("Condition on null")
+    {
+        const char* code = "x=null;"
+            "if(null) print(true); else print(false);"
+            "if(x) print(true); else print(false);"
+            "if(y) print(true); else print(false);"
+            "if(true) print(true); else print(false);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n0\n0\n1\n");
     }
 }
 
