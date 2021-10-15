@@ -96,9 +96,9 @@ TEST_CASE("Basic")
     }
     SECTION("Constants null false true")
     {
-        const char* code = "print(null); print(false); print(true); print(true + true - null - false);";
+        const char* code = "print(null); print(false); print(true); print(true + true - false);";
         env.Execute(code, strlen(code));
-        REQUIRE(env.GetOutput() == "0\n0\n1\n2\n");
+        REQUIRE(env.GetOutput() == "null\n0\n1\n2\n");
     }
     SECTION("If conditions")
     {
@@ -381,6 +381,20 @@ TEST_CASE("Basic")
         code = "s='ABCDEF'; s['x']='a';";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
+    SECTION("String copy to variable")
+    {
+        const char* code = "a='ABC'; b=a; b[0]='X'; print(a); print(b); b='DEF'; print(a); print(b);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "ABC\nXBC\nABC\nDEF\n");
+    }
+    SECTION("String passing as parameter")
+    {
+        const char* code =
+            "function f(x){ print(x); x=x+x; print(x); x='A'; print(x); }"
+            "a='ABC'; f('---'); f(a); print(a); f(a); print(a);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "---\n------\nA\nABC\nABCABC\nA\nABC\nABC\nABCABC\nA\nABC\n");
+    }
     SECTION("Switch basic")
     {
         const char* code = "switch(123) { case 1: print(1); case 'a': print('a'); case 123: print(123); default: print('Boo!'); }";
@@ -420,6 +434,16 @@ TEST_CASE("Basic")
         code = "switch(1) { case 1: case 1: }";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
     }
+    SECTION("Null assignment")
+    {
+        const char* code = 
+            "print(a);"
+            "a=1; print(a);"
+            "a=null; print(a);"
+            "a='A'; print(a);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "null\n1\nnull\nA\n");
+    }
 }
 
 TEST_CASE("Functions")
@@ -442,7 +466,8 @@ TEST_CASE("Functions")
     SECTION("Local variables invalid")
     {
         const char* code = "f=function(){ a=1; print(a); }; f(); print(a);";
-        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\nnull\n");
     }
     SECTION("Parameters")
     {
@@ -458,7 +483,7 @@ TEST_CASE("Functions")
             "functionReturningSomething = function(){ print('functionReturningSomething'); return 123; print('DUPA'); }; \n"
             "print(functionNotReturning()); print(functionReturningNull()); print(functionReturningSomething());";
         env.Execute(code, strlen(code));
-        REQUIRE(env.GetOutput() == "functionNotReturning\n0\nfunctionReturningNull\n0\nfunctionReturningSomething\n123\n");
+        REQUIRE(env.GetOutput() == "functionNotReturning\nnull\nfunctionReturningNull\nnull\nfunctionReturningSomething\n123\n");
     }
     SECTION("Return without function")
     {

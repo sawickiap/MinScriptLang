@@ -370,9 +370,9 @@ static const char* SYSTEM_FUNCTION_NAMES[] = {
 class Value
 {
 public:
-    enum class Type { Number, String, Function, SystemFunction };
+    enum class Type { Null, Number, String, Function, SystemFunction };
 
-    Value() : m_Number(0.0) { }
+    Value() { }
     Value(double number) : m_Type(Type::Number), m_Number(number) { }
     Value(string&& str) : m_Type(Type::String), m_String(std::move(str)) { }
     Value(const AST::FunctionDefinition* func) : m_Type{Type::Function}, m_Function{func} { }
@@ -391,8 +391,11 @@ public:
         {
             switch(m_Type)
             {
+            case Type::Null: return true;
             case Type::Number: return m_Number == rhs.m_Number;
             case Type::String: return m_String == rhs.m_String;
+            case Type::Function: return m_Function == rhs.m_Function;
+            case Type::SystemFunction: return m_SystemFunction == rhs.m_SystemFunction;
             default: assert(0);
             }
         }
@@ -404,8 +407,11 @@ public:
         {
             switch(m_Type)
             {
+            case Type::Null: return false;
             case Type::Number: return m_Number != rhs.m_Number;
             case Type::String: return m_String != rhs.m_String;
+            case Type::Function: return m_Function != rhs.m_Function;
+            case Type::SystemFunction: return m_SystemFunction == rhs.m_SystemFunction;
             default: assert(0);
             }
         }
@@ -416,17 +422,21 @@ public:
     {
         switch(m_Type)
         {
+        case Type::Null: return false;
         case Type::Number: return m_Number != 0.f;
         case Type::String: return !m_String.empty();
+        case Type::Function: return true;
+        case Type::SystemFunction: return true;
         default: assert(0); return false;
         }
     }
 
+    void SetNull() { m_Type = Type::Null; m_String.clear(); }
     void SetNumber(double number) { m_Type = Type::Number; m_Number = number; m_String.clear(); }
     void SetString(string&& str) { m_Type = Type::String; m_String = std::move(str); }
 
 private:
-    Type m_Type = Type::Number;
+    Type m_Type = Type::Null;
     union
     {
         double m_Number;
@@ -757,6 +767,7 @@ public:
     void Execute(const char* code, size_t codeLen);
     const string& GetOutput() const { return m_Output; }
     void Print(const char* s, size_t sLen) { m_Output.append(s, s + sLen); }
+    void Print(const char* s) { Print(s, strlen(s)); }
 
 private:
     AST::Script m_Script;
@@ -1385,12 +1396,10 @@ void Identifier::DebugPrint(uint32_t indentLevel, const char* prefix) const
 
 Value Identifier::Evaluate(ExecuteContext& ctx) const
 {
-    Object* const localObj = ctx.LocalContexts.empty() ? nullptr : ctx.LocalContexts.back();
-
     // Local variable
-    if(localObj)
+    if(!ctx.LocalContexts.empty())
     {
-        Value* val = localObj->TryGetValue(S);
+        Value* val = ctx.LocalContexts.back()->TryGetValue(S);
         if(val)
             return *val;
     }
@@ -1407,8 +1416,8 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
         if(S == SYSTEM_FUNCTION_NAMES[i])
             return Value{(SystemFunction)i};
 
-    // Not found
-    EXECUTION_CHECK( false, string("Variable \"") + S + "\" doesn't exist." );
+    // Not found - null
+    return Value{};
 }
 
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
@@ -1694,9 +1703,19 @@ Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
     // This one is able to create new value.
     if(Type == BinaryOperatorType::Assignment)
     {
-        Value& lhsValRef = lhs.Obj.GetOrCreateValue(lhs.Key);
-        lhsValRef = std::move(rhs);
-        return lhsValRef;
+        // Assigning null - deleting the value.
+        if(rhs.GetType() == Value::Type::Null)
+        {
+            if(lhs.Obj.HasKey(lhs.Key))
+                lhs.Obj.Remove(lhs.Key);
+            return Value{};
+        }
+        else
+        {
+            Value& lhsValRef = lhs.Obj.GetOrCreateValue(lhs.Key);
+            lhsValRef = std::move(rhs);
+            return lhsValRef;
+        }
     }
 
     // These ones require existing value.
@@ -1796,6 +1815,9 @@ Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t 
         const Value& val = args[i];
         switch(val.GetType())
         {
+        case Value::Type::Null:
+            ctx.Env.Print("null\n");
+            break;
         case Value::Type::Number:
             Format(s, "%g\n", val.GetNumber());
             ctx.Env.Print(s.data(), s.length());
@@ -1805,6 +1827,9 @@ Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t 
                 ctx.Env.Print(val.GetString().data(), val.GetString().length());
             ctx.Env.Print("\n", 1);
             break;
+        case Value::Type::Function:
+        case Value::Type::SystemFunction:
+            ctx.Env.Print("function\n");
         default: assert(0);
         }
             
