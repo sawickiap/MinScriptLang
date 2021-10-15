@@ -261,6 +261,12 @@ TEST_CASE("Basic")
             "14\n2\n1\n"
             "8\n16\n");
     }
+    SECTION("Chained assignment")
+    {
+        const char* code = "a=b=c=2; b=3; print(a, b, c);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "2\n3\n2\n");
+    }
     SECTION("String")
     {
         const char* code = "a=\"aaa\"; b='bbb\n"
@@ -451,11 +457,7 @@ TEST_CASE("Null")
     }
     SECTION("Null in operators")
     {
-        const char* code = "print(null + 1);";
-        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
-        code = "print(a / 2);";
-        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
-        code = "print('AAA' + a);";
+        const char* code = "print(a / 2);";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
         code = "print(null < 5);";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
@@ -498,6 +500,24 @@ TEST_CASE("Null")
             "if(true) print(true); else print(false);";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "0\n0\n0\n1\n");
+    }
+    SECTION("Add to null")
+    {
+        const char* code = "print(x + 2); print(2 + null);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "2\n2\n");
+    }
+    SECTION("Assign add null")
+    {
+        const char* code = "a += 3; a += 2; print(a); b += 'AAA'; b += 'BBB'; print(b);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "5\nAAABBB\n");
+    }
+    SECTION("Increment null")
+    {
+        const char* code = "a = null; print(a++); print(++a);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n2\n");
     }
 }
 
