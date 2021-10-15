@@ -627,3 +627,26 @@ TEST_CASE("Functions")
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
 }
+
+TEST_CASE("Object")
+{
+    Environment env;
+    SECTION("Initialization and member access")
+    {
+        const char* code = 
+            "a={}; print(a); print(a.x);"
+            "a={'x':2}; print(a); print(a.x);"
+            "a={'x':2,}; print(a); print(a.x);"
+            "a={'x':2,'y':3}; print(a); print(a.y);"
+            "a={'x':2,'y':3,}; print(a); print(a.y);"
+            "a.z=5; a.w=a.z; a.z=4; print(a.z); print(a.w);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() ==
+            "object\nnull\n"
+            "object\n2\n"
+            "object\n2\n"
+            "object\n3\n"
+            "object\n3\n"
+            "4\n5\n");
+    }
+}

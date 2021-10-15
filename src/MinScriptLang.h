@@ -137,6 +137,8 @@ static const char* const ERROR_MESSAGE_EXPECTED_IDENTIFIER = "Expected identifie
 static const char* const ERROR_MESSAGE_EXPECTED_LVALUE = "Expected l-value.";
 static const char* const ERROR_MESSAGE_EXPECTED_NUMBER = "Expected number.";
 static const char* const ERROR_MESSAGE_EXPECTED_STRING = "Expected string.";
+static const char* const ERROR_MESSAGE_EXPECTED_OBJECT = "Expected object.";
+static const char* const ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER = "Expected object member.";
 static const char* const ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING = "Expected single character string.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL                     = "Expected symbol.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_COLON               = "Expected symbol ':'.";
@@ -662,6 +664,16 @@ private:
     Value BitwiseNot(Value&& operand) const;
 };
 
+struct MemberAccessOperator : Operator
+{
+    unique_ptr<Expression> Operand;
+    string MemberName;
+    MemberAccessOperator(const PlaceInCode& place) : Operator{place} { }
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual LValue GetLValue(ExecuteContext& ctx) const;
+};
+
 enum class BinaryOperatorType
 {
     Mul, Div, Mod, Add, Sub, ShiftLeft, ShiftRight,
@@ -722,6 +734,15 @@ struct FunctionDefinition : public Expression
     bool AreParameterNamesUnique() const;
 };
 
+struct ObjectExpression : public Expression
+{
+    vector<string> ItemNames;
+    std::vector<unique_ptr<Expression>> ItemValues;
+    ObjectExpression(const PlaceInCode& place) : Expression{place} { }
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual Value Evaluate(ExecuteContext& ctx) const;
+};
+
 } // namespace AST
 
 static inline void CheckNumberOperand(const AST::Expression* operand, const Value& value)
@@ -750,6 +771,8 @@ private:
     unique_ptr<AST::ConstantValue> TryParseConstantValue();
     unique_ptr<AST::Identifier> TryParseIdentifierValue();
     unique_ptr<AST::ConstantExpression> TryParseConstantExpr();
+    unique_ptr<AST::Expression> TryParseObjectMember(string& outMemberName);
+    unique_ptr<AST::ObjectExpression> TryParseObject();
     unique_ptr<AST::Expression> TryParseExpr0();
     unique_ptr<AST::Expression> TryParseExpr2();
     unique_ptr<AST::Expression> TryParseExpr3();
@@ -1539,6 +1562,29 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
     assert(0); return Value{};
 }
 
+void MemberAccessOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
+{
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "MemberAccessOperator Member=%s\n", DEBUG_PRINT_ARGS_BEG, MemberName.c_str());
+    Operand->DebugPrint(indentLevel + 1, "Operand: ");
+}
+
+Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
+{
+    Value objVal = Operand->Evaluate(ctx);
+    EXECUTION_CHECK_PLACE(objVal.GetType() == Value::Type::Object, GetPlace(), ERROR_MESSAGE_EXPECTED_OBJECT);
+    const Value* memberVal = objVal.GetObject()->TryGetValue(MemberName);
+    if(memberVal)
+        return *memberVal;
+    return Value{};
+}
+
+LValue MemberAccessOperator::GetLValue(ExecuteContext& ctx) const
+{
+    Value objVal = Operand->Evaluate(ctx);
+    EXECUTION_CHECK_PLACE(objVal.GetType() == Value::Type::Object, GetPlace(), ERROR_MESSAGE_EXPECTED_OBJECT);
+    return LValue{*objVal.GetObject(), MemberName.c_str()};
+}
+
 Value UnaryOperator::BitwiseNot(Value&& operand) const
 {
     const int64_t operandInt = (int64_t)operand.GetNumber();
@@ -1855,12 +1901,33 @@ bool FunctionDefinition::AreParameterNamesUnique() const
     return true;
 }
 
+void ObjectExpression::DebugPrint(uint32_t indentLevel, const char* prefix) const
+{
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "Object\n", DEBUG_PRINT_ARGS_BEG);
+    ++indentLevel;
+    const size_t count = ItemNames.size();
+    for(size_t i = 0; i < count; ++i)
+        ItemValues[0]->DebugPrint(indentLevel, ItemNames[i].c_str());
+}
+
+Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
+{
+    auto obj = make_shared<Object>();
+    const size_t count = ItemNames.size();
+    for(size_t i = 0; i < count; ++i)
+    {
+        Value& memberVal = obj->GetOrCreateValue(ItemNames[i]);
+        memberVal = ItemValues[i]->Evaluate(ctx);
+    }
+    return Value{std::move(obj)};
+}
+
 } // namespace AST
 
 ////////////////////////////////////////////////////////////////////////////////
 // Built in functions
 
-Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t argCount)
+static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t argCount)
 {
     string s;
     for(size_t i = 0; i < argCount; ++i)
@@ -1883,6 +1950,9 @@ Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t 
         case Value::Type::Function:
         case Value::Type::SystemFunction:
             ctx.Env.Print("function\n");
+            break;
+        case Value::Type::Object:
+            ctx.Env.Print("object\n");
             break;
         default: assert(0);
         }
@@ -2262,6 +2332,56 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
     return TryParseIdentifierValue();
 }
 
+unique_ptr<AST::Expression> Parser::TryParseObjectMember(string& outMemberName)
+{
+    if(m_TokenIndex + 3 < m_Tokens.size() &&
+        m_Tokens[m_TokenIndex].Symbol == Symbol::String &&
+        m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Colon)
+    {
+        outMemberName = m_Tokens[m_TokenIndex].String;
+        m_TokenIndex += 2;
+        return TryParseExpr16();
+    }
+    return unique_ptr<AST::Expression>{};
+}
+
+unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
+{
+    if((m_TokenIndex + 1 < m_Tokens.size() &&
+            m_Tokens[m_TokenIndex].Symbol == Symbol::CurlyBracketOpen &&
+            m_Tokens[m_TokenIndex + 1].Symbol == Symbol::CurlyBracketClose) ||
+        (m_TokenIndex + 2 < m_Tokens.size() &&
+            m_Tokens[m_TokenIndex].Symbol == Symbol::CurlyBracketOpen &&
+            m_Tokens[m_TokenIndex + 1].Symbol == Symbol::String &&
+            m_Tokens[m_TokenIndex + 2].Symbol == Symbol::Colon))
+    {
+        auto objExpr = make_unique<AST::ObjectExpression>(GetCurrentTokenPlace());
+        TryParseSymbol(Symbol::CurlyBracketOpen);
+        if(!TryParseSymbol(Symbol::CurlyBracketClose))
+        {
+            string memberName;
+            unique_ptr<AST::Expression> memberValue;
+            MUST_PARSE( memberValue = TryParseObjectMember(memberName), ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER );
+            objExpr->ItemNames.push_back(std::move(memberName));
+            objExpr->ItemValues.push_back(std::move(memberValue));
+            if(!TryParseSymbol(Symbol::CurlyBracketClose))
+            {
+                while(TryParseSymbol(Symbol::Comma))
+                {
+                    if(TryParseSymbol(Symbol::CurlyBracketClose))
+                        return objExpr;
+                    MUST_PARSE( memberValue = TryParseObjectMember(memberName), ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER );
+                    objExpr->ItemNames.push_back(std::move(memberName));
+                    objExpr->ItemValues.push_back(std::move(memberValue));
+                }
+                MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
+            }
+        }
+        return objExpr;
+    }
+    return unique_ptr<AST::ObjectExpression>{};
+}
+
 unique_ptr<AST::Expression> Parser::TryParseExpr0()
 {
     const PlaceInCode place = GetCurrentTokenPlace();
@@ -2274,6 +2394,9 @@ unique_ptr<AST::Expression> Parser::TryParseExpr0()
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
         return expr;
     }
+
+    if(auto objExpr = TryParseObject())
+        return objExpr;
 
     // 'function' '(' [ TOKEN_IDENTIFIER ( ',' TOKE_IDENTIFIER )* ] ')' '{' Block '}'
     if(m_Tokens[m_TokenIndex].Symbol == Symbol::Function && m_Tokens[m_TokenIndex + 1].Symbol == Symbol::RoundBracketOpen)
@@ -2342,7 +2465,15 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
         MUST_PARSE( TryParseSymbol(Symbol::SquareBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE );
         return op;
     }
-    // #TODO Member access: Expr0 '.' TOKEN_IDENTIFIER
+    if(TryParseSymbol(Symbol::Dot))
+    {
+        auto op = std::make_unique<AST::MemberAccessOperator>(place);
+        op->Operand = std::move(expr);
+        auto identifier = TryParseIdentifierValue();
+        MUST_PARSE( identifier && identifier->Scope == AST::IdentifierScope::None, ERROR_MESSAGE_EXPECTED_IDENTIFIER );
+        op->MemberName = std::move(identifier->S);
+        return op;
+    }
     // Just Expr0
     return expr;
 }
