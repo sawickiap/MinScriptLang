@@ -2181,13 +2181,14 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     }
 
     // Syntactic sugar for functions:
-    // 'function' TOKEN_IDENTIFIER '(' [ TOKEN_IDENTIFIER ( ',' TOKE_IDENTIFIER )* ] ')' '{' Block '}'
-    if(m_Tokens[m_TokenIndex].Symbol == Symbol::Function && m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Identifier)
+    // 'function' IdentifierValue '(' [ TOKEN_IDENTIFIER ( ',' TOKE_IDENTIFIER )* ] ')' '{' Block '}'
+    if(m_Tokens[m_TokenIndex].Symbol == Symbol::Function &&
+        (m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Identifier || m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Local ||
+            m_Tokens[m_TokenIndex + 1].Symbol == Symbol::This || m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Global))
     {
         ++m_TokenIndex;
         unique_ptr<AST::BinaryOperator> assignmentOp = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Assignment);
-        assignmentOp->Operands[0] = make_unique<AST::Identifier>(GetCurrentTokenPlace(), AST::IdentifierScope::None, string(m_Tokens[m_TokenIndex].String));
-        ++m_TokenIndex;
+        MUST_PARSE( assignmentOp->Operands[0] = TryParseIdentifierValue(), ERROR_MESSAGE_EXPECTED_IDENTIFIER );
         unique_ptr<AST::FunctionDefinition> funcDef = make_unique<AST::FunctionDefinition>(place);
         ParseFunctionDefinition(*funcDef);
         assignmentOp->Operands[1] = std::move(funcDef);

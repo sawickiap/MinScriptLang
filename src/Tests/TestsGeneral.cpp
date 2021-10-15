@@ -462,6 +462,17 @@ TEST_CASE("Basic")
         code = "env.a=1;";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
+    SECTION("local global in function definition")
+    {
+        const char* code = "function Outer() { "
+            "   function InnerNone() { print('InnerNone'); } "
+            "   function local.InnerLocal() { print('InnerLocal'); } "
+            "   function global.InnerGlobal() { print('InnerGlobal'); } "
+            "   InnerNone(); InnerLocal(); InnerGlobal();"
+            "} Outer(); InnerGlobal();";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "InnerNone\nInnerLocal\nInnerGlobal\nInnerGlobal\n");
+    }
 }
 
 TEST_CASE("Null")
