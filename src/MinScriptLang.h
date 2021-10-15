@@ -11,7 +11,6 @@
 
 #include <string>
 #include <exception>
-
 #include <cstdint>
 
 namespace MinScriptLang {
@@ -443,25 +442,20 @@ private:
 class Object
 {
 public:
-    bool HasKey(const Constant& key) const;
     bool HasKey(const string& key) const;
-    Value& GetOrCreateValue(const Constant& key); // Creates new null value if doesn't exist.
     Value& GetOrCreateValue(const string& key); // Creates new null value if doesn't exist.
-    Value* TryGetValue(const Constant& key); // Returns null if doesn't exist.
     Value* TryGetValue(const string& key); // Returns null if doesn't exist.
-    bool Remove(const Constant& key); // Returns true if has been found and removed.
+    bool Remove(const string& key); // Returns true if has been found and removed.
 
 private:
-    using NumberMapType = std::map<double, Value>;
-    using StringMapType = std::unordered_map<string, Value>;
-    NumberMapType m_NumberMap;
-    StringMapType m_StringMap;
+    using MapType = std::unordered_map<string, Value>;
+    MapType m_Items;
 };
 
 struct LValue
 {
     Object& Obj;
-    Constant Key;
+    const char* Key;
     size_t Index; // SIZE_MAX if not indexing single character.
     
     bool HasIndex() const { return Index != SIZE_MAX; }
@@ -1094,95 +1088,33 @@ bool Tokenizer::ParseString(Token& out)
 ////////////////////////////////////////////////////////////////////////////////
 // class Object implementation
 
-bool Object::HasKey(const Constant& key) const
-{
-    switch(key.GetType())
-    {
-    case Constant::Type::Number:
-        return m_NumberMap.find(key.GetNumber()) != m_NumberMap.end();
-    case Constant::Type::String:
-        return m_StringMap.find(key.GetString()) != m_StringMap.end();
-    default: assert(0); return false;
-    }
-}
-
 bool Object::HasKey(const string& key) const
 {
-    return m_StringMap.find(key) != m_StringMap.end();
-}
-
-Value& Object::GetOrCreateValue(const Constant& key)
-{
-    switch(key.GetType())
-    {
-    case Constant::Type::Number:
-        return m_NumberMap[key.GetNumber()];
-    case Constant::Type::String:
-        return m_StringMap[key.GetString()];
-    default: assert(0); return m_NumberMap[0];
-    }
+    return m_Items.find(key) != m_Items.end();
 }
 
 Value& Object::GetOrCreateValue(const string& key)
 {
-    return m_StringMap[key];
-}
-
-Value* Object::TryGetValue(const Constant& key)
-{
-    switch(key.GetType())
-    {
-    case Constant::Type::Number:
-    {
-        auto it = m_NumberMap.find(key.GetNumber());
-        if(it != m_NumberMap.end())
-            return &it->second;
-    }
-    case Constant::Type::String:
-    {
-        auto it = m_StringMap.find(key.GetString());
-        if(it != m_StringMap.end())
-            return &it->second;
-    }
-    default: assert(0);
-    }
-    return nullptr;
+    return m_Items[key];
 }
 
 Value* Object::TryGetValue(const string& key)
 {
-    auto it = m_StringMap.find(key);
-    if(it != m_StringMap.end())
+    auto it = m_Items.find(key);
+    if(it != m_Items.end())
         return &it->second;
     return nullptr;
 }
 
-bool Object::Remove(const Constant& key)
+bool Object::Remove(const string& key)
 {
-    switch(key.GetType())
+    auto it = m_Items.find(key);
+    if(it != m_Items.end())
     {
-    case Constant::Type::Number:
-    {
-        auto it = m_NumberMap.find(key.GetNumber());
-        if(it != m_NumberMap.end())
-        {
-            m_NumberMap.erase(it);
-            return true;
-        }
-        return false;
+        m_Items.erase(it);
+        return true;
     }
-    case Constant::Type::String:
-    {
-        auto it = m_StringMap.find(key.GetString());
-        if(it != m_StringMap.end())
-        {
-            m_StringMap.erase(it);
-            return true;
-        }
-        return false;
-    }
-    default: assert(0); return false;
-    }
+    return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1485,19 +1417,19 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
 
     // Local variable
     if(localObj && localObj->HasKey(S))
-        return LValue{*localObj, Constant{string(S)}, SIZE_MAX};
+        return LValue{*localObj, S.c_str(), SIZE_MAX};
     
     // #TODO this
     
     // Global variable
     if(ctx.GlobalContext.HasKey(S))
-        return LValue{ctx.GlobalContext, Constant{string(S)}, SIZE_MAX};
+        return LValue{ctx.GlobalContext, S.c_str(), SIZE_MAX};
 
     // Not found: return reference to smallest scope.
     if(localObj)
-        return LValue{*localObj, Constant{string(S)}, SIZE_MAX};
+        return LValue{*localObj, S.c_str(), SIZE_MAX};
     else
-        return LValue{ctx.GlobalContext, Constant{string(S)}, SIZE_MAX};
+        return LValue{ctx.GlobalContext, S.c_str(), SIZE_MAX};
 }
 
 void UnaryOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -1544,7 +1476,7 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         }
     }
     // Those use r-value.
-    if(Type == UnaryOperatorType::Plus ||
+    else if(Type == UnaryOperatorType::Plus ||
         Type == UnaryOperatorType::Minus ||
         Type == UnaryOperatorType::LogicalNot ||
         Type == UnaryOperatorType::BitwiseNot)
