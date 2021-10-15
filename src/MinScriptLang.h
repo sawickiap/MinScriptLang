@@ -466,9 +466,9 @@ struct LValue
 {
     Object& Obj;
     const char* Key;
-    size_t Index; // SIZE_MAX if not indexing single character.
+    size_t CharIndex; // SIZE_MAX if not indexing single character.
     
-    bool HasIndex() const { return Index != SIZE_MAX; }
+    bool HasIndex() const { return CharIndex != SIZE_MAX; }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1675,7 +1675,7 @@ LValue BinaryOperator::GetLValue(ExecuteContext& ctx) const
         LValue lval = Operands[0]->GetLValue(ctx);
         const Value indexVal = Operands[1]->Evaluate(ctx);
         EXECUTION_CHECK( indexVal.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
-        EXECUTION_CHECK( NumberToIndex(lval.Index, indexVal.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
+        EXECUTION_CHECK( NumberToIndex(lval.CharIndex, indexVal.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
         return lval;
     }
     return __super::GetLValue(ctx);
@@ -1706,9 +1706,9 @@ Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
         Value* const lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
         EXECUTION_CHECK( lhsValPtr != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
         EXECUTION_CHECK( lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
-        EXECUTION_CHECK( lhs.Index < lhsValPtr->GetString().length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
+        EXECUTION_CHECK( lhs.CharIndex < lhsValPtr->GetString().length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
         EXECUTION_CHECK( rhs.GetString().length() == 1, ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING );
-        lhsValPtr->GetString()[lhs.Index] = rhs.GetString()[0];
+        lhsValPtr->GetString()[lhs.CharIndex] = rhs.GetString()[0];
         return *lhsValPtr;
     }
 
