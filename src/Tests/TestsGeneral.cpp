@@ -440,6 +440,28 @@ TEST_CASE("Basic")
         code = "switch(1) { case 1: case 1: }";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
     }
+    SECTION("local global")
+    {
+        const char* code =
+            "function ChangeDefault() { print(a); a=1; print(a); }"
+            "function ChangeGlobal() { print(a); global.a=2; print(a); }"
+            "function ChangeLocal() { print(a); local.a=3; print(a); }"
+            "        ChangeDefault(); ChangeGlobal(); ChangeLocal();"
+            "a=10;   ChangeDefault(); ChangeGlobal(); ChangeLocal();"
+            "a=null; ChangeDefault(); ChangeGlobal(); ChangeLocal();";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() ==
+            "null\n1\nnull\n2\n2\n3\n"
+            "10\n1\n1\n2\n2\n3\n"
+            "null\n1\nnull\n2\n2\n3\n");
+    }
+    SECTION("invalid local env")
+    {
+        const char* code = "local.a=1;";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+        code = "env.a=1;";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
 }
 
 TEST_CASE("Null")

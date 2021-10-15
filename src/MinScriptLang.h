@@ -146,6 +146,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Ex
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN  = "Expected symbol '{'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE = "Expected symbol ']'.";
+static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_DOT                 = "Expected symbol '.'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
 static const char* const ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT = "Expected unique constant.";
 static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
@@ -156,6 +157,8 @@ static const char* const ERROR_MESSAGE_RETURN_WITHOUT_FUNCTION = "Return without
 static const char* const ERROR_MESSAGE_INCOMPATIBLE_TYPES = "Incompatible types.";
 static const char* const ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS = "Index out of bounds.";
 static const char* const ERROR_MESSAGE_PARAMETER_NAMES_MUST_BE_UNIQUE = "Parameter naems must be unique.";
+static const char* const ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT = "Cannot change environment.";
+static const char* const ERROR_MESSAGE_NO_LOCAL_SCOPE = "There is no local scope here.";
 
 struct Constant
 {
@@ -206,6 +209,7 @@ enum class Symbol
     Amperstand,        // &
     Caret,             // ^
     Pipe,              // |
+    Dot,               // .
     // Multiple character symbols
     DoublePlus,        // ++
     DoubleDash,        // --
@@ -229,18 +233,20 @@ enum class Symbol
     DoublePipe,        // ||
     // Keywords
     Null, False, True, If, Else, While, Do, For, Break, Continue,
-    Switch, Case, Default, Function, Return, Count
+    Switch, Case, Default, Function, Return,
+    Local, This, Global, Env, Count
 };
 static const char* SYMBOL_STR[] = {
     // Token types
     "", "", "", "", "",
     // Symbols
-    ",", "?", ":", ";", "(", ")", "[", "]", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", "&", "^", "|",
+    ",", "?", ":", ";", "(", ")", "[", "]", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", "&", "^", "|", ".",
     // Multiple character symbols
     "++", "--", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
     // Keywords
     "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue",
     "switch", "case", "default", "function", "return",
+    "local", "this", "global", "env",
 };
 
 struct Token
@@ -359,6 +365,7 @@ private:
 // class Value definition
 
 namespace AST { struct FunctionDefinition; }
+class Object;
 
 enum class SystemFunction {
     Print, Count
@@ -370,13 +377,14 @@ static const char* SYSTEM_FUNCTION_NAMES[] = {
 class Value
 {
 public:
-    enum class Type { Null, Number, String, Function, SystemFunction };
+    enum class Type { Null, Number, String, Function, SystemFunction, Object };
 
     Value() { }
     Value(double number) : m_Type(Type::Number), m_Number(number) { }
     Value(string&& str) : m_Type(Type::String), m_String(std::move(str)) { }
     Value(const AST::FunctionDefinition* func) : m_Type{Type::Function}, m_Function{func} { }
     Value(SystemFunction func) : m_Type{Type::SystemFunction}, m_SystemFunction{func} { }
+    Value(shared_ptr<Object> &&obj) : m_Type{Type::Object}, m_Object(obj) { }
 
     Type GetType() const { return m_Type; }
     double GetNumber() const { assert(m_Type == Type::Number); return m_Number; }
@@ -384,6 +392,7 @@ public:
     const string& GetString() const { assert(m_Type == Type::String); return m_String; }
     const AST::FunctionDefinition* GetFunction() const { assert(m_Type == Type::Function && m_Function); return m_Function; }
     SystemFunction GetSystemFunction() const { assert(m_Type == Type::SystemFunction); return m_SystemFunction; }
+    Object* GetObject() const { assert(m_Type == Type::Object); return m_Object.get(); }
 
     bool operator==(const Value& rhs) const
     {
@@ -444,6 +453,7 @@ private:
         SystemFunction m_SystemFunction;
     };
     string m_String;
+    shared_ptr<Object> m_Object;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -466,7 +476,7 @@ struct LValue
 {
     Object& Obj;
     const char* Key;
-    size_t CharIndex; // SIZE_MAX if not indexing single character.
+    size_t CharIndex = SIZE_MAX; // SIZE_MAX if not indexing single character.
     
     bool HasIndex() const { return CharIndex != SIZE_MAX; }
 };
@@ -618,10 +628,12 @@ struct ConstantValue : ConstantExpression
     virtual Value Evaluate(ExecuteContext& ctx) const { return Val; }
 };
 
+enum class IdentifierScope { None, Local, This, Global, Env, Count };
 struct Identifier : ConstantExpression
 {
+    IdentifierScope Scope = IdentifierScope::Count;
     string S;
-    Identifier(const PlaceInCode& place, string&& s) : ConstantExpression{place}, S(std::move(s)) { }
+    Identifier(const PlaceInCode& place, IdentifierScope scope, string&& s) : ConstantExpression{place}, Scope(scope), S(std::move(s)) { }
     virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
@@ -736,6 +748,7 @@ private:
     void ParseFunctionDefinition(AST::FunctionDefinition& funcDef);
     unique_ptr<AST::Statement> TryParseStatement();
     unique_ptr<AST::ConstantValue> TryParseConstantValue();
+    unique_ptr<AST::Identifier> TryParseIdentifierValue();
     unique_ptr<AST::ConstantExpression> TryParseConstantExpr();
     unique_ptr<AST::Expression> TryParseExpr0();
     unique_ptr<AST::Expression> TryParseExpr2();
@@ -815,6 +828,8 @@ void Tokenizer::GetNextToken(Token& out)
 
     if(ParseString(out))
         return;
+    if(ParseNumber(out))
+        return;
     // Multi char symbol
     for(size_t i = (size_t)firstMultiCharSymbol; i < (size_t)firstKeywordSymbol; ++i)
     {
@@ -836,8 +851,6 @@ void Tokenizer::GetNextToken(Token& out)
             return;
         }
     }
-    if(ParseNumber(out))
-        return;
     // Identifier or keyword
     if(IsAlpha(currentCode[0]))
     {
@@ -1383,21 +1396,28 @@ void ConstantValue::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     switch(Val.GetType())
     {
+    case Value::Type::Null: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant null\n", DEBUG_PRINT_ARGS_BEG); break;
     case Value::Type::Number: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant number: %g\n", DEBUG_PRINT_ARGS_BEG, Val.GetNumber()); break;
     case Value::Type::String: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant string: %s\n", DEBUG_PRINT_ARGS_BEG, Val.GetString().c_str()); break;
+    case Value::Type::Function: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant function\n", DEBUG_PRINT_ARGS_BEG); break;
+    case Value::Type::SystemFunction: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant system function: %s\n", DEBUG_PRINT_ARGS_BEG, SYSTEM_FUNCTION_NAMES[(size_t)Val.GetSystemFunction()]); break;
+    case Value::Type::Object: assert(0 && "TODO");
     default: assert(0);
     }
 }
 
 void Identifier::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
-    printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier: %s\n", DEBUG_PRINT_ARGS_BEG, S.c_str());
+    static const char* PREFIX[] = { "", "local.", "this.", "global.", "env." };
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier: %s%s\n", DEBUG_PRINT_ARGS_BEG, PREFIX[(size_t)Scope], S.c_str());
 }
 
 Value Identifier::Evaluate(ExecuteContext& ctx) const
 {
+    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || !ctx.LocalContexts.empty(), GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
+
     // Local variable
-    if(!ctx.LocalContexts.empty())
+    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && !ctx.LocalContexts.empty())
     {
         Value* val = ctx.LocalContexts.back()->TryGetValue(S);
         if(val)
@@ -1407,14 +1427,20 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
     // #TODO this
     
     // Global variable
-    Value* val = ctx.GlobalContext.TryGetValue(S);
-    if(val)
-        return *val;
+    if(Scope == IdentifierScope::None || Scope == IdentifierScope::Global)
+    {
+        Value* val = ctx.GlobalContext.TryGetValue(S);
+        if(val)
+            return *val;
+    }
 
     // System function
-    for(size_t i = 0, count = (size_t)SystemFunction::Count; i < count; ++i)
-        if(S == SYSTEM_FUNCTION_NAMES[i])
-            return Value{(SystemFunction)i};
+    if(Scope == IdentifierScope::None || Scope == IdentifierScope::Env)
+    {
+        for(size_t i = 0, count = (size_t)SystemFunction::Count; i < count; ++i)
+            if(S == SYSTEM_FUNCTION_NAMES[i])
+                return Value{(SystemFunction)i};
+    }
 
     // Not found - null
     return Value{};
@@ -1422,23 +1448,26 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
 
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
 {
-    Object* const localObj = ctx.LocalContexts.empty() ? nullptr : ctx.LocalContexts.back();
+    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Env, GetPlace(), ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT);
+    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || !ctx.LocalContexts.empty(), GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
+
+    Object* const localCtx = ctx.LocalContexts.empty() ? nullptr : ctx.LocalContexts.back();
 
     // Local variable
-    if(localObj && localObj->HasKey(S))
-        return LValue{*localObj, S.c_str(), SIZE_MAX};
+    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && localCtx && localCtx->HasKey(S))
+        return LValue{*localCtx, S.c_str()};
     
     // #TODO this
     
     // Global variable
-    if(ctx.GlobalContext.HasKey(S))
-        return LValue{ctx.GlobalContext, S.c_str(), SIZE_MAX};
+    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Global) && ctx.GlobalContext.HasKey(S))
+        return LValue{ctx.GlobalContext, S.c_str()};
 
     // Not found: return reference to smallest scope.
-    if(localObj)
-        return LValue{*localObj, S.c_str(), SIZE_MAX};
-    else
-        return LValue{ctx.GlobalContext, S.c_str(), SIZE_MAX};
+    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && localCtx)
+        return LValue{*localCtx, S.c_str()};
+    // #TODO this
+    return LValue{ctx.GlobalContext, S.c_str()};
 }
 
 void UnaryOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -1854,6 +1883,7 @@ Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t 
         case Value::Type::Function:
         case Value::Type::SystemFunction:
             ctx.Env.Print("function\n");
+            break;
         default: assert(0);
         }
             
@@ -2156,7 +2186,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     {
         ++m_TokenIndex;
         unique_ptr<AST::BinaryOperator> assignmentOp = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Assignment);
-        assignmentOp->Operands[0] = make_unique<AST::Identifier>(GetCurrentTokenPlace(), string(m_Tokens[m_TokenIndex].String));
+        assignmentOp->Operands[0] = make_unique<AST::Identifier>(GetCurrentTokenPlace(), AST::IdentifierScope::None, string(m_Tokens[m_TokenIndex].String));
         ++m_TokenIndex;
         unique_ptr<AST::FunctionDefinition> funcDef = make_unique<AST::FunctionDefinition>(place);
         ParseFunctionDefinition(*funcDef);
@@ -2196,15 +2226,39 @@ unique_ptr<AST::ConstantValue> Parser::TryParseConstantValue()
     return unique_ptr<AST::ConstantValue>{};
 }
 
-unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
+unique_ptr<AST::Identifier> Parser::TryParseIdentifierValue()
 {
     const Token& t = m_Tokens[m_TokenIndex];
+    if(t.Symbol == Symbol::Local || t.Symbol == Symbol::This || t.Symbol == Symbol::Global || t.Symbol == Symbol::Env)
+    {
+        ++m_TokenIndex;
+        MUST_PARSE( TryParseSymbol(Symbol::Dot), ERROR_MESSAGE_EXPECTED_SYMBOL_DOT );
+        MUST_PARSE( m_TokenIndex < m_Tokens.size(), ERROR_MESSAGE_EXPECTED_IDENTIFIER );
+        const Token& tIdentifier = m_Tokens[m_TokenIndex++];
+        MUST_PARSE( tIdentifier.Symbol == Symbol::Identifier, ERROR_MESSAGE_EXPECTED_IDENTIFIER );
+        AST::IdentifierScope identifierScope = AST::IdentifierScope::Count;
+        switch(t.Symbol)
+        {
+        case Symbol::Local: identifierScope = AST::IdentifierScope::Local; break;
+        case Symbol::This: identifierScope = AST::IdentifierScope::This; break;
+        case Symbol::Global: identifierScope = AST::IdentifierScope::Global; break;
+        case Symbol::Env: identifierScope = AST::IdentifierScope::Env; break;
+        }
+        return make_unique<AST::Identifier>(t.Place, identifierScope, string(tIdentifier.String));
+    }
     if(t.Symbol == Symbol::Identifier)
     {
         ++m_TokenIndex;
-        return make_unique<AST::Identifier>(t.Place, string(t.String));
+        return make_unique<AST::Identifier>(t.Place, AST::IdentifierScope::None, string(t.String));
     }
-    return TryParseConstantValue();
+    return unique_ptr<AST::Identifier>{};
+}
+
+unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
+{
+    if(auto r = TryParseConstantValue())
+        return r;
+    return TryParseIdentifierValue();
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr0()
@@ -2564,7 +2618,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr17()
 
 bool Parser::TryParseSymbol(Symbol symbol)
 {
-    if(m_Tokens[m_TokenIndex].Symbol == symbol)
+    if(m_TokenIndex < m_Tokens.size() && m_Tokens[m_TokenIndex].Symbol == symbol)
     {
         ++m_TokenIndex;
         return true;
