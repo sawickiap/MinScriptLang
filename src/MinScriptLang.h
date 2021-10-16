@@ -477,10 +477,10 @@ private:
 struct LValue
 {
     Object& Obj;
-    const char* Key;
+    string Key;
     size_t CharIndex = SIZE_MAX; // SIZE_MAX if not indexing single character.
     
-    bool HasIndex() const { return CharIndex != SIZE_MAX; }
+    bool HasCharIndex() const { return CharIndex != SIZE_MAX; }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1515,7 +1515,7 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         Type == UnaryOperatorType::Postdecrementation)
     {
         LValue lval = Operand->GetLValue(ctx);
-        EXECUTION_CHECK( !lval.HasIndex(), ERROR_MESSAGE_INVALID_LVALUE );
+        EXECUTION_CHECK( !lval.HasCharIndex(), ERROR_MESSAGE_INVALID_LVALUE );
         Value* val = lval.Obj.TryGetValue(lval.Key);
         // Incrementation can operate on null.
         if(!val && (Type == UnaryOperatorType::Preincrementation || Type == UnaryOperatorType::Postincrementation))
@@ -1569,7 +1569,7 @@ LValue UnaryOperator::GetLValue(ExecuteContext& ctx) const
     if(Type == UnaryOperatorType::Preincrementation || Type == UnaryOperatorType::Predecrementation)
     {
         LValue lval = Operand->GetLValue(ctx);
-        EXECUTION_CHECK( !lval.HasIndex(), ERROR_MESSAGE_INVALID_LVALUE );
+        EXECUTION_CHECK( !lval.HasCharIndex(), ERROR_MESSAGE_INVALID_LVALUE );
         Value* val = lval.Obj.TryGetValue(lval.Key);
         // Incrementation can operate on null.
         if(!val && Type == UnaryOperatorType::Preincrementation)
@@ -1743,11 +1743,22 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     }
     if(Type == BinaryOperatorType::Indexing)
     {
-        EXECUTION_CHECK( lhsType == Value::Type::String && rhsType == Value::Type::Number, ERROR_MESSAGE_INVALID_TYPE );
-        size_t index = 0;
-        EXECUTION_CHECK( NumberToIndex(index, rhs.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
-        EXECUTION_CHECK( index < lhs.GetString().length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
-        return Value{string(1, lhs.GetString()[index])};
+        if(lhsType == Value::Type::String)
+        {
+            EXECUTION_CHECK( rhsType == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+            size_t index = 0;
+            EXECUTION_CHECK( NumberToIndex(index, rhs.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
+            EXECUTION_CHECK( index < lhs.GetString().length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
+            return Value{string(1, lhs.GetString()[index])};
+        }
+        if(lhsType == Value::Type::Object)
+        {
+            EXECUTION_CHECK( rhsType == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
+            if(Value* val = lhs.GetObject()->TryGetValue(rhs.GetString()))
+                return *val;
+            return Value{};
+        }
+        EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
     }
 
     // Remaining operators require numbers.
@@ -1775,10 +1786,21 @@ LValue BinaryOperator::GetLValue(ExecuteContext& ctx) const
     if(Type == BinaryOperatorType::Indexing)
     {
         LValue lval = Operands[0]->GetLValue(ctx);
+        EXECUTION_CHECK( !lval.HasCharIndex(), ERROR_MESSAGE_INVALID_LVALUE );
+        Value* leftVal = lval.Obj.TryGetValue(lval.Key);
+        EXECUTION_CHECK( leftVal, ERROR_MESSAGE_INVALID_LVALUE );
         const Value indexVal = Operands[1]->Evaluate(ctx);
-        EXECUTION_CHECK( indexVal.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
-        EXECUTION_CHECK( NumberToIndex(lval.CharIndex, indexVal.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
-        return lval;
+        if(leftVal->GetType() == Value::Type::String)
+        {
+            EXECUTION_CHECK( indexVal.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+            EXECUTION_CHECK( NumberToIndex(lval.CharIndex, indexVal.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
+            return lval;
+        }
+        if(leftVal->GetType() == Value::Type::Object)
+        {
+            EXECUTION_CHECK( indexVal.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
+            return LValue{*leftVal->GetObject(), indexVal.GetString()};
+        }
     }
     return __super::GetLValue(ctx);
 }
@@ -1802,7 +1824,7 @@ Value BinaryOperator::ShiftRight(const Value& lhs, const Value& rhs) const
 Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
 {
     // Indexing: string[index] = newChar
-    if(lhs.HasIndex())
+    if(lhs.HasCharIndex())
     {
         EXECUTION_CHECK( Type == BinaryOperatorType::Assignment, ERROR_MESSAGE_INVALID_LVALUE );
         Value* const lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);

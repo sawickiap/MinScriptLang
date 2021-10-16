@@ -725,4 +725,37 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n");
     }
+    SECTION("Object indexing")
+    {
+        const char* code =
+            "o1 = { 'x': 1, 'y': 2, 'a b c': 3 }; \n"
+            "index = 'y'; \n"
+            "print(o1['x'], o1[index], o1['a b' + ' c']); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n2\n3\n");
+    }
+    SECTION("Object indexing nested")
+    {
+        const char* code =
+            "o1 = { 'x': { 'y': { 'z': 5 } } }; \n"
+            "print(o1['x'].y['z']); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "5\n");
+    }
+    SECTION("Object indexing l-value")
+    {
+        const char* code =
+            "o={}; o['A A'] = 1; o['A A'] += 5; \n"
+            "print(o['A A']); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "6\n");
+    }
+    SECTION("Object indexing nested")
+    {
+        const char* code =
+            "o={}; o['A'] = {}; o['A']['B'] = {}; o['A']['B'].c = 10; \n"
+            "print(o.A.B['c']); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "10\n");
+    }
 }
