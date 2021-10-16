@@ -1823,7 +1823,12 @@ Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
 
     if(Type == BinaryOperatorType::AssignmentAdd)
     {
-        if(lhsValPtr->GetType() == Value::Type::Number && rhs.GetType() == Value::Type::Number)
+        if((lhsValPtr->GetType() == Value::Type::Number || lhsValPtr->GetType() == Value::Type::String) &&
+            rhs.GetType() == Value::Type::Null)
+        {
+            // Increment by null - not changing value.
+        }
+        else if(lhsValPtr->GetType() == Value::Type::Number && rhs.GetType() == Value::Type::Number)
             lhsValPtr->SetNumber(lhsValPtr->GetNumber() + rhs.GetNumber());
         else if(lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String)
             lhsValPtr->GetString() += rhs.GetString();

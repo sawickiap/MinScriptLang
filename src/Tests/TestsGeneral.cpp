@@ -473,6 +473,13 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "InnerNone\nInnerLocal\nInnerGlobal\nInnerGlobal\n");
     }
+    SECTION("Increment by null")
+    {
+        const char* code = "a=1; a+=null; print(a);"
+            "b='DUPA'; b+=null; print(b);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\nDUPA\n");
+    }
 }
 
 TEST_CASE("Null")
