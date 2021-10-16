@@ -2166,7 +2166,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     // Block: '{' Block '}'
     if(!IsNonEmptyObject() && TryParseSymbol(Symbol::CurlyBracketOpen))
     {
-        unique_ptr<AST::Block> block = make_unique<AST::Block>(GetCurrentTokenPlace());
+        auto block = make_unique<AST::Block>(GetCurrentTokenPlace());
         ParseBlock(*block);
         MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
         return block;
@@ -2176,7 +2176,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     if(TryParseSymbol(Symbol::If))
     {
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
-        unique_ptr<AST::Condition> condition = make_unique<AST::Condition>(place);
+        auto condition = make_unique<AST::Condition>(place);
         MUST_PARSE( condition->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
         MUST_PARSE( condition->Statements[0] = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
@@ -2189,7 +2189,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     if(TryParseSymbol(Symbol::While))
     {
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
-        unique_ptr<AST::WhileLoop> loop = make_unique<AST::WhileLoop>(place, AST::WhileLoopType::While);
+        auto loop = make_unique<AST::WhileLoop>(place, AST::WhileLoopType::While);
         MUST_PARSE( loop->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
         MUST_PARSE( loop->Body = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
@@ -2199,7 +2199,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     // Loop: 'do' Statement 'while' '(' Expr17 ')' ';'    - loop
     if(TryParseSymbol(Symbol::Do))
     {
-        unique_ptr<AST::WhileLoop> loop = make_unique<AST::WhileLoop>(place, AST::WhileLoopType::DoWhile);
+        auto loop = make_unique<AST::WhileLoop>(place, AST::WhileLoopType::DoWhile);
         MUST_PARSE( loop->Body = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
         MUST_PARSE( TryParseSymbol(Symbol::While), ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE );
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
@@ -2213,7 +2213,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     if(TryParseSymbol(Symbol::For))
     {
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
-        unique_ptr<AST::ForLoop> loop = make_unique<AST::ForLoop>(place);
+        auto loop = make_unique<AST::ForLoop>(place);
         if(!TryParseSymbol(Symbol::Semicolon))
         {
             MUST_PARSE( loop->InitExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
@@ -2250,7 +2250,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     // 'return' [ Expr17 ] ';'
     if(TryParseSymbol(Symbol::Return))
     {
-        unique_ptr<AST::ReturnStatement> stmt = std::make_unique<AST::ReturnStatement>(place);
+        auto stmt = std::make_unique<AST::ReturnStatement>(place);
         stmt->ReturnedValue = TryParseExpr17();
         MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
         return stmt;
@@ -2259,7 +2259,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     // 'switch' '(' Expr17 ')' '{' SwitchItem+ '}'
     if(TryParseSymbol(Symbol::Switch))
     {
-        unique_ptr<AST::SwitchStatement> stmt = std::make_unique<AST::SwitchStatement>(place);
+        auto stmt = std::make_unique<AST::SwitchStatement>(place);
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
         MUST_PARSE( stmt->Condition = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
         MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
@@ -2301,9 +2301,9 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
             m_Tokens[m_TokenIndex + 1].Symbol == Symbol::This || m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Global))
     {
         ++m_TokenIndex;
-        unique_ptr<AST::BinaryOperator> assignmentOp = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Assignment);
+        auto assignmentOp = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Assignment);
         MUST_PARSE( assignmentOp->Operands[0] = TryParseIdentifierValue(), ERROR_MESSAGE_EXPECTED_IDENTIFIER );
-        unique_ptr<AST::FunctionDefinition> funcDef = make_unique<AST::FunctionDefinition>(place);
+        auto funcDef = make_unique<AST::FunctionDefinition>(place);
         ParseFunctionDefinition(*funcDef);
         assignmentOp->Operands[1] = std::move(funcDef);
         return assignmentOp;
@@ -2438,7 +2438,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr0()
     if(m_Tokens[m_TokenIndex].Symbol == Symbol::Function && m_Tokens[m_TokenIndex + 1].Symbol == Symbol::RoundBracketOpen)
     {
         ++m_TokenIndex;
-        unique_ptr<AST::FunctionDefinition> func = std::make_unique<AST::FunctionDefinition>(place);
+        auto func = std::make_unique<AST::FunctionDefinition>(place);
         ParseFunctionDefinition(*func);
         return func;
     }
@@ -2462,21 +2462,21 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
         // Postincrementation: Expr0 '++'
         if(TryParseSymbol(Symbol::DoublePlus))
         {
-            unique_ptr<AST::UnaryOperator> op = std::make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Postincrementation);
+            auto op = std::make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Postincrementation);
             op->Operand = std::move(expr);
             expr = std::move(op);
         }
         // Postdecrementation: Expr0 '--'
         else if(TryParseSymbol(Symbol::DoubleDash))
         {
-            unique_ptr<AST::UnaryOperator> op = std::make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Postdecrementation);
+            auto op = std::make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Postdecrementation);
             op->Operand = std::move(expr);
             expr = std::move(op);
         }
         // Call: Expr0 '(' [ Expr16 ( ',' Expr16 )* ')'
         else if(TryParseSymbol(Symbol::RoundBracketOpen))
         {
-            unique_ptr<AST::MultiOperator> op = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
+            auto op = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
             // Callee
             op->Operands.push_back(std::move(expr));
             // First argument
@@ -2497,7 +2497,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
         // Indexing: Expr0 '[' Expr17 ']'
         else if(TryParseSymbol(Symbol::SquareBracketOpen))
         {
-            unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Indexing);
+            auto op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Indexing);
             op->Operands[0] = std::move(expr);
             MUST_PARSE( op->Operands[1] = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
             MUST_PARSE( TryParseSymbol(Symbol::SquareBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE );
@@ -2525,7 +2525,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr3()
 #define PARSE_UNARY_OPERATOR(symbol, unaryOperatorType) \
     if(TryParseSymbol(symbol)) \
     { \
-        unique_ptr<AST::UnaryOperator> op = make_unique<AST::UnaryOperator>(place, (unaryOperatorType)); \
+        auto op = make_unique<AST::UnaryOperator>(place, (unaryOperatorType)); \
         MUST_PARSE( op->Operand = TryParseExpr3(), ERROR_MESSAGE_EXPECTED_EXPRESSION ); \
         return op; \
     }
@@ -2542,7 +2542,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr3()
 
 #define PARSE_BINARY_OPERATOR(binaryOperatorType, exprParseFunc) \
     { \
-        unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(place, (binaryOperatorType)); \
+        auto op = make_unique<AST::BinaryOperator>(place, (binaryOperatorType)); \
         op->Operands[0] = std::move(expr); \
         MUST_PARSE( op->Operands[1] = (exprParseFunc)(), ERROR_MESSAGE_EXPECTED_EXPRESSION ); \
         expr = std::move(op); \
@@ -2741,7 +2741,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr16()
     // Ternary operator: Expr15 '?' Expr16 ':' Expr16
     if(TryParseSymbol(Symbol::QuestionMark))
     {
-        unique_ptr<AST::TernaryOperator> op = make_unique<AST::TernaryOperator>(GetCurrentTokenPlace());
+        auto op = make_unique<AST::TernaryOperator>(GetCurrentTokenPlace());
         op->Operands[0] = std::move(expr);
         MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
         MUST_PARSE( TryParseSymbol(Symbol::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON );
@@ -2752,7 +2752,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr16()
 #define TRY_PARSE_ASSIGNMENT(symbol, binaryOperatorType) \
     if(TryParseSymbol(symbol)) \
     { \
-        unique_ptr<AST::BinaryOperator> op = make_unique<AST::BinaryOperator>(GetCurrentTokenPlace(), (binaryOperatorType)); \
+        auto op = make_unique<AST::BinaryOperator>(GetCurrentTokenPlace(), (binaryOperatorType)); \
         op->Operands[0] = std::move(expr); \
         MUST_PARSE( op->Operands[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION ); \
         return op; \
