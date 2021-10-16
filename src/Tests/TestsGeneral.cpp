@@ -273,6 +273,18 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "2\n");
     }
+    SECTION("Operator sequence arithmetic")
+    {
+        const char* code = "a=1; b=2; c=a+b+b-2+b*3; print(c);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "9\n");
+    }
+    SECTION("Operator sequence logical")
+    {
+        const char* code = "a=false; b=true; c=a&&b&&a&&b||a||a&&a; print(c);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n");
+    }
     SECTION("String")
     {
         const char* code = "a=\"aaa\"; b='bbb\n"
