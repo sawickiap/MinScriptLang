@@ -767,6 +767,7 @@ private:
     void ParseBlock(AST::Block& outBlock);
     bool TryParseSwitchItem(AST::SwitchStatement& switchStatement);
     void ParseFunctionDefinition(AST::FunctionDefinition& funcDef);
+    bool IsNonEmptyObject();
     unique_ptr<AST::Statement> TryParseStatement();
     unique_ptr<AST::ConstantValue> TryParseConstantValue();
     unique_ptr<AST::Identifier> TryParseIdentifierValue();
@@ -2120,6 +2121,14 @@ void Parser::ParseFunctionDefinition(AST::FunctionDefinition& funcDef)
     MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
 }
 
+bool Parser::IsNonEmptyObject()
+{
+    return m_TokenIndex + 2 < m_Tokens.size() &&
+        m_Tokens[m_TokenIndex].Symbol == Symbol::CurlyBracketOpen &&
+        m_Tokens[m_TokenIndex + 1].Symbol == Symbol::String &&
+        m_Tokens[m_TokenIndex + 2].Symbol == Symbol::Colon;
+}
+
 unique_ptr<AST::Statement> Parser::TryParseStatement()
 {
     const PlaceInCode place = GetCurrentTokenPlace();
@@ -2129,7 +2138,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
         return make_unique<AST::EmptyStatement>(place);
     
     // Block: '{' Block '}'
-    if(TryParseSymbol(Symbol::CurlyBracketOpen))
+    if(!IsNonEmptyObject() && TryParseSymbol(Symbol::CurlyBracketOpen))
     {
         unique_ptr<AST::Block> block = make_unique<AST::Block>(GetCurrentTokenPlace());
         ParseBlock(*block);
@@ -2351,13 +2360,10 @@ unique_ptr<AST::Expression> Parser::TryParseObjectMember(string& outMemberName)
 
 unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
 {
-    if((m_TokenIndex + 1 < m_Tokens.size() &&
+    if((m_TokenIndex + 1 < m_Tokens.size() && // { }
             m_Tokens[m_TokenIndex].Symbol == Symbol::CurlyBracketOpen &&
             m_Tokens[m_TokenIndex + 1].Symbol == Symbol::CurlyBracketClose) ||
-        (m_TokenIndex + 2 < m_Tokens.size() &&
-            m_Tokens[m_TokenIndex].Symbol == Symbol::CurlyBracketOpen &&
-            m_Tokens[m_TokenIndex + 1].Symbol == Symbol::String &&
-            m_Tokens[m_TokenIndex + 2].Symbol == Symbol::Colon))
+        IsNonEmptyObject()) // { 'key' :
     {
         auto objExpr = make_unique<AST::ObjectExpression>(GetCurrentTokenPlace());
         TryParseSymbol(Symbol::CurlyBracketOpen);

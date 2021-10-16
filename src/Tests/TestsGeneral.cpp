@@ -662,4 +662,10 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "5\n");
     }
+    SECTION("Object definition versus block")
+    {
+        const char* code = "{ print(1); { print(2); } { } print(3); } { }; {'a':1, 'b':false}; { print(4); } print(5);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n2\n3\n4\n5\n");
+    }
 }
