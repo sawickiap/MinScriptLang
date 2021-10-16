@@ -2430,61 +2430,66 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
     unique_ptr<AST::Expression> expr = TryParseExpr0();
     if(!expr)
         return unique_ptr<AST::Expression>{};
-    const PlaceInCode place = GetCurrentTokenPlace();
-    // Postincrementation: Expr0 '++'
-    if(TryParseSymbol(Symbol::DoublePlus))
+    for(;;)
     {
-        unique_ptr<AST::UnaryOperator> op = std::make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Postincrementation);
-        op->Operand = std::move(expr);
-        return op;
-    }
-    // Postdecrementation: Expr0 '--'
-    if(TryParseSymbol(Symbol::DoubleDash))
-    {
-        unique_ptr<AST::UnaryOperator> op = std::make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Postdecrementation);
-        op->Operand = std::move(expr);
-        return op;
-    }
-    // Call: Expr0 '(' [ Expr16 ( ',' Expr16 )* ')'
-    if(TryParseSymbol(Symbol::RoundBracketOpen))
-    {
-        unique_ptr<AST::MultiOperator> op = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
-        // Callee
-        op->Operands.push_back(std::move(expr));
-        // First argument
-        expr = TryParseExpr16();
-        if(expr)
+        const PlaceInCode place = GetCurrentTokenPlace();
+        // Postincrementation: Expr0 '++'
+        if(TryParseSymbol(Symbol::DoublePlus))
         {
-            op->Operands.push_back(std::move(expr));
-            // Further arguments
-            while(TryParseSymbol(Symbol::Comma))
-            {
-                MUST_PARSE( expr = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-                op->Operands.push_back(std::move(expr));
-            }
+            unique_ptr<AST::UnaryOperator> op = std::make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Postincrementation);
+            op->Operand = std::move(expr);
+            expr = std::move(op);
         }
-        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
-        return op;
+        // Postdecrementation: Expr0 '--'
+        else if(TryParseSymbol(Symbol::DoubleDash))
+        {
+            unique_ptr<AST::UnaryOperator> op = std::make_unique<AST::UnaryOperator>(place, AST::UnaryOperatorType::Postdecrementation);
+            op->Operand = std::move(expr);
+            expr = std::move(op);
+        }
+        // Call: Expr0 '(' [ Expr16 ( ',' Expr16 )* ')'
+        else if(TryParseSymbol(Symbol::RoundBracketOpen))
+        {
+            unique_ptr<AST::MultiOperator> op = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
+            // Callee
+            op->Operands.push_back(std::move(expr));
+            // First argument
+            expr = TryParseExpr16();
+            if(expr)
+            {
+                op->Operands.push_back(std::move(expr));
+                // Further arguments
+                while(TryParseSymbol(Symbol::Comma))
+                {
+                    MUST_PARSE( expr = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+                    op->Operands.push_back(std::move(expr));
+                }
+            }
+            MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
+            expr = std::move(op);
+        }
+        // Indexing: Expr0 '[' Expr17 ']'
+        else if(TryParseSymbol(Symbol::SquareBracketOpen))
+        {
+            unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Indexing);
+            op->Operands[0] = std::move(expr);
+            MUST_PARSE( op->Operands[1] = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+            MUST_PARSE( TryParseSymbol(Symbol::SquareBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE );
+            expr = std::move(op);
+        }
+        // Member access: Expr2 '.' TOKEN_IDENTIFIER
+        else if(TryParseSymbol(Symbol::Dot))
+        {
+            auto op = std::make_unique<AST::MemberAccessOperator>(place);
+            op->Operand = std::move(expr);
+            auto identifier = TryParseIdentifierValue();
+            MUST_PARSE( identifier && identifier->Scope == AST::IdentifierScope::None, ERROR_MESSAGE_EXPECTED_IDENTIFIER );
+            op->MemberName = std::move(identifier->S);
+            expr = std::move(op);
+        }
+        else
+            break;
     }
-    // Indexing: Expr0 '[' Expr17 ']'
-    if(TryParseSymbol(Symbol::SquareBracketOpen))
-    {
-        unique_ptr<AST::BinaryOperator> op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Indexing);
-        op->Operands[0] = std::move(expr);
-        MUST_PARSE( op->Operands[1] = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-        MUST_PARSE( TryParseSymbol(Symbol::SquareBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE );
-        return op;
-    }
-    if(TryParseSymbol(Symbol::Dot))
-    {
-        auto op = std::make_unique<AST::MemberAccessOperator>(place);
-        op->Operand = std::move(expr);
-        auto identifier = TryParseIdentifierValue();
-        MUST_PARSE( identifier && identifier->Scope == AST::IdentifierScope::None, ERROR_MESSAGE_EXPECTED_IDENTIFIER );
-        op->MemberName = std::move(identifier->S);
-        return op;
-    }
-    // Just Expr0
     return expr;
 }
 

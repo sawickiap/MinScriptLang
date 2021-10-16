@@ -668,4 +668,34 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n2\n3\n4\n5\n");
     }
+    SECTION("Nested object")
+    {
+        const char* code =
+            "o1 = { 'x': 1 }; \n"
+            "o2 = { 'y': o1 }; \n"
+            "print(o2.y.x); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n");
+    }
+    SECTION("Nested object definition")
+    {
+        const char* code =
+            "o1 = { 'x': { 'y': 5 } }; \n"
+            "o1.x.y += 5; \n"
+            "print(o1.x.y); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "10\n");
+    }
+    SECTION("Passing object around by reference")
+    {
+        const char* code =
+            "o1 = { 'x': 1 }; \n"
+            "o2 = o1; \n"
+            "o2.x += 1; \n"
+            "function f(arg) { arg.x += 2; return arg; } \n"
+            "print(f(o2).x); \n"
+            "print(o1.x); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "4\n4\n");
+    }
 }
