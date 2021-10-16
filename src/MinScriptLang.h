@@ -2048,8 +2048,12 @@ void Parser::ParseScript(AST::Script& outScript)
     {
         Token token;
         m_Tokenizer.GetNextToken(token);
-        m_Tokens.push_back(std::move(token));
-        if(token.Symbol == Symbol::End)
+        const bool isEnd = token.Symbol == Symbol::End;
+        if(token.Symbol == Symbol::String && !m_Tokens.empty() && m_Tokens.back().Symbol == Symbol::String)
+            m_Tokens.back().String += token.String;
+        else
+            m_Tokens.push_back(std::move(token));
+        if(isEnd)
             break;
     }
 
@@ -2282,13 +2286,8 @@ unique_ptr<AST::ConstantValue> Parser::TryParseConstantValue()
         ++m_TokenIndex;
         return make_unique<AST::ConstantValue>(t.Place, Value{t.Number});
     case Symbol::String:
-    {
         ++m_TokenIndex;
-        unique_ptr<AST::ConstantValue> expr = make_unique<AST::ConstantValue>(t.Place, string(t.String));
-        while(m_Tokens[m_TokenIndex].Symbol == Symbol::String)
-            expr->Val.GetString() += m_Tokens[m_TokenIndex++].String;
-        return expr;
-    }
+        return make_unique<AST::ConstantValue>(t.Place, string(t.String));
     case Symbol::Null:
         ++m_TokenIndex;
         return make_unique<AST::ConstantValue>(t.Place, Value{});

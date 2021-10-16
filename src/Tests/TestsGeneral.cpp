@@ -656,4 +656,10 @@ TEST_CASE("Object")
             "object\n3\n"
             "4\n5\n");
     }
+    SECTION("Compound string in object definition")
+    {
+        const char* code = "a={ 'AAA' /*comment*/ \"BBB\": 5 }; print(a.AAABBB);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "5\n");
+    }
 }
