@@ -267,6 +267,12 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "2\n3\n2\n");
     }
+    SECTION("Operator sequence Expr3")
+    {
+        const char* code = "a=1; ++----++++a; print(a);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "2\n");
+    }
     SECTION("String")
     {
         const char* code = "a=\"aaa\"; b='bbb\n"
@@ -697,5 +703,14 @@ TEST_CASE("Object")
             "print(o1.x); \n";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "4\n4\n");
+    }
+    SECTION("Operator sequence Expr2")
+    {
+        const char* code =
+            "o1 = { 'f1': function() { return o2; }, 'val1': 1 }; \n"
+            "o2 = { 'f2': function() { return o1; }, 'val2': 2 }; \n"
+            "print(o1.f1().f2().val1); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n");
     }
 }

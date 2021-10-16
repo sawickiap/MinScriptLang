@@ -659,6 +659,7 @@ struct UnaryOperator : Operator
     UnaryOperator(const PlaceInCode& place, UnaryOperatorType type) : Operator{place}, Type(type) { }
     virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual LValue GetLValue(ExecuteContext& ctx) const;
 
 private:
     Value BitwiseNot(Value&& operand) const;
@@ -1561,6 +1562,31 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         }
     }
     assert(0); return Value{};
+}
+
+LValue UnaryOperator::GetLValue(ExecuteContext& ctx) const
+{
+    if(Type == UnaryOperatorType::Preincrementation || Type == UnaryOperatorType::Predecrementation)
+    {
+        LValue lval = Operand->GetLValue(ctx);
+        EXECUTION_CHECK( !lval.HasIndex(), ERROR_MESSAGE_INVALID_LVALUE );
+        Value* val = lval.Obj.TryGetValue(lval.Key);
+        // Incrementation can operate on null.
+        if(!val && Type == UnaryOperatorType::Preincrementation)
+        {
+            val = &lval.Obj.GetOrCreateValue(lval.Key);
+            val->SetNumber(0.0);
+        }
+        EXECUTION_CHECK( val != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
+        EXECUTION_CHECK( val->GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+        switch(Type)
+        {
+        case UnaryOperatorType::Preincrementation: val->SetNumber(val->GetNumber() + 1.0); return lval;
+        case UnaryOperatorType::Predecrementation: val->SetNumber(val->GetNumber() - 1.0); return lval;
+        default: assert(0);
+        }
+    }
+    EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_LVALUE );
 }
 
 void MemberAccessOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
