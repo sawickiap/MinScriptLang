@@ -847,4 +847,21 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "3\n4\n5\n6\n");
     }
+    SECTION("Explicit this")
+    {
+        const char* code =
+            "obj={ 'x': 2, 'f1': function() { this.x += 1; print(this.x); } }; \n"
+            "obj.f1(); obj['f1'](); (101, '102', obj.f1)(); \n"
+            "obj2={'subObj':obj}; obj2.subObj.f1();";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "3\n4\n5\n6\n");
+    }
+    SECTION("Returning this")
+    {
+        const char* code =
+            "obj={ 'x': 2, 'f': function() { this.x += 1; return this; } }; \n"
+            "obj2 = obj.f(); print(obj2.x); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "3\n");
+    }
 }

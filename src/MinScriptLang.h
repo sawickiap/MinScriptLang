@@ -163,6 +163,7 @@ static const char* const ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS = "Index out of bound
 static const char* const ERROR_MESSAGE_PARAMETER_NAMES_MUST_BE_UNIQUE = "Parameter naems must be unique.";
 static const char* const ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT = "Cannot change environment.";
 static const char* const ERROR_MESSAGE_NO_LOCAL_SCOPE = "There is no local scope here.";
+static const char* const ERROR_MESSAGE_NO_THIS = "There is no 'this' here.";
 
 struct Constant
 {
@@ -651,6 +652,13 @@ struct Identifier : ConstantExpression
     virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
+};
+
+struct ThisExpression : ConstantExpression
+{
+    ThisExpression(const PlaceInCode& place) : ConstantExpression{place} { }
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
 struct Operator : Expression
@@ -1560,7 +1568,8 @@ void ConstantValue::DebugPrint(uint32_t indentLevel, const char* prefix) const
 
 void Identifier::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
-    static const char* PREFIX[] = { "", "local.", "this.", "global.", "env." };
+    static const char* PREFIX[] = { "", "local.", "global.", "env." };
+    static_assert(_countof(PREFIX) == (size_t)IdentifierScope::Count);
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier: %s%s\n", DEBUG_PRINT_ARGS_BEG, PREFIX[(size_t)Scope], S.c_str());
 }
 
@@ -1625,6 +1634,17 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
     if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && !isGlobal)
         return LValue{*ctx.LocalContexts.back(), S.c_str()};
     return LValue{ctx.GlobalContext, S};
+}
+
+void ThisExpression::DebugPrint(uint32_t indentLevel, const char* prefix) const
+{
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "This\n", DEBUG_PRINT_ARGS_BEG);
+}
+
+Value ThisExpression::Evaluate(ExecuteContext& ctx) const
+{
+    EXECUTION_CHECK(!ctx.IsGlobal() && ctx.This.back(), ERROR_MESSAGE_NO_THIS);
+    return Value{shared_ptr<Object>{ctx.This.back()}};
 }
 
 void UnaryOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -2498,7 +2518,12 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
 {
     if(auto r = TryParseConstantValue())
         return r;
-    return TryParseIdentifierValue();
+    if(auto r = TryParseIdentifierValue())
+        return r;
+    const PlaceInCode place = m_Tokens[m_TokenIndex].Place;
+    if(TryParseSymbol(Symbol::This))
+        return make_unique<AST::ThisExpression>(place);
+    return unique_ptr<AST::ConstantExpression>{};
 }
 
 unique_ptr<AST::Expression> Parser::TryParseObjectMember(string& outMemberName)
