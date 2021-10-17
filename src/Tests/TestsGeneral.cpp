@@ -850,7 +850,7 @@ TEST_CASE("Object")
     SECTION("Explicit this")
     {
         const char* code =
-            "obj={ 'x': 2, 'f1': function() { this.x += 1; print(this.x); } }; \n"
+            "obj={ 'x': 2, 'f1': function() { this.y = 1; this.x += y; print(this.x); } }; \n"
             "obj.f1(); obj['f1'](); (101, '102', obj.f1)(); \n"
             "obj2={'subObj':obj}; obj2.subObj.f1();";
         env.Execute(code, strlen(code));
