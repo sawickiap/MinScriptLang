@@ -463,6 +463,17 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "---\n------\nA\nABC\nABCABC\nA\nABC\nABC\nABCABC\nA\nABC\n");
     }
+    SECTION("Range-based for loop on string")
+    {
+        const char* code =
+            "s='ABCD'; \n"
+            "for(ch : s) print(ch); \n"
+            "for(i, ch : s) print(i, ch); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() ==
+            "A\nB\nC\nD\n"
+            "0\nA\n1\nB\n2\nC\n3\nD\n");
+    }
     SECTION("Switch basic")
     {
         const char* code = "switch(123) { case 1: print(1); case 'a': print('a'); case 123: print(123); default: print('Boo!'); }";

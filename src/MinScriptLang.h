@@ -495,6 +495,7 @@ struct ExecuteContext
     private:
         ExecuteContext& m_Ctx;
     };
+    Object& GetInnermostContext() const { return !LocalContexts.empty() ? *LocalContexts.back() : GlobalContext; }
 };
 
 struct Statement
@@ -504,6 +505,8 @@ struct Statement
     const PlaceInCode& GetPlace() const { return m_Place; }
     virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const = 0;
     virtual void Execute(ExecuteContext& ctx) const = 0;
+protected:
+    void Assign(const LValue& lhs, Value&& rhs) const;
 private:
     const PlaceInCode m_Place;
 };
@@ -786,6 +789,7 @@ private:
     unique_ptr<AST::Expression> TryParseExpr16();
     unique_ptr<AST::Expression> TryParseExpr17();
     bool TryParseSymbol(Symbol symbol);
+    string TryParseIdentifier(); // If failed, returns empty string.
     const PlaceInCode& GetCurrentTokenPlace() const { return m_Tokens[m_TokenIndex].Place; }
 };
   
@@ -1162,7 +1166,7 @@ bool Object::Remove(const string& key)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Built in functions
+// Built-in functions
 
 static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t argCount)
 {
@@ -1217,6 +1221,23 @@ namespace AST {
 
 #define DEBUG_PRINT_FORMAT_STR_BEG "(%u,%u) %s%s"
 #define DEBUG_PRINT_ARGS_BEG GetPlace().Row, GetPlace().Column, GetDebugPrintIndent(indentLevel), prefix
+
+void Statement::Assign(const LValue& lhs, Value&& rhs) const
+{
+    if(lhs.HasCharIndex())
+    {
+        Value* const lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
+        EXECUTION_CHECK( lhsValPtr != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
+        EXECUTION_CHECK( lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
+        EXECUTION_CHECK( lhs.CharIndex < lhsValPtr->GetString().length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
+        EXECUTION_CHECK( rhs.GetString().length() == 1, ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING );
+        lhsValPtr->GetString()[lhs.CharIndex] = rhs.GetString()[0];
+    }
+    else if(rhs.GetType() == Value::Type::Null)
+        lhs.Obj.Remove(lhs.Key);
+    else
+        lhs.Obj.GetOrCreateValue(lhs.Key) = std::move(rhs);
+}
 
 void EmptyStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
@@ -1342,12 +1363,42 @@ void ForLoop::Execute(ExecuteContext& ctx) const
 
 void RangeBasedForLoop::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
-    // #TODO
+    if(!KeyVarName.empty())
+        printf(DEBUG_PRINT_FORMAT_STR_BEG "Range-based for: %s, %s\n", DEBUG_PRINT_ARGS_BEG, KeyVarName.c_str(), ValueVarName.c_str());
+    else
+        printf(DEBUG_PRINT_FORMAT_STR_BEG "Range-based for: %s\n", DEBUG_PRINT_ARGS_BEG, ValueVarName.c_str());
+    ++indentLevel;
+    RangeExpression->DebugPrint(indentLevel, "RangeExpression: ");
+    Body->DebugPrint(indentLevel, "Body: ");
 }
 
 void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
 {
-    // #TODO
+    Value rangeVal = RangeExpression->Evaluate(ctx);
+    if(rangeVal.GetType() == Value::Type::String)
+    {
+        Object& innermostCtxObj = ctx.GetInnermostContext();
+        const string& rangeStr = rangeVal.GetString();
+        const size_t count = rangeStr.length();
+        const bool useKey = !KeyVarName.empty();
+        for(size_t i = 0; i < count; ++i)
+        {
+            if(useKey)
+                Assign(LValue{innermostCtxObj, KeyVarName}, Value{(double)i});
+            const char ch = rangeStr[i];
+            Assign(LValue{innermostCtxObj, ValueVarName}, Value{string{&ch, &ch + 1}});
+            Body->Execute(ctx);
+        }
+        if(useKey)
+            Assign(LValue{innermostCtxObj, KeyVarName}, Value{});
+        Assign(LValue{innermostCtxObj, ValueVarName}, Value{});
+    }
+    else if(rangeVal.GetType() == Value::Type::Object)
+    {
+        assert(0); // #TODO
+    }
+    else
+        EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
 }
 
 void LoopBreakStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -1888,36 +1939,15 @@ Value BinaryOperator::ShiftRight(const Value& lhs, const Value& rhs) const
 
 Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
 {
-    // Indexing: string[index] = newChar
-    if(lhs.HasCharIndex())
-    {
-        EXECUTION_CHECK( Type == BinaryOperatorType::Assignment, ERROR_MESSAGE_INVALID_LVALUE );
-        Value* const lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
-        EXECUTION_CHECK( lhsValPtr != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
-        EXECUTION_CHECK( lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
-        EXECUTION_CHECK( lhs.CharIndex < lhsValPtr->GetString().length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
-        EXECUTION_CHECK( rhs.GetString().length() == 1, ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING );
-        lhsValPtr->GetString()[lhs.CharIndex] = rhs.GetString()[0];
-        return *lhsValPtr;
-    }
-
     // This one is able to create new value.
     if(Type == BinaryOperatorType::Assignment)
     {
-        // Assigning null - deleting the value.
-        if(rhs.GetType() == Value::Type::Null)
-        {
-            lhs.Obj.Remove(lhs.Key);
-            return rhs;
-        }
-        else
-        {
-            Value& lhsValRef = lhs.Obj.GetOrCreateValue(lhs.Key);
-            lhsValRef = std::move(rhs);
-            return lhsValRef;
-        }
+        Value valCopy = rhs;
+        Assign(lhs, std::move(rhs));
+        return valCopy;
     }
 
+    EXECUTION_CHECK( !lhs.HasCharIndex(), ERROR_MESSAGE_INVALID_LVALUE );
     Value* lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
 
     // += can work on null if adding a number or string.
@@ -2255,18 +2285,29 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
 
     if(TryParseSymbol(Symbol::For))
     {
+        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
         // Range-based loop: 'for' '(' TOKEN_IDENTIFIER [ ',' TOKEN_IDENTIFIER ] ':' Expr17 ')' Statement
         if(PeekSymbols({Symbol::Identifier, Symbol::Colon}) ||
             PeekSymbols({Symbol::Identifier, Symbol::Comma, Symbol::Identifier, Symbol::Colon}))
         {
-            MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
             auto loop = make_unique<AST::RangeBasedForLoop>(place);
-            
+            loop->ValueVarName = TryParseIdentifier();
+            MUST_PARSE( !loop->ValueVarName.empty(), ERROR_MESSAGE_EXPECTED_IDENTIFIER );
+            if(TryParseSymbol(Symbol::Comma))
+            {
+                loop->KeyVarName = std::move(loop->ValueVarName);
+                loop->ValueVarName = TryParseIdentifier();
+                MUST_PARSE( !loop->ValueVarName.empty(), ERROR_MESSAGE_EXPECTED_IDENTIFIER );
+            }
+            MUST_PARSE( TryParseSymbol(Symbol::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON );
+            MUST_PARSE( loop->RangeExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+            MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON );
+            MUST_PARSE( loop->Body = TryParseStatement(), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON );
+            return loop;
         }
         // Loop: 'for' '(' Expr17? ';' Expr17? ';' Expr17? ')' Statement
         else
         {
-            MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
             auto loop = make_unique<AST::ForLoop>(place);
             if(!TryParseSymbol(Symbol::Semicolon))
             {
@@ -2852,6 +2893,13 @@ bool Parser::TryParseSymbol(Symbol symbol)
         return true;
     }
     return false;
+}
+
+string Parser::TryParseIdentifier()
+{
+    if(m_TokenIndex < m_Tokens.size() && m_Tokens[m_TokenIndex].Symbol == Symbol::Identifier)
+        return m_Tokens[m_TokenIndex++].String;
+    return string{};
 }
 
 ////////////////////////////////////////////////////////////////////////////////
