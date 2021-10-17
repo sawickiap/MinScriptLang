@@ -838,4 +838,13 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "15\n7\n15\n");
     }
+    SECTION("Implicit this")
+    {
+        const char* code =
+            "obj={ 'x': 2, 'f1': function() { x += 1; print(x); } }; \n"
+            "obj.f1(); obj['f1'](); (101, '102', obj.f1)(); \n"
+            "obj2={'subObj':obj}; obj2.subObj.f1();";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "3\n4\n5\n6\n");
+    }
 }

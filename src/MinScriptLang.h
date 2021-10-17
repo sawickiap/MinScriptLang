@@ -382,6 +382,8 @@ class Value
 {
 public:
     enum class Type { Null, Number, String, Function, SystemFunction, Object };
+    
+    shared_ptr<Object> m_ThisObject;
 
     Value() { }
     Value(double number) : m_Type(Type::Number), m_Number(number) { }
@@ -397,6 +399,7 @@ public:
     const AST::FunctionDefinition* GetFunction() const { assert(m_Type == Type::Function && m_Function); return m_Function; }
     SystemFunction GetSystemFunction() const { assert(m_Type == Type::SystemFunction); return m_SystemFunction; }
     Object* GetObject() const { assert(m_Type == Type::Object); return m_Object.get(); }
+    shared_ptr<Object> GetObjectPtr() const { assert(m_Type == Type::Object); return m_Object; }
 
     bool IsEqual(const Value& rhs) const
     {
@@ -486,15 +489,27 @@ struct ExecuteContext
     EnvironmentPimpl& Env;
     Object& GlobalContext;
     vector<Object*> LocalContexts;
+    vector<shared_ptr<Object>> This;
 
     struct LocalContextPush
     {
-        LocalContextPush(ExecuteContext& ctx, Object* localObj) : m_Ctx{ctx} { ctx.LocalContexts.push_back(localObj); }
-        ~LocalContextPush() { m_Ctx.LocalContexts.pop_back(); }
+        LocalContextPush(ExecuteContext& ctx, Object* localObj, shared_ptr<Object>&& thisObj) :
+            m_Ctx{ctx}
+        {
+            ctx.LocalContexts.push_back(localObj);
+            ctx.This.push_back(std::move(thisObj));
+        }
+        ~LocalContextPush()
+        {
+            m_Ctx.This.pop_back();
+            m_Ctx.LocalContexts.pop_back();
+        }
     private:
         ExecuteContext& m_Ctx;
     };
-    Object& GetInnermostContext() const { return !LocalContexts.empty() ? *LocalContexts.back() : GlobalContext; }
+    bool IsGlobal() const { return LocalContexts.empty(); }
+    Object& GetInnermostContext() const { return !IsGlobal() ? *LocalContexts.back() : GlobalContext; }
+    shared_ptr<Object> GetInnermostThis() const { return !IsGlobal() ? This.back() : shared_ptr<Object>{}; }
 };
 
 struct Statement
@@ -627,7 +642,7 @@ struct ConstantValue : ConstantExpression
     virtual Value Evaluate(ExecuteContext& ctx) const { return Val; }
 };
 
-enum class IdentifierScope { None, Local, This, Global, Env, Count };
+enum class IdentifierScope { None, Local, Global, Env, Count };
 struct Identifier : ConstantExpression
 {
     IdentifierScope Scope = IdentifierScope::Count;
@@ -1551,17 +1566,19 @@ void Identifier::DebugPrint(uint32_t indentLevel, const char* prefix) const
 
 Value Identifier::Evaluate(ExecuteContext& ctx) const
 {
-    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || !ctx.LocalContexts.empty(), GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
+    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || !ctx.IsGlobal(), GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
 
-    // Local variable
-    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && !ctx.LocalContexts.empty())
+    if(!ctx.IsGlobal())
     {
-        Value* val = ctx.LocalContexts.back()->TryGetValue(S);
-        if(val)
-            return *val;
+        // Local variable
+        if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local))
+            if(Value* val = ctx.LocalContexts.back()->TryGetValue(S); val)
+                return *val;
+        // This
+        if(Scope == IdentifierScope::None && ctx.This.back())
+            if(Value* val = ctx.This.back()->TryGetValue(S); val)
+                return *val;
     }
-    
-    // #TODO this
     
     // Global variable
     if(Scope == IdentifierScope::None || Scope == IdentifierScope::Global)
@@ -1585,26 +1602,29 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
 
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
 {
+    const bool isGlobal = ctx.IsGlobal();
     EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Env, GetPlace(), ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT);
-    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || !ctx.LocalContexts.empty(), GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
+    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || !isGlobal, GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
 
-    Object* const localCtx = ctx.LocalContexts.empty() ? nullptr : ctx.LocalContexts.back();
-
-    // Local variable
-    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && localCtx && localCtx->HasKey(S))
-        return LValue{*localCtx, S.c_str()};
-    
-    // #TODO this
+    if(!isGlobal)
+    {
+        // Local variable
+        if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && ctx.LocalContexts.back()->HasKey(S))
+            return LValue{*ctx.LocalContexts.back(), S};
+        // This
+        if(Scope == IdentifierScope::None)
+            if(Object* thisObj = ctx.This.back().get(); thisObj && thisObj->HasKey(S))
+                return LValue{*thisObj, S};
+    }    
     
     // Global variable
     if((Scope == IdentifierScope::None || Scope == IdentifierScope::Global) && ctx.GlobalContext.HasKey(S))
-        return LValue{ctx.GlobalContext, S.c_str()};
+        return LValue{ctx.GlobalContext, S};
 
     // Not found: return reference to smallest scope.
-    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && localCtx)
-        return LValue{*localCtx, S.c_str()};
-    // #TODO this
-    return LValue{ctx.GlobalContext, S.c_str()};
+    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && !isGlobal)
+        return LValue{*ctx.LocalContexts.back(), S.c_str()};
+    return LValue{ctx.GlobalContext, S};
 }
 
 void UnaryOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -1714,7 +1734,11 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
     {
         const Value* memberVal = objVal.GetObject()->TryGetValue(MemberName);
         if(memberVal)
-            return *memberVal;
+        {
+            Value resultVal = *memberVal;
+            resultVal.m_ThisObject = objVal.GetObjectPtr();
+            return resultVal;
+        }
         if(MemberName == "Count")
             return BuiltInMember_Object_Count(ctx, std::move(objVal));
         return Value{};
@@ -1878,7 +1902,11 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
         {
             EXECUTION_CHECK( rhsType == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
             if(Value* val = lhs.GetObject()->TryGetValue(rhs.GetString()))
-                return *val;
+            {
+                Value resultVal = *val;
+                resultVal.m_ThisObject = lhs.GetObjectPtr();
+                return resultVal;
+            }
             return Value{};
         }
         EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
@@ -2088,7 +2116,7 @@ Value MultiOperator::Evaluate(ExecuteContext& ctx) const
 
 Value MultiOperator::Call(ExecuteContext& ctx) const
 {
-    Value callee = Operands[0]->Evaluate(ctx);
+    const Value callee = Operands[0]->Evaluate(ctx);
     const size_t argCount = Operands.size() - 1;
     vector<Value> arguments(argCount);
     for(size_t i = 0; i < argCount; ++i)
@@ -2102,7 +2130,7 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
         // Setup parameters
         for(size_t argIndex = 0; argIndex != argCount; ++argIndex)
             localContext.GetOrCreateValue(funcDef->Parameters[argIndex]) = std::move(arguments[argIndex]);
-        ExecuteContext::LocalContextPush localContextPush{ctx, &localContext};
+        ExecuteContext::LocalContextPush localContextPush{ctx, &localContext, shared_ptr<Object>{callee.m_ThisObject}};
         try
         {
             callee.GetFunction()->Body.Execute(ctx);
@@ -2442,7 +2470,7 @@ unique_ptr<AST::ConstantValue> Parser::TryParseConstantValue()
 unique_ptr<AST::Identifier> Parser::TryParseIdentifierValue()
 {
     const Token& t = m_Tokens[m_TokenIndex];
-    if(t.Symbol == Symbol::Local || t.Symbol == Symbol::This || t.Symbol == Symbol::Global || t.Symbol == Symbol::Env)
+    if(t.Symbol == Symbol::Local || t.Symbol == Symbol::Global || t.Symbol == Symbol::Env)
     {
         ++m_TokenIndex;
         MUST_PARSE( TryParseSymbol(Symbol::Dot), ERROR_MESSAGE_EXPECTED_SYMBOL_DOT );
@@ -2453,7 +2481,6 @@ unique_ptr<AST::Identifier> Parser::TryParseIdentifierValue()
         switch(t.Symbol)
         {
         case Symbol::Local: identifierScope = AST::IdentifierScope::Local; break;
-        case Symbol::This: identifierScope = AST::IdentifierScope::This; break;
         case Symbol::Global: identifierScope = AST::IdentifierScope::Global; break;
         case Symbol::Env: identifierScope = AST::IdentifierScope::Env; break;
         }
