@@ -124,6 +124,7 @@ static const char* const ERROR_MESSAGE_INVALID_NUMBER = "Invalid number.";
 static const char* const ERROR_MESSAGE_INVALID_STRING = "Invalid string.";
 static const char* const ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE = "Invalid escape sequence in a string.";
 static const char* const ERROR_MESSAGE_INVALID_TYPE = "Invalid type.";
+static const char* const ERROR_MESSAGE_INVALID_MEMBER = "Invalid member.";
 static const char* const ERROR_MESSAGE_INVALID_INDEX = "Invalid index.";
 static const char* const ERROR_MESSAGE_INVALID_LVALUE = "Invalid l-value.";
 static const char* const ERROR_MESSAGE_INVALID_FUNCTION = "Invalid function.";
@@ -1199,11 +1200,14 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, 
 
 static Value BuiltInMember_Object_Count(AST::ExecuteContext& ctx, Value&& objVal)
 {
-    assert(objVal.GetType() == Value::Type::Object);
-    const Object* const obj = objVal.GetObject();
-    assert(obj);
-    const size_t count = obj->GetCount();
-    return Value{(double)count};
+    assert(objVal.GetType() == Value::Type::Object && objVal.GetObject());
+    return Value{(double)objVal.GetObject()->GetCount()};
+}
+
+static Value BuiltInMember_String_Count(AST::ExecuteContext& ctx, Value&& objVal)
+{
+    assert(objVal.GetType() == Value::Type::String);
+    return Value{(double)objVal.GetString().length()};
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1648,13 +1652,22 @@ void MemberAccessOperator::DebugPrint(uint32_t indentLevel, const char* prefix) 
 Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
 {
     Value objVal = Operand->Evaluate(ctx);
-    EXECUTION_CHECK_PLACE(objVal.GetType() == Value::Type::Object, GetPlace(), ERROR_MESSAGE_EXPECTED_OBJECT);
-    const Value* memberVal = objVal.GetObject()->TryGetValue(MemberName);
-    if(memberVal)
-        return *memberVal;
-    if(MemberName == "Count")
-        return BuiltInMember_Object_Count(ctx, std::move(objVal));
-    return Value{};
+    if(objVal.GetType() == Value::Type::Object)
+    {
+        const Value* memberVal = objVal.GetObject()->TryGetValue(MemberName);
+        if(memberVal)
+            return *memberVal;
+        if(MemberName == "Count")
+            return BuiltInMember_Object_Count(ctx, std::move(objVal));
+        return Value{};
+    }
+    if(objVal.GetType() == Value::Type::String)
+    {
+        if(MemberName == "Count")
+            return BuiltInMember_String_Count(ctx, std::move(objVal));
+        EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_MEMBER );
+    }
+    EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
 }
 
 LValue MemberAccessOperator::GetLValue(ExecuteContext& ctx) const

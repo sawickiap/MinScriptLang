@@ -405,6 +405,13 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "B\nCC\n");
     }
+    SECTION("String Count")
+    {
+        const char* code = "s='ABCD'; \n"
+            "for(i=0; i<s.Count; ++i) { print(i, s[i]); }";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\nA\n1\nB\n2\nC\n3\nD\n");
+    }
     SECTION("Invalid string indexing")
     {
         const char* code = "s='ABCDEF'; print(s[-1]);";
