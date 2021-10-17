@@ -443,9 +443,7 @@ public:
         }
     }
 
-    void SetNull() { m_Type = Type::Null; m_String.clear(); }
-    void SetNumber(double number) { m_Type = Type::Number; m_Number = number; m_String.clear(); }
-    void SetString(string&& str) { m_Type = Type::String; m_String = std::move(str); }
+    void ChangeNumber(double number) { assert(m_Type == Type::Number); m_Number = number; }
 
 private:
     Type m_Type = Type::Null;
@@ -1543,24 +1541,24 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         if(!val && (Type == UnaryOperatorType::Preincrementation || Type == UnaryOperatorType::Postincrementation))
         {
             val = &lval.Obj.GetOrCreateValue(lval.Key);
-            val->SetNumber(0.0);
+            *val = Value{0.0};
         }
         EXECUTION_CHECK( val != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
         EXECUTION_CHECK( val->GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
         {
-        case UnaryOperatorType::Preincrementation: val->SetNumber(val->GetNumber() + 1.0); return *val;
-        case UnaryOperatorType::Predecrementation: val->SetNumber(val->GetNumber() - 1.0); return *val;
+        case UnaryOperatorType::Preincrementation: val->ChangeNumber(val->GetNumber() + 1.0); return *val;
+        case UnaryOperatorType::Predecrementation: val->ChangeNumber(val->GetNumber() - 1.0); return *val;
         case UnaryOperatorType::Postincrementation:
         {
             Value result = *val;
-            val->SetNumber(val->GetNumber() + 1.0);
+            val->ChangeNumber(val->GetNumber() + 1.0);
             return std::move(result);
         }
         case UnaryOperatorType::Postdecrementation:
         {
             Value result = *val;
-            val->SetNumber(val->GetNumber() - 1.0);
+            val->ChangeNumber(val->GetNumber() - 1.0);
             return std::move(result);
         }
         default: assert(0); return Value{};
@@ -1597,14 +1595,14 @@ LValue UnaryOperator::GetLValue(ExecuteContext& ctx) const
         if(!val && Type == UnaryOperatorType::Preincrementation)
         {
             val = &lval.Obj.GetOrCreateValue(lval.Key);
-            val->SetNumber(0.0);
+            *val = Value{0.0};
         }
         EXECUTION_CHECK( val != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
         EXECUTION_CHECK( val->GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
         {
-        case UnaryOperatorType::Preincrementation: val->SetNumber(val->GetNumber() + 1.0); return lval;
-        case UnaryOperatorType::Predecrementation: val->SetNumber(val->GetNumber() - 1.0); return lval;
+        case UnaryOperatorType::Preincrementation: val->ChangeNumber(val->GetNumber() + 1.0); return lval;
+        case UnaryOperatorType::Predecrementation: val->ChangeNumber(val->GetNumber() - 1.0); return lval;
         default: assert(0);
         }
     }
@@ -1864,9 +1862,8 @@ Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
         // Assigning null - deleting the value.
         if(rhs.GetType() == Value::Type::Null)
         {
-            if(lhs.Obj.HasKey(lhs.Key))
-                lhs.Obj.Remove(lhs.Key);
-            return Value{};
+            lhs.Obj.Remove(lhs.Key);
+            return rhs;
         }
         else
         {
@@ -1884,9 +1881,9 @@ Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
     {
         lhsValPtr = &lhs.Obj.GetOrCreateValue(lhs.Key);
         if(rhs.GetType() == Value::Type::Number)
-            lhsValPtr->SetNumber(0.);
+            *lhsValPtr = Value{0.0};
         else
-            lhsValPtr->SetString(string{});
+            *lhsValPtr = Value{string{}};
     }
 
     // Others require existing value.
@@ -1900,7 +1897,7 @@ Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
             // Increment by null - not changing value.
         }
         else if(lhsValPtr->GetType() == Value::Type::Number && rhs.GetType() == Value::Type::Number)
-            lhsValPtr->SetNumber(lhsValPtr->GetNumber() + rhs.GetNumber());
+            lhsValPtr->ChangeNumber(lhsValPtr->GetNumber() + rhs.GetNumber());
         else if(lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String)
             lhsValPtr->GetString() += rhs.GetString();
         else
@@ -1913,15 +1910,15 @@ Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
     EXECUTION_CHECK( rhs.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER);
     switch(Type)
     {
-    case BinaryOperatorType::AssignmentSub: lhsValPtr->SetNumber(lhsValPtr->GetNumber() - rhs.GetNumber()); break;
-    case BinaryOperatorType::AssignmentMul: lhsValPtr->SetNumber(lhsValPtr->GetNumber() * rhs.GetNumber()); break;
-    case BinaryOperatorType::AssignmentDiv: lhsValPtr->SetNumber(lhsValPtr->GetNumber() / rhs.GetNumber()); break;
-    case BinaryOperatorType::AssignmentMod: lhsValPtr->SetNumber(fmod(lhsValPtr->GetNumber(), rhs.GetNumber())); break;
+    case BinaryOperatorType::AssignmentSub: lhsValPtr->ChangeNumber(lhsValPtr->GetNumber() - rhs.GetNumber()); break;
+    case BinaryOperatorType::AssignmentMul: lhsValPtr->ChangeNumber(lhsValPtr->GetNumber() * rhs.GetNumber()); break;
+    case BinaryOperatorType::AssignmentDiv: lhsValPtr->ChangeNumber(lhsValPtr->GetNumber() / rhs.GetNumber()); break;
+    case BinaryOperatorType::AssignmentMod: lhsValPtr->ChangeNumber(fmod(lhsValPtr->GetNumber(), rhs.GetNumber())); break;
     case BinaryOperatorType::AssignmentShiftLeft:  *lhsValPtr = ShiftLeft (*lhsValPtr, rhs); break;
     case BinaryOperatorType::AssignmentShiftRight: *lhsValPtr = ShiftRight(*lhsValPtr, rhs); break;
-    case BinaryOperatorType::AssignmentBitwiseAnd: lhsValPtr->SetNumber( (double)( (int64_t)lhsValPtr->GetNumber() & (int64_t)rhs.GetNumber() ) ); break;
-    case BinaryOperatorType::AssignmentBitwiseXor: lhsValPtr->SetNumber( (double)( (int64_t)lhsValPtr->GetNumber() ^ (int64_t)rhs.GetNumber() ) ); break;
-    case BinaryOperatorType::AssignmentBitwiseOr:  lhsValPtr->SetNumber( (double)( (int64_t)lhsValPtr->GetNumber() | (int64_t)rhs.GetNumber() ) ); break;
+    case BinaryOperatorType::AssignmentBitwiseAnd: lhsValPtr->ChangeNumber( (double)( (int64_t)lhsValPtr->GetNumber() & (int64_t)rhs.GetNumber() ) ); break;
+    case BinaryOperatorType::AssignmentBitwiseXor: lhsValPtr->ChangeNumber( (double)( (int64_t)lhsValPtr->GetNumber() ^ (int64_t)rhs.GetNumber() ) ); break;
+    case BinaryOperatorType::AssignmentBitwiseOr:  lhsValPtr->ChangeNumber( (double)( (int64_t)lhsValPtr->GetNumber() | (int64_t)rhs.GetNumber() ) ); break;
     default:
         assert(0);
     }
