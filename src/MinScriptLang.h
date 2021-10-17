@@ -397,48 +397,31 @@ public:
     SystemFunction GetSystemFunction() const { assert(m_Type == Type::SystemFunction); return m_SystemFunction; }
     Object* GetObject() const { assert(m_Type == Type::Object); return m_Object.get(); }
 
-    bool operator==(const Value& rhs) const
+    bool IsEqual(const Value& rhs) const
     {
-        if(m_Type == rhs.m_Type)
+        if(m_Type != rhs.m_Type)
+            return false;
+        switch(m_Type)
         {
-            switch(m_Type)
-            {
-            case Type::Null: return true;
-            case Type::Number: return m_Number == rhs.m_Number;
-            case Type::String: return m_String == rhs.m_String;
-            case Type::Function: return m_Function == rhs.m_Function;
-            case Type::SystemFunction: return m_SystemFunction == rhs.m_SystemFunction;
-            default: assert(0);
-            }
+        case Type::Null:           return true;
+        case Type::Number:         return m_Number == rhs.m_Number;
+        case Type::String:         return m_String == rhs.m_String;
+        case Type::Function:       return m_Function == rhs.m_Function;
+        case Type::SystemFunction: return m_SystemFunction == rhs.m_SystemFunction;
+        case Type::Object:         return m_Object.get() == rhs.m_Object.get();
+        default: assert(0); return false;
         }
-        return false;
     }
-    bool operator!=(const Value& rhs) const
-    {
-        if(m_Type == rhs.m_Type)
-        {
-            switch(m_Type)
-            {
-            case Type::Null: return false;
-            case Type::Number: return m_Number != rhs.m_Number;
-            case Type::String: return m_String != rhs.m_String;
-            case Type::Function: return m_Function != rhs.m_Function;
-            case Type::SystemFunction: return m_SystemFunction == rhs.m_SystemFunction;
-            default: assert(0);
-            }
-        }
-        return true;
-    }
-
     bool IsTrue() const
     {
         switch(m_Type)
         {
-        case Type::Null: return false;
-        case Type::Number: return m_Number != 0.f;
-        case Type::String: return !m_String.empty();
-        case Type::Function: return true;
+        case Type::Null:           return false;
+        case Type::Number:         return m_Number != 0.f;
+        case Type::String:         return !m_String.empty();
+        case Type::Function:       return true;
         case Type::SystemFunction: return true;
+        case Type::Object:         return true;
         default: assert(0); return false;
         }
     }
@@ -1392,7 +1375,7 @@ void SwitchStatement::Execute(ExecuteContext& ctx) const
     {
         if(ItemValues[itemIndex])
         {
-            if(ItemValues[itemIndex]->Val == condVal)
+            if(ItemValues[itemIndex]->Val.IsEqual(condVal))
                 break;
         }
         else
@@ -1724,11 +1707,11 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     }
     if(Type == BinaryOperatorType::Equal)
     {
-        return Value{lhs == rhs ? 1.0 : 0.0};
+        return Value{lhs.IsEqual(rhs) ? 1.0 : 0.0};
     }
     if(Type == BinaryOperatorType::NotEqual)
     {
-        return Value{lhs != rhs ? 1.0 : 0.0};
+        return Value{!lhs.IsEqual(rhs) ? 1.0 : 0.0};
     }
     if(Type == BinaryOperatorType::Less || Type == BinaryOperatorType::LessEqual ||
         Type == BinaryOperatorType::Greater || Type == BinaryOperatorType::GreaterEqual)
@@ -2331,7 +2314,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
                         throw ParsingError(place, ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT);
                     if(stmt->ItemValues[i] && stmt->ItemValues[j])
                     {
-                        if(stmt->ItemValues[i]->Val == stmt->ItemValues[j]->Val)
+                        if(stmt->ItemValues[i]->Val.IsEqual(stmt->ItemValues[j]->Val))
                             throw ParsingError(stmt->ItemValues[j]->GetPlace(), ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT);
                     }
                 }
