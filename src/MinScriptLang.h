@@ -447,15 +447,14 @@ private:
 class Object
 {
 public:
+    using MapType = std::unordered_map<string, Value>;
+    MapType m_Items;
+
     size_t GetCount() const { return m_Items.size(); }
     bool HasKey(const string& key) const;
     Value& GetOrCreateValue(const string& key); // Creates new null value if doesn't exist.
     Value* TryGetValue(const string& key); // Returns null if doesn't exist.
     bool Remove(const string& key); // Returns true if has been found and removed.
-
-private:
-    using MapType = std::unordered_map<string, Value>;
-    MapType m_Items;
 };
 
 struct LValue
@@ -1374,13 +1373,14 @@ void RangeBasedForLoop::DebugPrint(uint32_t indentLevel, const char* prefix) con
 
 void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
 {
-    Value rangeVal = RangeExpression->Evaluate(ctx);
+    const Value rangeVal = RangeExpression->Evaluate(ctx);
+    Object& innermostCtxObj = ctx.GetInnermostContext();
+    const bool useKey = !KeyVarName.empty();
+
     if(rangeVal.GetType() == Value::Type::String)
     {
-        Object& innermostCtxObj = ctx.GetInnermostContext();
         const string& rangeStr = rangeVal.GetString();
         const size_t count = rangeStr.length();
-        const bool useKey = !KeyVarName.empty();
         for(size_t i = 0; i < count; ++i)
         {
             if(useKey)
@@ -1389,16 +1389,23 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
             Assign(LValue{innermostCtxObj, ValueVarName}, Value{string{&ch, &ch + 1}});
             Body->Execute(ctx);
         }
-        if(useKey)
-            Assign(LValue{innermostCtxObj, KeyVarName}, Value{});
-        Assign(LValue{innermostCtxObj, ValueVarName}, Value{});
     }
     else if(rangeVal.GetType() == Value::Type::Object)
     {
-        assert(0); // #TODO
+        for(const auto& [key, value]: rangeVal.GetObject()->m_Items)
+        {
+            if(useKey)
+                Assign(LValue{innermostCtxObj, KeyVarName}, Value{string{key}});
+            Assign(LValue{innermostCtxObj, ValueVarName}, Value{value});
+            Body->Execute(ctx);
+        }
     }
     else
         EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
+
+    if(useKey)
+        Assign(LValue{innermostCtxObj, KeyVarName}, Value{});
+    Assign(LValue{innermostCtxObj, ValueVarName}, Value{});
 }
 
 void LoopBreakStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const

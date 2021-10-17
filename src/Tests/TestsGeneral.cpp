@@ -829,4 +829,13 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "2\n");
     }
+    SECTION("Range-based for loop for objects")
+    {
+        const char* code =
+            "obj={'a':1, 'bbbb':4, 'cc':10}; \n"
+            "sum = 0; for(val: obj) sum += val; print(sum);\n"
+            "sumKeyLen = 0; sumVal = 0; for(key, val: obj) { sumKeyLen += key.Count; sumVal += val; } print(sumKeyLen, sumVal); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "15\n7\n15\n");
+    }
 }
