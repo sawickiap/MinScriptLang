@@ -353,6 +353,38 @@ TEST_CASE("Basic")
         code = "v='bbb' < null;";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
+    SECTION("Equality of numbers")
+    {
+        const char* code =
+            "n1=1; n2=n1; n3=3; \n"
+            "print(n1==n1, n1==n2, n1==n3, n1!=n1, n1!=n2, n1!=n3); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n1\n0\n0\n0\n1\n");
+    }
+    SECTION("Equality of strings")
+    {
+        const char* code =
+            "s1='A'; s2=s1; s3='C'; \n"
+            "print(s1==s1, s1==s2, s1==s3, s1!=s1, s1!=s2, s1!=s3); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n1\n0\n0\n0\n1\n");
+    }
+    SECTION("Equality of functions")
+    {
+        const char* code =
+            "f1=function(){}; f2=f1; f3=function(){}; \n"
+            "print(f1==f1, f1==f2, f1==f3, f1!=f1, f1!=f2, f1!=f3); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n1\n0\n0\n0\n1\n");
+    }
+    SECTION("Equality of system functions")
+    {
+        const char* code =
+            "sf1=print; sf2=sf1; sf3=print; \n"
+            "print(sf1==sf1, sf1==sf2, sf1==sf3, sf1!=sf1, sf1!=sf2, sf1!=sf3); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n1\n1\n0\n0\n0\n");
+    }
     SECTION("String comparisons equality")
     {
         const char* code = "a='aa'; b='bb'; n=1; \n"
@@ -757,5 +789,13 @@ TEST_CASE("Object")
             "print(o.A.B['c']); \n";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "10\n");
+    }
+    SECTION("Equality of objects")
+    {
+        const char* code =
+            "o1={'a':1, 'b':2}; o2=o1; o3={'a':1, 'b':2}; \n"
+            "print(o1==o1, o1==o2, o1==o3, o1!=o1, o1!=o2, o1!=o3); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n1\n0\n0\n0\n1\n");
     }
 }
