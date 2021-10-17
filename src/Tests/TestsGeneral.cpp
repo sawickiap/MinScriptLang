@@ -864,4 +864,13 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "3\n");
     }
+    SECTION("Passing function together with this")
+    {
+        const char* code =
+            "obj={ 'x': 2, 'f': function() { this.x += 1; print(this.x); } }; \n"
+            "function call(a) { a(); } \n"
+            "call(obj.f); call(obj.f); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "3\n4\n");
+    }
 }
