@@ -95,6 +95,7 @@ private:
 #include <string>
 #include <memory>
 #include <algorithm>
+#include <initializer_list>
 
 #include <cstdlib>
 #include <cassert>
@@ -565,6 +566,17 @@ struct ForLoop : public Statement
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
+struct RangeBasedForLoop : public Statement
+{
+    string KeyVarName; // Can be empty.
+    string ValueVarName; // Cannot be empty.
+    unique_ptr<Expression> RangeExpression;
+    unique_ptr<Statement> Body;
+    explicit RangeBasedForLoop(const PlaceInCode& place) : Statement{place} { }
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void Execute(ExecuteContext& ctx) const;
+};
+
 enum class LoopBreakType { Break, Continue, Count };
 struct LoopBreakStatement : public Statement
 {
@@ -697,7 +709,7 @@ struct BinaryOperator : Operator
 private:
     Value ShiftLeft(const Value& lhs, const Value& rhs) const;
     Value ShiftRight(const Value& lhs, const Value& rhs) const;
-    Value Assignment(const LValue& lhs, Value&& rhs) const;
+    Value Assignment(LValue&& lhs, Value&& rhs) const;
 };
 
 struct TernaryOperator : Operator
@@ -768,7 +780,7 @@ private:
     void ParseBlock(AST::Block& outBlock);
     bool TryParseSwitchItem(AST::SwitchStatement& switchStatement);
     void ParseFunctionDefinition(AST::FunctionDefinition& funcDef);
-    bool IsNonEmptyObject();
+    bool PeekSymbols(std::initializer_list<Symbol> arr);
     unique_ptr<AST::Statement> TryParseStatement();
     unique_ptr<AST::ConstantValue> TryParseConstantValue();
     unique_ptr<AST::Identifier> TryParseIdentifierValue();
@@ -1296,6 +1308,16 @@ void ForLoop::Execute(ExecuteContext& ctx) const
     }
 }
 
+void RangeBasedForLoop::DebugPrint(uint32_t indentLevel, const char* prefix) const
+{
+    // #TODO
+}
+
+void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
+{
+    // #TODO
+}
+
 void LoopBreakStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     static const char* LOOP_BREAK_TYPE_NAMES[] = { "Break", "Continue" };
@@ -1661,7 +1683,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     {
         LValue lhs = Operands[0]->GetLValue(ctx);
         Value rhs = Operands[1]->Evaluate(ctx);
-        return Assignment(lhs, std::move(rhs));
+        return Assignment(std::move(lhs), std::move(rhs));
     }
     }
     
@@ -1821,7 +1843,7 @@ Value BinaryOperator::ShiftRight(const Value& lhs, const Value& rhs) const
     return Value{(double)resultInt};
 }
 
-Value BinaryOperator::Assignment(const LValue& lhs, Value&& rhs) const
+Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
 {
     // Indexing: string[index] = newChar
     if(lhs.HasCharIndex())
@@ -2169,12 +2191,14 @@ void Parser::ParseFunctionDefinition(AST::FunctionDefinition& funcDef)
     MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
 }
 
-bool Parser::IsNonEmptyObject()
+bool Parser::PeekSymbols(std::initializer_list<Symbol> symbols)
 {
-    return m_TokenIndex + 2 < m_Tokens.size() &&
-        m_Tokens[m_TokenIndex].Symbol == Symbol::CurlyBracketOpen &&
-        m_Tokens[m_TokenIndex + 1].Symbol == Symbol::String &&
-        m_Tokens[m_TokenIndex + 2].Symbol == Symbol::Colon;
+    if(m_TokenIndex + symbols.size() >= m_Tokens.size())
+        return false;
+    for(size_t i = 0; i < symbols.size(); ++i)
+        if(m_Tokens[m_TokenIndex + i].Symbol != symbols.begin()[i])
+            return false;
+    return true;
 }
 
 unique_ptr<AST::Statement> Parser::TryParseStatement()
@@ -2186,7 +2210,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
         return make_unique<AST::EmptyStatement>(place);
     
     // Block: '{' Block '}'
-    if(!IsNonEmptyObject() && TryParseSymbol(Symbol::CurlyBracketOpen))
+    if(!PeekSymbols({Symbol::CurlyBracketOpen, Symbol::String, Symbol::Colon}) && TryParseSymbol(Symbol::CurlyBracketOpen))
     {
         auto block = make_unique<AST::Block>(GetCurrentTokenPlace());
         ParseBlock(*block);
@@ -2231,28 +2255,39 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
         return loop;
     }
 
-    // Loop: 'for' '(' Expr17? ';' Expr17? ';' Expr17? ')' Statement
     if(TryParseSymbol(Symbol::For))
     {
-        MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
-        auto loop = make_unique<AST::ForLoop>(place);
-        if(!TryParseSymbol(Symbol::Semicolon))
+        // Range-based loop: 'for' '(' TOKEN_IDENTIFIER [ ',' TOKEN_IDENTIFIER ] ':' Expr17 ')' Statement
+        if(PeekSymbols({Symbol::Identifier, Symbol::Colon}) ||
+            PeekSymbols({Symbol::Identifier, Symbol::Comma, Symbol::Identifier, Symbol::Colon}))
         {
-            MUST_PARSE( loop->InitExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-            MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
+            MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
+            auto loop = make_unique<AST::RangeBasedForLoop>(place);
+            
         }
-        if(!TryParseSymbol(Symbol::Semicolon))
+        // Loop: 'for' '(' Expr17? ';' Expr17? ';' Expr17? ')' Statement
+        else
         {
-            MUST_PARSE( loop->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-            MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
+            MUST_PARSE( TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN );
+            auto loop = make_unique<AST::ForLoop>(place);
+            if(!TryParseSymbol(Symbol::Semicolon))
+            {
+                MUST_PARSE( loop->InitExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+                MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
+            }
+            if(!TryParseSymbol(Symbol::Semicolon))
+            {
+                MUST_PARSE( loop->ConditionExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+                MUST_PARSE( TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON );
+            }
+            if(!TryParseSymbol(Symbol::RoundBracketClose))
+            {
+                MUST_PARSE( loop->IterationExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+                MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
+            }
+            MUST_PARSE( loop->Body = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
+            return loop;
         }
-        if(!TryParseSymbol(Symbol::RoundBracketClose))
-        {
-            MUST_PARSE( loop->IterationExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
-            MUST_PARSE( TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE );
-        }
-        MUST_PARSE( loop->Body = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT );
-        return loop;
     }
 
     // 'break' ';'
@@ -2411,7 +2446,7 @@ unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
     if((m_TokenIndex + 1 < m_Tokens.size() && // { }
             m_Tokens[m_TokenIndex].Symbol == Symbol::CurlyBracketOpen &&
             m_Tokens[m_TokenIndex + 1].Symbol == Symbol::CurlyBracketClose) ||
-        IsNonEmptyObject()) // { 'key' :
+        PeekSymbols({Symbol::CurlyBracketOpen, Symbol::String, Symbol::Colon})) // { 'key' :
     {
         auto objExpr = make_unique<AST::ObjectExpression>(GetCurrentTokenPlace());
         TryParseSymbol(Symbol::CurlyBracketOpen);
