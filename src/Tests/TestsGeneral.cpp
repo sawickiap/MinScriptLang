@@ -798,4 +798,12 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n1\n0\n0\n0\n1\n");
     }
+    SECTION("Count and setting unsetting members")
+    {
+        const char* code =
+            "obj={'a':1, 'b':2}; obj.c=3; obj.b=null; \n"
+            "print(obj.Count); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "2\n");
+    }
 }

@@ -446,6 +446,7 @@ private:
 class Object
 {
 public:
+    size_t GetCount() const { return m_Items.size(); }
     bool HasKey(const string& key) const;
     Value& GetOrCreateValue(const string& key); // Creates new null value if doesn't exist.
     Value* TryGetValue(const string& key); // Returns null if doesn't exist.
@@ -1160,6 +1161,52 @@ bool Object::Remove(const string& key)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Built in functions
+
+static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t argCount)
+{
+    string s;
+    for(size_t i = 0; i < argCount; ++i)
+    {
+        const Value& val = args[i];
+        switch(val.GetType())
+        {
+        case Value::Type::Null:
+            ctx.Env.Print("null\n");
+            break;
+        case Value::Type::Number:
+            Format(s, "%g\n", val.GetNumber());
+            ctx.Env.Print(s.data(), s.length());
+            break;
+        case Value::Type::String:
+            if(!val.GetString().empty())
+                ctx.Env.Print(val.GetString().data(), val.GetString().length());
+            ctx.Env.Print("\n", 1);
+            break;
+        case Value::Type::Function:
+        case Value::Type::SystemFunction:
+            ctx.Env.Print("function\n");
+            break;
+        case Value::Type::Object:
+            ctx.Env.Print("object\n");
+            break;
+        default: assert(0);
+        }
+
+    }
+    return Value{};
+}
+
+static Value BuiltInMember_Object_Count(AST::ExecuteContext& ctx, Value&& objVal)
+{
+    assert(objVal.GetType() == Value::Type::Object);
+    const Object* const obj = objVal.GetObject();
+    assert(obj);
+    const size_t count = obj->GetCount();
+    return Value{(double)count};
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Abstract Syntax Tree implementation
 
 namespace AST {
@@ -1605,6 +1652,8 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
     const Value* memberVal = objVal.GetObject()->TryGetValue(MemberName);
     if(memberVal)
         return *memberVal;
+    if(MemberName == "Count")
+        return BuiltInMember_Object_Count(ctx, std::move(objVal));
     return Value{};
 }
 
@@ -1977,50 +2026,6 @@ Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
     }
     return Value{std::move(obj)};
 }
-
-} // namespace AST
-
-////////////////////////////////////////////////////////////////////////////////
-// Built in functions
-
-static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t argCount)
-{
-    string s;
-    for(size_t i = 0; i < argCount; ++i)
-    {
-        const Value& val = args[i];
-        switch(val.GetType())
-        {
-        case Value::Type::Null:
-            ctx.Env.Print("null\n");
-            break;
-        case Value::Type::Number:
-            Format(s, "%g\n", val.GetNumber());
-            ctx.Env.Print(s.data(), s.length());
-            break;
-        case Value::Type::String:
-            if(!val.GetString().empty())
-                ctx.Env.Print(val.GetString().data(), val.GetString().length());
-            ctx.Env.Print("\n", 1);
-            break;
-        case Value::Type::Function:
-        case Value::Type::SystemFunction:
-            ctx.Env.Print("function\n");
-            break;
-        case Value::Type::Object:
-            ctx.Env.Print("object\n");
-            break;
-        default: assert(0);
-        }
-            
-    }
-    return Value{};
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// AST implementation
-
-namespace AST {
 
 Value MultiOperator::Evaluate(ExecuteContext& ctx) const
 {
