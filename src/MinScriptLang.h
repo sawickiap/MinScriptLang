@@ -487,10 +487,9 @@ namespace AST
 
 struct ExecuteContext
 {
+public:
     EnvironmentPimpl& Env;
     Object& GlobalContext;
-    vector<Object*> LocalContexts;
-    vector<shared_ptr<Object>> This;
 
     struct LocalContextPush
     {
@@ -508,9 +507,16 @@ struct ExecuteContext
     private:
         ExecuteContext& m_Ctx;
     };
+
+    ExecuteContext(EnvironmentPimpl& env, Object& globalCtx) : Env{env}, GlobalContext{globalCtx} { }
     bool IsGlobal() const { return LocalContexts.empty(); }
+    Object* GetLocalContext() { assert(!IsGlobal()); return LocalContexts.back(); }
+    const shared_ptr<Object>& GetThis() { assert(!IsGlobal()); return This.back(); }
     Object& GetInnermostContext() const { return !IsGlobal() ? *LocalContexts.back() : GlobalContext; }
-    shared_ptr<Object> GetInnermostThis() const { return !IsGlobal() ? This.back() : shared_ptr<Object>{}; }
+
+private:
+    vector<Object*> LocalContexts;
+    vector<shared_ptr<Object>> This;
 };
 
 struct Statement
@@ -1581,15 +1587,15 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
     {
         // Local variable
         if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local))
-            if(Value* val = ctx.LocalContexts.back()->TryGetValue(S); val)
+            if(Value* val = ctx.GetLocalContext()->TryGetValue(S); val)
                 return *val;
         // This
-        if(Scope == IdentifierScope::None && ctx.This.back())
+        if(Scope == IdentifierScope::None && ctx.GetThis())
         {
-            if(Value* val = ctx.This.back()->TryGetValue(S); val)
+            if(Value* val = ctx.GetThis()->TryGetValue(S); val)
             {
                 Value valWithThis = *val;
-                valWithThis.m_ThisObject = ctx.This.back();
+                valWithThis.m_ThisObject = ctx.GetThis();
                 return valWithThis;
             }
         }
@@ -1624,11 +1630,11 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
     if(!isGlobal)
     {
         // Local variable
-        if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && ctx.LocalContexts.back()->HasKey(S))
-            return LValue{*ctx.LocalContexts.back(), S};
+        if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && ctx.GetLocalContext()->HasKey(S))
+            return LValue{*ctx.GetLocalContext(), S};
         // This
         if(Scope == IdentifierScope::None)
-            if(Object* thisObj = ctx.This.back().get(); thisObj && thisObj->HasKey(S))
+            if(Object* thisObj = ctx.GetThis().get(); thisObj && thisObj->HasKey(S))
                 return LValue{*thisObj, S};
     }    
     
@@ -1638,7 +1644,7 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
 
     // Not found: return reference to smallest scope.
     if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && !isGlobal)
-        return LValue{*ctx.LocalContexts.back(), S.c_str()};
+        return LValue{*ctx.GetLocalContext(), S.c_str()};
     return LValue{ctx.GlobalContext, S};
 }
 
@@ -1649,8 +1655,8 @@ void ThisExpression::DebugPrint(uint32_t indentLevel, const char* prefix) const
 
 Value ThisExpression::Evaluate(ExecuteContext& ctx) const
 {
-    EXECUTION_CHECK(!ctx.IsGlobal() && ctx.This.back(), ERROR_MESSAGE_NO_THIS);
-    return Value{shared_ptr<Object>{ctx.This.back()}};
+    EXECUTION_CHECK(!ctx.IsGlobal() && ctx.GetThis(), ERROR_MESSAGE_NO_THIS);
+    return Value{shared_ptr<Object>{ctx.GetThis()}};
 }
 
 void UnaryOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -2125,8 +2131,9 @@ Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
     const size_t count = ItemNames.size();
     for(size_t i = 0; i < count; ++i)
     {
-        Value& memberVal = obj->GetOrCreateValue(ItemNames[i]);
-        memberVal = ItemValues[i]->Evaluate(ctx);
+        Value val = ItemValues[i]->Evaluate(ctx);
+        if(val.GetType() != Value::Type::Null)
+            obj->GetOrCreateValue(ItemNames[i]) = std::move(val);
     }
     return Value{std::move(obj)};
 }
