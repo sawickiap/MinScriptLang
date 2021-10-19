@@ -1644,7 +1644,7 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
 
     // Not found: return reference to smallest scope.
     if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && isLocal)
-        return LValue{*ctx.GetLocalContext(), S.c_str()};
+        return LValue{*ctx.GetLocalContext(), S};
     return LValue{ctx.GlobalContext, S};
 }
 
@@ -1788,7 +1788,7 @@ LValue MemberAccessOperator::GetLValue(ExecuteContext& ctx) const
 {
     Value objVal = Operand->Evaluate(ctx);
     EXECUTION_CHECK_PLACE(objVal.GetType() == Value::Type::Object, GetPlace(), ERROR_MESSAGE_EXPECTED_OBJECT);
-    return LValue{*objVal.GetObject(), MemberName.c_str()};
+    return LValue{*objVal.GetObject(), MemberName};
 }
 
 Value UnaryOperator::BitwiseNot(Value&& operand) const
