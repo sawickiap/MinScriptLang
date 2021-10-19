@@ -149,6 +149,12 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "10\n8\n6\n4\n2\n");
     }
+    SECTION("For loop with empty statement")
+    {
+        const char* code = "for(a=0; a<10; ++a) ; print('a');";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "a\n");
+    }
     SECTION("for loop with empty sections")
     {
         const char* code = "a=10; for(; a;) { print(a); a=a-2; }";
@@ -824,7 +830,7 @@ TEST_CASE("Object")
     SECTION("Count and setting unsetting members")
     {
         const char* code =
-            "obj={'a':1, 'b':2}; obj.c=3; obj.b=null; \n"
+            "obj={'a':1, 'b':2, 'd':null}; obj.c=3; obj.b=null; \n"
             "print(obj.Count); \n";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "2\n");
@@ -880,5 +886,16 @@ TEST_CASE("Object")
             "obj.f1(); \n";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "2\n2\n2\n2\n");
+    }
+    SECTION("Invalid use of this in global scope")
+    {
+        const char* code = "print(this.x);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Invalid use of this in local scope")
+    {
+        const char* code = "function f() { print(this.x); } \n"
+            "f();";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
 }
