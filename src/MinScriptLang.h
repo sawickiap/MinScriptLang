@@ -509,10 +509,10 @@ public:
     };
 
     ExecuteContext(EnvironmentPimpl& env, Object& globalCtx) : Env{env}, GlobalContext{globalCtx} { }
-    bool IsGlobal() const { return LocalContexts.empty(); }
-    Object* GetLocalContext() { assert(!IsGlobal()); return LocalContexts.back(); }
-    const shared_ptr<Object>& GetThis() { assert(!IsGlobal()); return This.back(); }
-    Object& GetInnermostContext() const { return !IsGlobal() ? *LocalContexts.back() : GlobalContext; }
+    bool IsLocal() const { return !LocalContexts.empty(); }
+    Object* GetLocalContext() { assert(IsLocal()); return LocalContexts.back(); }
+    const shared_ptr<Object>& GetThis() { assert(IsLocal()); return This.back(); }
+    Object& GetInnermostContext() const { return IsLocal() ? *LocalContexts.back() : GlobalContext; }
 
 private:
     vector<Object*> LocalContexts;
@@ -1581,9 +1581,9 @@ void Identifier::DebugPrint(uint32_t indentLevel, const char* prefix) const
 
 Value Identifier::Evaluate(ExecuteContext& ctx) const
 {
-    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || !ctx.IsGlobal(), GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
+    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || ctx.IsLocal(), GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
 
-    if(!ctx.IsGlobal())
+    if(ctx.IsLocal())
     {
         // Local variable
         if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local))
@@ -1623,11 +1623,11 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
 
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
 {
-    const bool isGlobal = ctx.IsGlobal();
+    const bool isLocal = ctx.IsLocal();
     EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Env, GetPlace(), ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT);
-    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || !isGlobal, GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
+    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || isLocal, GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
 
-    if(!isGlobal)
+    if(isLocal)
     {
         // Local variable
         if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && ctx.GetLocalContext()->HasKey(S))
@@ -1643,7 +1643,7 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
         return LValue{ctx.GlobalContext, S};
 
     // Not found: return reference to smallest scope.
-    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && !isGlobal)
+    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && isLocal)
         return LValue{*ctx.GetLocalContext(), S.c_str()};
     return LValue{ctx.GlobalContext, S};
 }
@@ -1655,7 +1655,7 @@ void ThisExpression::DebugPrint(uint32_t indentLevel, const char* prefix) const
 
 Value ThisExpression::Evaluate(ExecuteContext& ctx) const
 {
-    EXECUTION_CHECK(!ctx.IsGlobal() && ctx.GetThis(), ERROR_MESSAGE_NO_THIS);
+    EXECUTION_CHECK(ctx.IsLocal() && ctx.GetThis(), ERROR_MESSAGE_NO_THIS);
     return Value{shared_ptr<Object>{ctx.GetThis()}};
 }
 
