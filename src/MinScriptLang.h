@@ -1585,8 +1585,14 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
                 return *val;
         // This
         if(Scope == IdentifierScope::None && ctx.This.back())
+        {
             if(Value* val = ctx.This.back()->TryGetValue(S); val)
-                return *val;
+            {
+                Value valWithThis = *val;
+                valWithThis.m_ThisObject = ctx.This.back();
+                return valWithThis;
+            }
+        }
     }
     
     // Global variable

@@ -873,4 +873,12 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "3\n4\n");
     }
+    SECTION("Calling a method from another method")
+    {
+        const char* code =
+            "obj={ 'x': 2, 'f1': function() { f2(); this.f2(); }, 'f2': function() { print(x); print(this.x); } }; \n"
+            "obj.f1(); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "2\n2\n2\n2\n");
+    }
 }
