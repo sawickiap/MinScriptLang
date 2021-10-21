@@ -712,6 +712,36 @@ TEST_CASE("Functions")
             "for(i=0; i<10; ++i) { Bad(); }";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
+    SECTION("Wrong number of parameters expected 0 passed 1")
+    {
+        const char* code = "function f() { print('a'); } f(2);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Wrong number of parameters expected 1 passed 0")
+    {
+        const char* code = "function f(a) { print(a); } f();";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Wrong number of parameters expected 1 passed 3")
+    {
+        const char* code = "function f(a) { print(a); } f(1, 2, 3);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Wrong number of parameters expected 4 passed 0")
+    {
+        const char* code = "function f(a, b, c, d) { print(a, b, c, d); } f();";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Wrong number of parameters expected 4 passed 2")
+    {
+        const char* code = "function f(a, b, c, d) { print(a, b, c, d); } f(1, 2);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Wrong number of parameters expected 4 passed 5")
+    {
+        const char* code = "function f(a, b, c, d) { print(a, b, c, d); } f('1', '2', '3' ,'4', '5');";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
 }
 
 TEST_CASE("Object")
