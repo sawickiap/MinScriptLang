@@ -1829,15 +1829,17 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     Value lhs = Operands[0]->Evaluate(ctx);
 
     // Logical operators with short circuit for right hand side operand.
-    if(Type == BinaryOperatorType::LogicalAnd || Type == BinaryOperatorType::LogicalOr)
+    if(Type == BinaryOperatorType::LogicalAnd)
     {
-        bool result = false;
-        switch(Type)
-        {
-        case BinaryOperatorType::LogicalAnd: result = lhs.IsTrue() ? Operands[1]->Evaluate(ctx).IsTrue() : false; break;
-        case BinaryOperatorType::LogicalOr:  result = lhs.IsTrue() ? true : Operands[1]->Evaluate(ctx).IsTrue(); break;
-        }
-        return Value{result ? 1.0 : 0.0};
+        if(!lhs.IsTrue())
+            return lhs;
+        return Operands[1]->Evaluate(ctx);
+    }
+    if(Type == BinaryOperatorType::LogicalOr)
+    {
+        if(lhs.IsTrue())
+            return lhs;
+        return Operands[1]->Evaluate(ctx);
     }
 
     // Remaining operators use both operands as r-values.

@@ -213,6 +213,15 @@ TEST_CASE("Basic")
         REQUIRE(env.GetOutput() == "101\n102\n201\n"
             "301\n302\n401\n");
     }
+    SECTION("Logical operators returning value not bool")
+    {
+        const char* code = "five=5; six=6; zero=0; nth=null; \n"
+            "print(five && zero); print(zero && five); print(zero && zero); print(five && six); print(zero && nth); print(nth && zero); \n"
+            "print(five || zero); print(zero || five); print(zero || zero); print(five || six); print(zero || nth); print(nth || zero); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n0\n0\n6\n0\nnull\n"
+            "5\n5\n0\n5\nnull\n0\n");
+    }
     SECTION("Comma operator")
     {
         const char* code = "a=(1,2,4); print(a, 3, 5); print((a, 3, 5));";
