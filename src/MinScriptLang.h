@@ -164,6 +164,7 @@ static const char* const ERROR_MESSAGE_PARAMETER_NAMES_MUST_BE_UNIQUE = "Paramet
 static const char* const ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT = "Cannot change environment.";
 static const char* const ERROR_MESSAGE_NO_LOCAL_SCOPE = "There is no local scope here.";
 static const char* const ERROR_MESSAGE_NO_THIS = "There is no 'this' here.";
+static const char* const ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT = "Repeating key in object.";
 
 struct Constant
 {
@@ -2564,7 +2565,7 @@ unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
             string memberName;
             unique_ptr<AST::Expression> memberValue;
             MUST_PARSE( memberValue = TryParseObjectMember(memberName), ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER );
-            objExpr->Items.insert(std::make_pair(std::move(memberName), std::move(memberValue)));
+            MUST_PARSE( objExpr->Items.insert(std::make_pair(std::move(memberName), std::move(memberValue))).second, ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT );
             if(!TryParseSymbol(Symbol::CurlyBracketClose))
             {
                 while(TryParseSymbol(Symbol::Comma))
@@ -2572,7 +2573,7 @@ unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
                     if(TryParseSymbol(Symbol::CurlyBracketClose))
                         return objExpr;
                     MUST_PARSE( memberValue = TryParseObjectMember(memberName), ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER );
-                    objExpr->Items.insert(std::make_pair(std::move(memberName), std::move(memberValue)));
+                    MUST_PARSE( objExpr->Items.insert(std::make_pair(std::move(memberName), std::move(memberValue))).second, ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT );
                 }
                 MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
             }

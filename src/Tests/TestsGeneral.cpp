@@ -865,6 +865,11 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "2\n");
     }
+    SECTION("Object with repeating keys")
+    {
+        const char* code = "obj={'a':1, 'b':2, 'a':3};";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+    }
     SECTION("Range-based for loop for objects")
     {
         const char* code =
