@@ -119,6 +119,10 @@ namespace MinScriptLang {
 ////////////////////////////////////////////////////////////////////////////////
 // Basic facilities
 
+// I would like it to be higher, but above that, even at 128, it crashes with
+// native "stack overflow" in Debug configuration.
+static const size_t LOCAL_SCOPE_STACK_MAX_SIZE = 100;
+
 static const char* const ERROR_MESSAGE_PARSING_ERROR = "Parsing error.";
 static const char* const ERROR_MESSAGE_INVALID_NUMBER = "Invalid number.";
 static const char* const ERROR_MESSAGE_INVALID_STRING = "Invalid string.";
@@ -165,6 +169,7 @@ static const char* const ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT = "Cannot chang
 static const char* const ERROR_MESSAGE_NO_LOCAL_SCOPE = "There is no local scope here.";
 static const char* const ERROR_MESSAGE_NO_THIS = "There is no 'this' here.";
 static const char* const ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT = "Repeating key in object.";
+static const char* const ERROR_MESSAGE_STACK_OVERFLOW = "Stack overflow.";
 
 struct Constant
 {
@@ -494,10 +499,12 @@ public:
 
     struct LocalScopePush
     {
-        LocalScopePush(ExecuteContext& ctx, Object* localObj, shared_ptr<Object>&& thisObj) :
+        LocalScopePush(ExecuteContext& ctx, Object* localScope, shared_ptr<Object>&& thisObj, const PlaceInCode& place) :
             m_Ctx{ctx}
         {
-            ctx.LocalScopes.push_back(localObj);
+            if(ctx.LocalScopes.size() == LOCAL_SCOPE_STACK_MAX_SIZE)
+                throw ExecutionError{place, ERROR_MESSAGE_STACK_OVERFLOW};
+            ctx.LocalScopes.push_back(localScope);
             ctx.Thises.push_back(std::move(thisObj));
         }
         ~LocalScopePush()
@@ -2162,7 +2169,7 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
         // Setup parameters
         for(size_t argIndex = 0; argIndex != argCount; ++argIndex)
             localScope.GetOrCreateValue(funcDef->Parameters[argIndex]) = std::move(arguments[argIndex]);
-        ExecuteContext::LocalScopePush localContextPush{ctx, &localScope, shared_ptr<Object>{callee.m_ThisObject}};
+        ExecuteContext::LocalScopePush localContextPush{ctx, &localScope, shared_ptr<Object>{callee.m_ThisObject}, GetPlace()};
         try
         {
             callee.GetFunction()->Body.Execute(ctx);

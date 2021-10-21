@@ -934,3 +934,13 @@ TEST_CASE("Object")
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
 }
+TEST_CASE("Extra slow")
+{
+    Environment env;
+    SECTION("Stack overflow")
+    {
+        const char* code = "function fib(x) { return fib(x+1) + fib(x+2); } \n"
+            "fib(1);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+}
