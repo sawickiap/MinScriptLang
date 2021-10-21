@@ -1188,12 +1188,11 @@ bool Object::Remove(const string& key)
 ////////////////////////////////////////////////////////////////////////////////
 // Built-in functions
 
-static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t argCount)
+static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     string s;
-    for(size_t i = 0; i < argCount; ++i)
+    for(const auto& val : args)
     {
-        const Value& val = args[i];
         switch(val.GetType())
         {
         case Value::Type::Null:
@@ -1222,13 +1221,13 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, 
     return Value{};
 }
 
-static Value BuiltInMember_Object_Count(AST::ExecuteContext& ctx, Value&& objVal)
+static Value BuiltInMember_Object_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
     assert(objVal.GetType() == Value::Type::Object && objVal.GetObject());
     return Value{(double)objVal.GetObject()->GetCount()};
 }
 
-static Value BuiltInMember_String_Count(AST::ExecuteContext& ctx, Value&& objVal)
+static Value BuiltInMember_String_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
     assert(objVal.GetType() == Value::Type::String);
     return Value{(double)objVal.GetString().length()};
@@ -1754,13 +1753,13 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
             return resultVal;
         }
         if(MemberName == "Count")
-            return BuiltInMember_Object_Count(ctx, std::move(objVal));
+            return BuiltInMember_Object_Count(ctx, GetPlace(), std::move(objVal));
         return Value{};
     }
     if(objVal.GetType() == Value::Type::String)
     {
         if(MemberName == "Count")
-            return BuiltInMember_String_Count(ctx, std::move(objVal));
+            return BuiltInMember_String_Count(ctx, GetPlace(), std::move(objVal));
         EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_MEMBER );
     }
     EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
@@ -2168,7 +2167,7 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
         switch(callee.GetSystemFunction())
         {
         case SystemFunction::Print:
-            return BuiltInFunction_Print(ctx, arguments.data(), arguments.size());
+            return BuiltInFunction_Print(ctx, GetPlace(), std::move(arguments));
         default:
             assert(0); return Value{};
         }
