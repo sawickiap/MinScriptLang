@@ -170,6 +170,7 @@ static const char* const ERROR_MESSAGE_NO_LOCAL_SCOPE = "There is no local scope
 static const char* const ERROR_MESSAGE_NO_THIS = "There is no 'this' here.";
 static const char* const ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT = "Repeating key in object.";
 static const char* const ERROR_MESSAGE_STACK_OVERFLOW = "Stack overflow.";
+static const char* const ERROR_MESSAGE_BASE_MUST_BE_OBJECT = "Base must be object.";
 
 struct Constant
 {
@@ -405,8 +406,8 @@ public:
     const string& GetString() const { assert(m_Type == Type::String); return m_String; }
     const AST::FunctionDefinition* GetFunction() const { assert(m_Type == Type::Function && m_Function); return m_Function; }
     SystemFunction GetSystemFunction() const { assert(m_Type == Type::SystemFunction); return m_SystemFunction; }
-    Object* GetObject() const { assert(m_Type == Type::Object); return m_Object.get(); }
-    shared_ptr<Object> GetObjectPtr() const { assert(m_Type == Type::Object); return m_Object; }
+    Object* GetObject() const { assert(m_Type == Type::Object && m_Object); return m_Object.get(); }
+    shared_ptr<Object> GetObjectPtr() const { assert(m_Type == Type::Object && m_Object); return m_Object; }
 
     bool IsEqual(const Value& rhs) const
     {
@@ -771,6 +772,7 @@ struct FunctionDefinition : public Expression
 
 struct ObjectExpression : public Expression
 {
+    unique_ptr<Expression> BaseExpression;
     using ItemMap = std::map<string, unique_ptr<Expression>>;
     ItemMap Items;
     ObjectExpression(const PlaceInCode& place) : Expression{place} { }
@@ -1190,6 +1192,14 @@ bool Object::Remove(const string& key)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Built-in functions
+
+static shared_ptr<Object> CopyObject(const Object& src)
+{
+    auto dst = std::make_shared<Object>();
+    for(const auto& item : src.m_Items)
+        dst->m_Items.insert(item);
+    return dst;
+}
 
 static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
@@ -2112,7 +2122,16 @@ void ObjectExpression::DebugPrint(uint32_t indentLevel, const char* prefix) cons
 
 Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
 {
-    auto obj = make_shared<Object>();
+    shared_ptr<Object> obj;
+    if(BaseExpression)
+    {
+        Value baseObj = BaseExpression->Evaluate(ctx);
+        if(baseObj.GetType() != Value::Type::Object)
+            throw ExecutionError{GetPlace(), ERROR_MESSAGE_BASE_MUST_BE_OBJECT};
+        obj = CopyObject(*baseObj.GetObject());
+    }
+    else
+        obj = make_shared<Object>();
     for(const auto& [name, valueExpr] : Items)
     {
         Value val = valueExpr->Evaluate(ctx);
@@ -2567,13 +2586,15 @@ unique_ptr<AST::Expression> Parser::TryParseClassSyntacticSugar()
         MUST_PARSE( !className.empty(), ERROR_MESSAGE_EXPECTED_IDENTIFIER );
         auto assignmentOp = std::make_unique<AST::BinaryOperator>(beginPlace, AST::BinaryOperatorType::Assignment);
         assignmentOp->Operands[0] = std::make_unique<AST::Identifier>(beginPlace, AST::IdentifierScope::None, std::move(className));
+        unique_ptr<AST::Expression> baseExpr;
         if(TryParseSymbol(Symbol::Colon))
         {
-            auto baseExpr = TryParseExpr16();
+            baseExpr = TryParseExpr16();
             MUST_PARSE( baseExpr, ERROR_MESSAGE_EXPECTED_EXPRESSION );
-            assert(0 && "#TODO implement inheritance");
         }
-        assignmentOp->Operands[1] = TryParseObject();
+        auto objExpr = TryParseObject();
+        objExpr->BaseExpression = std::move(baseExpr);
+        assignmentOp->Operands[1] = std::move(objExpr);
         MUST_PARSE( assignmentOp->Operands[1], ERROR_MESSAGE_EXPECTED_OBJECT );
         return assignmentOp;
     }

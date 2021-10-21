@@ -973,6 +973,21 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "2\n");
     }
+    SECTION("Class inheritance syntax")
+    {
+        const char* code = "class A { \n"
+            "   var: 1, \n"
+            "   '': function(x) { var=x; }, \n"
+            "   function print() { global.print(this.var); } \n"
+            "} \n"
+            "class B : A { \n"
+            "   '': function(x) { var=x+1; } \n"
+            "} \n"
+            " \n"
+            "B(2); B.print(); A.print(); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "3\n1\n");
+    }
 }
 TEST_CASE("Extra slow")
 {
