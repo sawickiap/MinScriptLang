@@ -1589,7 +1589,7 @@ void Identifier::DebugPrint(uint32_t indentLevel, const char* prefix) const
 
 Value Identifier::Evaluate(ExecuteContext& ctx) const
 {
-    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || ctx.IsLocal(), GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
+    EXECUTION_CHECK(Scope != IdentifierScope::Local || ctx.IsLocal(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
 
     if(ctx.IsLocal())
     {
@@ -1632,8 +1632,8 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
 {
     const bool isLocal = ctx.IsLocal();
-    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Env, GetPlace(), ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT);
-    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || isLocal, GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
+    EXECUTION_CHECK(Scope != IdentifierScope::Env, ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT);
+    EXECUTION_CHECK(Scope != IdentifierScope::Local || isLocal, ERROR_MESSAGE_NO_LOCAL_SCOPE);
 
     if(isLocal)
     {
@@ -1795,7 +1795,7 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
 LValue MemberAccessOperator::GetLValue(ExecuteContext& ctx) const
 {
     Value objVal = Operand->Evaluate(ctx);
-    EXECUTION_CHECK_PLACE(objVal.GetType() == Value::Type::Object, GetPlace(), ERROR_MESSAGE_EXPECTED_OBJECT);
+    EXECUTION_CHECK(objVal.GetType() == Value::Type::Object, ERROR_MESSAGE_EXPECTED_OBJECT);
     return LValue{*objVal.GetObject(), MemberName};
 }
 
