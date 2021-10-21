@@ -763,8 +763,8 @@ struct FunctionDefinition : public Expression
 
 struct ObjectExpression : public Expression
 {
-    vector<string> ItemNames;
-    std::vector<unique_ptr<Expression>> ItemValues;
+    using ItemMap = std::map<string, unique_ptr<Expression>>;
+    ItemMap Items;
     ObjectExpression(const PlaceInCode& place) : Expression{place} { }
     virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
@@ -2120,20 +2120,18 @@ void ObjectExpression::DebugPrint(uint32_t indentLevel, const char* prefix) cons
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Object\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
-    const size_t count = ItemNames.size();
-    for(size_t i = 0; i < count; ++i)
-        ItemValues[0]->DebugPrint(indentLevel, ItemNames[i].c_str());
+    for(const auto& [name, value] : Items)
+        value->DebugPrint(indentLevel, name.c_str());
 }
 
 Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
 {
     auto obj = make_shared<Object>();
-    const size_t count = ItemNames.size();
-    for(size_t i = 0; i < count; ++i)
+    for(const auto& [name, valueExpr] : Items)
     {
-        Value val = ItemValues[i]->Evaluate(ctx);
+        Value val = valueExpr->Evaluate(ctx);
         if(val.GetType() != Value::Type::Null)
-            obj->GetOrCreateValue(ItemNames[i]) = std::move(val);
+            obj->GetOrCreateValue(name) = std::move(val);
     }
     return Value{std::move(obj)};
 }
@@ -2566,8 +2564,7 @@ unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
             string memberName;
             unique_ptr<AST::Expression> memberValue;
             MUST_PARSE( memberValue = TryParseObjectMember(memberName), ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER );
-            objExpr->ItemNames.push_back(std::move(memberName));
-            objExpr->ItemValues.push_back(std::move(memberValue));
+            objExpr->Items.insert(std::make_pair(std::move(memberName), std::move(memberValue)));
             if(!TryParseSymbol(Symbol::CurlyBracketClose))
             {
                 while(TryParseSymbol(Symbol::Comma))
@@ -2575,8 +2572,7 @@ unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
                     if(TryParseSymbol(Symbol::CurlyBracketClose))
                         return objExpr;
                     MUST_PARSE( memberValue = TryParseObjectMember(memberName), ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER );
-                    objExpr->ItemNames.push_back(std::move(memberName));
-                    objExpr->ItemValues.push_back(std::move(memberValue));
+                    objExpr->Items.insert(std::make_pair(std::move(memberName), std::move(memberValue)));
                 }
                 MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
             }
