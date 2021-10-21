@@ -2527,13 +2527,17 @@ std::pair<string, unique_ptr<AST::FunctionDefinition>> Parser::TryParseFunctionS
 
 unique_ptr<AST::Expression> Parser::TryParseObjectMember(string& outMemberName)
 {
-    if(m_TokenIndex + 3 < m_Tokens.size() &&
-        (m_Tokens[m_TokenIndex].Symbol == Symbol::String || m_Tokens[m_TokenIndex].Symbol == Symbol::Identifier) &&
-        m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Colon)
+    if(PeekSymbols({Symbol::String, Symbol::Colon}) ||
+        PeekSymbols({Symbol::Identifier, Symbol::Colon}))
     {
         outMemberName = m_Tokens[m_TokenIndex].String;
         m_TokenIndex += 2;
         return TryParseExpr16();
+    }
+    if(auto fnSyntacticSugar = TryParseFunctionSyntacticSugar(); fnSyntacticSugar.second)
+    {
+        outMemberName = std::move(fnSyntacticSugar.first);
+        return std::move(fnSyntacticSugar.second);
     }
     return unique_ptr<AST::Expression>{};
 }

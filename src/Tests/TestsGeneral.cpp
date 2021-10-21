@@ -948,6 +948,13 @@ TEST_CASE("Object")
             "f();";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
+    SECTION("Function syntactic sugar in object definition")
+    {
+        const char* code = "obj={ var: 2, function fn() { print(var); } }; \n"
+            "obj.fn(); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "2\n");
+    }
 }
 TEST_CASE("Extra slow")
 {
