@@ -165,7 +165,6 @@ static const char* const ERROR_MESSAGE_RETURN_WITHOUT_FUNCTION = "Return without
 static const char* const ERROR_MESSAGE_INCOMPATIBLE_TYPES = "Incompatible types.";
 static const char* const ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS = "Index out of bounds.";
 static const char* const ERROR_MESSAGE_PARAMETER_NAMES_MUST_BE_UNIQUE = "Parameter naems must be unique.";
-static const char* const ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT = "Cannot change environment.";
 static const char* const ERROR_MESSAGE_NO_LOCAL_SCOPE = "There is no local scope here.";
 static const char* const ERROR_MESSAGE_NO_THIS = "There is no 'this' here.";
 static const char* const ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT = "Repeating key in object.";
@@ -245,7 +244,7 @@ enum class Symbol
     // Keywords
     Null, False, True, If, Else, While, Do, For, Break, Continue,
     Switch, Case, Default, Function, Return,
-    Local, This, Global, Env, Count
+    Local, This, Global, Count
 };
 static const char* SYMBOL_STR[] = {
     // Token types
@@ -257,7 +256,7 @@ static const char* SYMBOL_STR[] = {
     // Keywords
     "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue",
     "switch", "case", "default", "function", "return",
-    "local", "this", "global", "env",
+    "local", "this", "global",
 };
 
 struct Token
@@ -657,7 +656,7 @@ struct ConstantValue : ConstantExpression
     virtual Value Evaluate(ExecuteContext& ctx) const { return Val; }
 };
 
-enum class IdentifierScope { None, Local, Global, Env, Count };
+enum class IdentifierScope { None, Local, Global, Count };
 struct Identifier : ConstantExpression
 {
     IdentifierScope Scope = IdentifierScope::Count;
@@ -1562,7 +1561,7 @@ void ConstantValue::DebugPrint(uint32_t indentLevel, const char* prefix) const
 
 void Identifier::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
-    static const char* PREFIX[] = { "", "local.", "global.", "env." };
+    static const char* PREFIX[] = { "", "local.", "global." };
     static_assert(_countof(PREFIX) == (size_t)IdentifierScope::Count);
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier: %s%s\n", DEBUG_PRINT_ARGS_BEG, PREFIX[(size_t)Scope], S.c_str());
 }
@@ -1589,17 +1588,13 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
         }
     }
     
-    // Global variable
     if(Scope == IdentifierScope::None || Scope == IdentifierScope::Global)
     {
+        // Global variable
         Value* val = ctx.GlobalScope.TryGetValue(S);
         if(val)
             return *val;
-    }
-
-    // System function
-    if(Scope == IdentifierScope::None || Scope == IdentifierScope::Env)
-    {
+        // System function
         for(size_t i = 0, count = (size_t)SystemFunction::Count; i < count; ++i)
             if(S == SYSTEM_FUNCTION_NAMES[i])
                 return Value{(SystemFunction)i};
@@ -1612,7 +1607,6 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
 {
     const bool isLocal = ctx.IsLocal();
-    EXECUTION_CHECK(Scope != IdentifierScope::Env, ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT);
     EXECUTION_CHECK(Scope != IdentifierScope::Local || isLocal, ERROR_MESSAGE_NO_LOCAL_SCOPE);
 
     if(isLocal)
@@ -2484,7 +2478,7 @@ unique_ptr<AST::ConstantValue> Parser::TryParseConstantValue()
 unique_ptr<AST::Identifier> Parser::TryParseIdentifierValue()
 {
     const Token& t = m_Tokens[m_TokenIndex];
-    if(t.Symbol == Symbol::Local || t.Symbol == Symbol::Global || t.Symbol == Symbol::Env)
+    if(t.Symbol == Symbol::Local || t.Symbol == Symbol::Global)
     {
         ++m_TokenIndex;
         MUST_PARSE( TryParseSymbol(Symbol::Dot), ERROR_MESSAGE_EXPECTED_SYMBOL_DOT );
@@ -2496,7 +2490,6 @@ unique_ptr<AST::Identifier> Parser::TryParseIdentifierValue()
         {
         case Symbol::Local: identifierScope = AST::IdentifierScope::Local; break;
         case Symbol::Global: identifierScope = AST::IdentifierScope::Global; break;
-        case Symbol::Env: identifierScope = AST::IdentifierScope::Env; break;
         }
         return make_unique<AST::Identifier>(t.Place, identifierScope, string(tIdentifier.String));
     }
