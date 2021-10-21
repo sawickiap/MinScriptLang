@@ -955,6 +955,13 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "2\n");
     }
+    SECTION("Calling object default function")
+    {
+        const char* code = "obj={ var: 2, function fn() { print('fn'); }, '':function(a) { print('Default', a); } }; \n"
+            "obj(3); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "Default\n3\n");
+    }
 }
 TEST_CASE("Extra slow")
 {

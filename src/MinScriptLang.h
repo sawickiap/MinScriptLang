@@ -2131,11 +2131,19 @@ Value MultiOperator::Evaluate(ExecuteContext& ctx) const
 
 Value MultiOperator::Call(ExecuteContext& ctx) const
 {
-    const Value callee = Operands[0]->Evaluate(ctx);
+    Value callee = Operands[0]->Evaluate(ctx);
     const size_t argCount = Operands.size() - 1;
     vector<Value> arguments(argCount);
     for(size_t i = 0; i < argCount; ++i)
         arguments[i] = Operands[i + 1]->Evaluate(ctx);
+
+    // Calling an object: Call its function under '' key.
+    if(callee.GetType() == Value::Type::Object)
+    {
+        Object *calleeObj = callee.GetObject();
+        if(Value* defaultVal = calleeObj->TryGetValue(string{}); defaultVal && defaultVal->GetType() == Value::Type::Function)
+            callee = *defaultVal;
+    }
 
     if(callee.GetType() == Value::Type::Function)
     {
