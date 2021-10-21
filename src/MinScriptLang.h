@@ -357,7 +357,7 @@ private:
 class Tokenizer
 {
 public:
-    Tokenizer(const char* code, size_t codeLen);
+    Tokenizer(const char* code, size_t codeLen) : m_Code{code, codeLen} { }
     void GetNextToken(Token& out);
 
 private:
@@ -461,8 +461,8 @@ public:
     MapType m_Items;
 
     size_t GetCount() const { return m_Items.size(); }
-    bool HasKey(const string& key) const;
-    Value& GetOrCreateValue(const string& key); // Creates new null value if doesn't exist.
+    bool HasKey(const string& key) const { return m_Items.find(key) != m_Items.end(); }
+    Value& GetOrCreateValue(const string& key) { return m_Items[key]; }; // Creates new null value if doesn't exist.
     Value* TryGetValue(const string& key); // Returns null if doesn't exist.
     bool Remove(const string& key); // Returns true if has been found and removed.
 };
@@ -639,7 +639,7 @@ struct Expression : Statement
 {
     explicit Expression(const PlaceInCode& place) : Statement{place} { }
     virtual Value Evaluate(ExecuteContext& ctx) const = 0;
-    virtual LValue GetLValue(ExecuteContext& ctx) const;
+    virtual LValue GetLValue(ExecuteContext& ctx) const { EXECUTION_CHECK( false, ERROR_MESSAGE_EXPECTED_LVALUE ); }
     virtual void Execute(ExecuteContext& ctx) const { Evaluate(ctx); }
 };
 
@@ -791,7 +791,7 @@ static inline void CheckNumberOperand(const AST::Expression* operand, const Valu
 class Parser
 {
 public:
-    Parser(Tokenizer& tokenizer);
+    Parser(Tokenizer& tokenizer) : m_Tokenizer(tokenizer) { }
     void ParseScript(AST::Script& outScript);
 
 private:
@@ -835,8 +835,8 @@ private:
 class EnvironmentPimpl
 {
 public:
-    EnvironmentPimpl();
-    ~EnvironmentPimpl();
+    EnvironmentPimpl() : m_Script{PlaceInCode{0, 1, 1}} { }
+    ~EnvironmentPimpl() = default;
     void Execute(const char* code, size_t codeLen);
     const string& GetOutput() const { return m_Output; }
     void Print(const char* s, size_t sLen) { m_Output.append(s, s + sLen); }
@@ -860,11 +860,6 @@ const char* Error::what() const
 
 ////////////////////////////////////////////////////////////////////////////////
 // class Tokenizer implementation
-
-Tokenizer::Tokenizer(const char* code, size_t codeLen) :
-    m_Code{code, codeLen}
-{
-}
 
 void Tokenizer::GetNextToken(Token& out)
 {
@@ -1171,16 +1166,6 @@ bool Tokenizer::ParseString(Token& out)
 
 ////////////////////////////////////////////////////////////////////////////////
 // class Object implementation
-
-bool Object::HasKey(const string& key) const
-{
-    return m_Items.find(key) != m_Items.end();
-}
-
-Value& Object::GetOrCreateValue(const string& key)
-{
-    return m_Items[key];
-}
 
 Value* Object::TryGetValue(const string& key)
 {
@@ -1559,11 +1544,6 @@ void Script::Execute(ExecuteContext& ctx) const
     {
         throw ExecutionError{GetPlace(), ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP};
     }
-}
-
-LValue Expression::GetLValue(ExecuteContext& ctx) const
-{
-    EXECUTION_CHECK( false, ERROR_MESSAGE_EXPECTED_LVALUE );
 }
 
 void ConstantValue::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -2209,11 +2189,6 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
 // class Parser implementation
 
 #define MUST_PARSE(result, errorMessage)   do { if(!(result)) throw ParsingError(GetCurrentTokenPlace(), (errorMessage)); } while(false)
-
-Parser::Parser(Tokenizer& tokenizer) :
-    m_Tokenizer(tokenizer)
-{
-}
 
 void Parser::ParseScript(AST::Script& outScript)
 {
@@ -2979,15 +2954,6 @@ string Parser::TryParseIdentifier()
 
 ////////////////////////////////////////////////////////////////////////////////
 // class EnvironmentPimpl implementation
-
-EnvironmentPimpl::EnvironmentPimpl() :
-    m_Script{PlaceInCode{0, 1, 1}}
-{
-}
-
-EnvironmentPimpl::~EnvironmentPimpl()
-{
-}
 
 void EnvironmentPimpl::Execute(const char* code, size_t codeLen)
 {
