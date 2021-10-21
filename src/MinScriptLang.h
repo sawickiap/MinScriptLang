@@ -489,34 +489,34 @@ struct ExecuteContext
 {
 public:
     EnvironmentPimpl& Env;
-    Object& GlobalContext;
+    Object& GlobalScope;
 
-    struct LocalContextPush
+    struct LocalScopePush
     {
-        LocalContextPush(ExecuteContext& ctx, Object* localObj, shared_ptr<Object>&& thisObj) :
+        LocalScopePush(ExecuteContext& ctx, Object* localObj, shared_ptr<Object>&& thisObj) :
             m_Ctx{ctx}
         {
-            ctx.LocalContexts.push_back(localObj);
-            ctx.This.push_back(std::move(thisObj));
+            ctx.LocalScopes.push_back(localObj);
+            ctx.Thises.push_back(std::move(thisObj));
         }
-        ~LocalContextPush()
+        ~LocalScopePush()
         {
-            m_Ctx.This.pop_back();
-            m_Ctx.LocalContexts.pop_back();
+            m_Ctx.Thises.pop_back();
+            m_Ctx.LocalScopes.pop_back();
         }
     private:
         ExecuteContext& m_Ctx;
     };
 
-    ExecuteContext(EnvironmentPimpl& env, Object& globalCtx) : Env{env}, GlobalContext{globalCtx} { }
-    bool IsLocal() const { return !LocalContexts.empty(); }
-    Object* GetLocalContext() { assert(IsLocal()); return LocalContexts.back(); }
-    const shared_ptr<Object>& GetThis() { assert(IsLocal()); return This.back(); }
-    Object& GetInnermostContext() const { return IsLocal() ? *LocalContexts.back() : GlobalContext; }
+    ExecuteContext(EnvironmentPimpl& env, Object& globalScope) : Env{env}, GlobalScope{globalScope} { }
+    bool IsLocal() const { return !LocalScopes.empty(); }
+    Object* GetCurrentLocalScope() { assert(IsLocal()); return LocalScopes.back(); }
+    const shared_ptr<Object>& GetThis() { assert(IsLocal()); return Thises.back(); }
+    Object& GetInnermostScope() const { return IsLocal() ? *LocalScopes.back() : GlobalScope; }
 
 private:
-    vector<Object*> LocalContexts;
-    vector<shared_ptr<Object>> This;
+    vector<Object*> LocalScopes;
+    vector<shared_ptr<Object>> Thises;
 };
 
 struct Statement
@@ -836,7 +836,7 @@ public:
 
 private:
     AST::Script m_Script;
-    Object m_GlobalContext;
+    Object m_GlobalScope;
     string m_Output;
 };
 
@@ -1403,7 +1403,7 @@ void RangeBasedForLoop::DebugPrint(uint32_t indentLevel, const char* prefix) con
 void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
 {
     const Value rangeVal = RangeExpression->Evaluate(ctx);
-    Object& innermostCtxObj = ctx.GetInnermostContext();
+    Object& innermostCtxObj = ctx.GetInnermostScope();
     const bool useKey = !KeyVarName.empty();
 
     if(rangeVal.GetType() == Value::Type::String)
@@ -1587,7 +1587,7 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
     {
         // Local variable
         if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local))
-            if(Value* val = ctx.GetLocalContext()->TryGetValue(S); val)
+            if(Value* val = ctx.GetCurrentLocalScope()->TryGetValue(S); val)
                 return *val;
         // This
         if(Scope == IdentifierScope::None && ctx.GetThis())
@@ -1604,7 +1604,7 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
     // Global variable
     if(Scope == IdentifierScope::None || Scope == IdentifierScope::Global)
     {
-        Value* val = ctx.GlobalContext.TryGetValue(S);
+        Value* val = ctx.GlobalScope.TryGetValue(S);
         if(val)
             return *val;
     }
@@ -1630,8 +1630,8 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
     if(isLocal)
     {
         // Local variable
-        if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && ctx.GetLocalContext()->HasKey(S))
-            return LValue{*ctx.GetLocalContext(), S};
+        if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && ctx.GetCurrentLocalScope()->HasKey(S))
+            return LValue{*ctx.GetCurrentLocalScope(), S};
         // This
         if(Scope == IdentifierScope::None)
             if(Object* thisObj = ctx.GetThis().get(); thisObj && thisObj->HasKey(S))
@@ -1639,13 +1639,13 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
     }    
     
     // Global variable
-    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Global) && ctx.GlobalContext.HasKey(S))
-        return LValue{ctx.GlobalContext, S};
+    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Global) && ctx.GlobalScope.HasKey(S))
+        return LValue{ctx.GlobalScope, S};
 
     // Not found: return reference to smallest scope.
     if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && isLocal)
-        return LValue{*ctx.GetLocalContext(), S};
-    return LValue{ctx.GlobalContext, S};
+        return LValue{*ctx.GetCurrentLocalScope(), S};
+    return LValue{ctx.GlobalScope, S};
 }
 
 void ThisExpression::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -2159,11 +2159,11 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
     {
         const AST::FunctionDefinition* const funcDef = callee.GetFunction();
         EXECUTION_CHECK( argCount == funcDef->Parameters.size(), ERROR_MESSAGE_INVALID_NUMBER_OF_ARGUMENTS );
-        Object localContext;
+        Object localScope;
         // Setup parameters
         for(size_t argIndex = 0; argIndex != argCount; ++argIndex)
-            localContext.GetOrCreateValue(funcDef->Parameters[argIndex]) = std::move(arguments[argIndex]);
-        ExecuteContext::LocalContextPush localContextPush{ctx, &localContext, shared_ptr<Object>{callee.m_ThisObject}};
+            localScope.GetOrCreateValue(funcDef->Parameters[argIndex]) = std::move(arguments[argIndex]);
+        ExecuteContext::LocalScopePush localContextPush{ctx, &localScope, shared_ptr<Object>{callee.m_ThisObject}};
         try
         {
             callee.GetFunction()->Body.Execute(ctx);
@@ -2996,7 +2996,7 @@ void EnvironmentPimpl::Execute(const char* code, size_t codeLen)
         parser.ParseScript(m_Script);
     }
 
-    AST::ExecuteContext executeContext{*this, m_GlobalContext};
+    AST::ExecuteContext executeContext{*this, m_GlobalScope};
     try
     {
         m_Script.Execute(executeContext);
