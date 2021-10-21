@@ -765,6 +765,12 @@ TEST_CASE("Object")
             "object\n3\n"
             "4\n5\n");
     }
+    SECTION("Object definition using identifiers")
+    {
+        const char* code = "obj={a:1, b:2, c:3}; print(obj.a, obj.b, obj.c);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n2\n3\n");
+    }
     SECTION("Compound string in object definition")
     {
         const char* code = "a={ 'AAA' /*comment*/ \"BBB\": 5 }; print(a.AAABBB);";

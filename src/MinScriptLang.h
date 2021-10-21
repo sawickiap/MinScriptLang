@@ -2548,7 +2548,7 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
 unique_ptr<AST::Expression> Parser::TryParseObjectMember(string& outMemberName)
 {
     if(m_TokenIndex + 3 < m_Tokens.size() &&
-        m_Tokens[m_TokenIndex].Symbol == Symbol::String &&
+        (m_Tokens[m_TokenIndex].Symbol == Symbol::String || m_Tokens[m_TokenIndex].Symbol == Symbol::Identifier) &&
         m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Colon)
     {
         outMemberName = m_Tokens[m_TokenIndex].String;
@@ -2560,10 +2560,9 @@ unique_ptr<AST::Expression> Parser::TryParseObjectMember(string& outMemberName)
 
 unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
 {
-    if((m_TokenIndex + 1 < m_Tokens.size() && // { }
-            m_Tokens[m_TokenIndex].Symbol == Symbol::CurlyBracketOpen &&
-            m_Tokens[m_TokenIndex + 1].Symbol == Symbol::CurlyBracketClose) ||
-        PeekSymbols({Symbol::CurlyBracketOpen, Symbol::String, Symbol::Colon})) // { 'key' :
+    if(PeekSymbols({Symbol::CurlyBracketOpen, Symbol::CurlyBracketClose}) || // { }
+        PeekSymbols({Symbol::CurlyBracketOpen, Symbol::String, Symbol::Colon}) || // { 'key' :
+        PeekSymbols({Symbol::CurlyBracketOpen, Symbol::Identifier, Symbol::Colon})) // { key :
     {
         auto objExpr = make_unique<AST::ObjectExpression>(GetCurrentTokenPlace());
         TryParseSymbol(Symbol::CurlyBracketOpen);
