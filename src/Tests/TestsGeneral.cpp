@@ -962,6 +962,17 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "Default\n3\n");
     }
+    SECTION("Class syntactic sugar")
+    {
+        const char* code = "class C { \n"
+            "   var: 1, \n"
+            "   '': function(x) { var=x; }, \n"
+            "   function print() { global.print(this.var); } \n"
+            "} \n"
+            "C(2); C.print(); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "2\n");
+    }
 }
 TEST_CASE("Extra slow")
 {

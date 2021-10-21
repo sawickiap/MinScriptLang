@@ -113,6 +113,7 @@ using std::vector;
 // F***k Windows.h macros!
 #undef min
 #undef max
+#undef GetObject
 
 namespace MinScriptLang {
 
@@ -244,7 +245,7 @@ enum class Symbol
     // Keywords
     Null, False, True, If, Else, While, Do, For, Break, Continue,
     Switch, Case, Default, Function, Return,
-    Local, This, Global, Count
+    Local, This, Global, Class, Count
 };
 static const char* SYMBOL_STR[] = {
     // Token types
@@ -256,7 +257,7 @@ static const char* SYMBOL_STR[] = {
     // Keywords
     "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue",
     "switch", "case", "default", "function", "return",
-    "local", "this", "global",
+    "local", "this", "global", "class"
 };
 
 struct Token
@@ -807,6 +808,7 @@ private:
     unique_ptr<AST::Identifier> TryParseIdentifierValue();
     unique_ptr<AST::ConstantExpression> TryParseConstantExpr();
     std::pair<string, unique_ptr<AST::FunctionDefinition>> TryParseFunctionSyntacticSugar();
+    unique_ptr<AST::Expression> TryParseClassSyntacticSugar();
     unique_ptr<AST::Expression> TryParseObjectMember(string& outMemberName);
     unique_ptr<AST::ObjectExpression> TryParseObject();
     unique_ptr<AST::Expression> TryParseExpr0();
@@ -2140,9 +2142,12 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
     // Calling an object: Call its function under '' key.
     if(callee.GetType() == Value::Type::Object)
     {
-        Object *calleeObj = callee.GetObject();
+        shared_ptr<Object> calleeObj = callee.GetObjectPtr();
         if(Value* defaultVal = calleeObj->TryGetValue(string{}); defaultVal && defaultVal->GetType() == Value::Type::Function)
+        {
             callee = *defaultVal;
+            callee.m_ThisObject = std::move(calleeObj);
+        }
     }
 
     if(callee.GetType() == Value::Type::Function)
@@ -2453,6 +2458,9 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
         assignmentOp->Operands[1] = std::move(fnSyntacticSugar.second);
         return assignmentOp;
     }
+
+    if(auto cls = TryParseClassSyntacticSugar(); cls)
+        return cls;
     
     return unique_ptr<AST::Statement>{};
 }
@@ -2548,6 +2556,28 @@ unique_ptr<AST::Expression> Parser::TryParseObjectMember(string& outMemberName)
         return std::move(fnSyntacticSugar.second);
     }
     return unique_ptr<AST::Expression>{};
+}
+
+unique_ptr<AST::Expression> Parser::TryParseClassSyntacticSugar()
+{
+    const PlaceInCode beginPlace = GetCurrentTokenPlace();
+    if(TryParseSymbol(Symbol::Class))
+    {
+        string className = TryParseIdentifier();
+        MUST_PARSE( !className.empty(), ERROR_MESSAGE_EXPECTED_IDENTIFIER );
+        auto assignmentOp = std::make_unique<AST::BinaryOperator>(beginPlace, AST::BinaryOperatorType::Assignment);
+        assignmentOp->Operands[0] = std::make_unique<AST::Identifier>(beginPlace, AST::IdentifierScope::None, std::move(className));
+        if(TryParseSymbol(Symbol::Colon))
+        {
+            auto baseExpr = TryParseExpr16();
+            MUST_PARSE( baseExpr, ERROR_MESSAGE_EXPECTED_EXPRESSION );
+            assert(0 && "#TODO implement inheritance");
+        }
+        assignmentOp->Operands[1] = TryParseObject();
+        MUST_PARSE( assignmentOp->Operands[1], ERROR_MESSAGE_EXPECTED_OBJECT );
+        return assignmentOp;
+    }
+    return unique_ptr<AST::ObjectExpression>();
 }
 
 unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
