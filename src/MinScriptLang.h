@@ -743,21 +743,12 @@ struct TernaryOperator : Operator
     virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
-enum class MultiOperatorType
+struct CallOperator : Operator
 {
-    Call, Count
-};
-
-struct MultiOperator : Operator
-{
-    MultiOperatorType Type;
     vector<unique_ptr<Expression>> Operands;
-    MultiOperator(const PlaceInCode& place, MultiOperatorType type) : Operator{place}, Type(type) { }
+    CallOperator(const PlaceInCode& place) : Operator{place} { }
     virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
-
-private:
-    Value Call(ExecuteContext& ctx) const;
 };
 
 struct FunctionDefinition : public Expression
@@ -2078,11 +2069,9 @@ Value TernaryOperator::Evaluate(ExecuteContext& ctx) const
     return Operands[0]->Evaluate(ctx).IsTrue() ? Operands[1]->Evaluate(ctx) : Operands[2]->Evaluate(ctx);
 }
 
-void MultiOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void CallOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
-    static const char* MULTI_OPERATOR_TYPE_NAMES[] = { "Call" };
-    static_assert(_countof(MULTI_OPERATOR_TYPE_NAMES) == (size_t)MultiOperatorType::Count, "MULTI_OPERATOR_TYPE_NAMES is invalid.");
-    printf(DEBUG_PRINT_FORMAT_STR_BEG "MultiOperator %s\n", DEBUG_PRINT_ARGS_BEG, MULTI_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "CallOperator\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
     Operands[0]->DebugPrint(indentLevel, "Callee: ");
     for(size_t i = 1, count = Operands.size(); i < count; ++i)
@@ -2141,16 +2130,7 @@ Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
     return Value{std::move(obj)};
 }
 
-Value MultiOperator::Evaluate(ExecuteContext& ctx) const
-{
-    switch(Type)
-    {
-    case MultiOperatorType::Call: return Call(ctx);
-    default: assert(0); return Value{};
-    }
-}
-
-Value MultiOperator::Call(ExecuteContext& ctx) const
+Value CallOperator::Evaluate(ExecuteContext& ctx) const
 {
     Value callee = Operands[0]->Evaluate(ctx);
     const size_t argCount = Operands.size() - 1;
@@ -2690,7 +2670,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
         // Call: Expr0 '(' [ Expr16 ( ',' Expr16 )* ')'
         else if(TryParseSymbol(Symbol::RoundBracketOpen))
         {
-            auto op = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
+            auto op = make_unique<AST::CallOperator>(place);
             // Callee
             op->Operands.push_back(std::move(expr));
             // First argument
