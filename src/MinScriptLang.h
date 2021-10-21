@@ -806,6 +806,7 @@ private:
     unique_ptr<AST::ConstantValue> TryParseConstantValue();
     unique_ptr<AST::Identifier> TryParseIdentifierValue();
     unique_ptr<AST::ConstantExpression> TryParseConstantExpr();
+    std::pair<string, unique_ptr<AST::FunctionDefinition>> TryParseFunctionSyntacticSugar();
     unique_ptr<AST::Expression> TryParseObjectMember(string& outMemberName);
     unique_ptr<AST::ObjectExpression> TryParseObject();
     unique_ptr<AST::Expression> TryParseExpr0();
@@ -2436,16 +2437,12 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
 
     // Syntactic sugar for functions:
     // 'function' IdentifierValue '(' [ TOKEN_IDENTIFIER ( ',' TOKE_IDENTIFIER )* ] ')' '{' Block '}'
-    if(m_Tokens[m_TokenIndex].Symbol == Symbol::Function &&
-        (m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Identifier || m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Local ||
-            m_Tokens[m_TokenIndex + 1].Symbol == Symbol::This || m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Global))
+    if(auto fnSyntacticSugar = TryParseFunctionSyntacticSugar(); fnSyntacticSugar.second)
     {
-        ++m_TokenIndex;
+        auto identifierExpr = std::make_unique<AST::Identifier>(place, AST::IdentifierScope::None, std::move(fnSyntacticSugar.first));
         auto assignmentOp = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Assignment);
-        MUST_PARSE( assignmentOp->Operands[0] = TryParseIdentifierValue(), ERROR_MESSAGE_EXPECTED_IDENTIFIER );
-        auto funcDef = make_unique<AST::FunctionDefinition>(place);
-        ParseFunctionDefinition(*funcDef);
-        assignmentOp->Operands[1] = std::move(funcDef);
+        assignmentOp->Operands[0] = std::move(identifierExpr);
+        assignmentOp->Operands[1] = std::move(fnSyntacticSugar.second);
         return assignmentOp;
     }
     
@@ -2512,6 +2509,20 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
     if(TryParseSymbol(Symbol::This))
         return make_unique<AST::ThisExpression>(place);
     return unique_ptr<AST::ConstantExpression>{};
+}
+
+std::pair<string, unique_ptr<AST::FunctionDefinition>> Parser::TryParseFunctionSyntacticSugar()
+{
+    if(PeekSymbols({Symbol::Function, Symbol::Identifier}))
+    {
+        ++m_TokenIndex;
+        std::pair<string, unique_ptr<AST::FunctionDefinition>> result;
+        result.first = m_Tokens[m_TokenIndex++].String;
+        result.second = make_unique<AST::FunctionDefinition>(GetCurrentTokenPlace());
+        ParseFunctionDefinition(*result.second);
+        return result;
+    }
+    return std::make_pair(string{}, unique_ptr<AST::FunctionDefinition>{});
 }
 
 unique_ptr<AST::Expression> Parser::TryParseObjectMember(string& outMemberName)

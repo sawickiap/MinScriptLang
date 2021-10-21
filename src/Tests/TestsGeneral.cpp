@@ -552,12 +552,12 @@ TEST_CASE("Basic")
     }
     SECTION("local global in function definition")
     {
-        const char* code = "function Outer() { "
-            "   function InnerNone() { print('InnerNone'); } "
-            "   function local.InnerLocal() { print('InnerLocal'); } "
-            "   function global.InnerGlobal() { print('InnerGlobal'); } "
-            "   InnerNone(); InnerLocal(); InnerGlobal();"
-            "} Outer(); InnerGlobal();";
+        const char* code = "function Outer() { \n"
+            "   function InnerNone() { print('InnerNone'); } \n"
+            "   local.InnerLocal = function() { print('InnerLocal'); }; \n"
+            "   global.InnerGlobal = function() { print('InnerGlobal'); }; \n"
+            "   InnerNone(); InnerLocal(); InnerGlobal(); \n"
+            "} Outer(); InnerGlobal(); \n";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "InnerNone\nInnerLocal\nInnerGlobal\nInnerGlobal\n");
     }
