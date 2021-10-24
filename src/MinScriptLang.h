@@ -113,11 +113,16 @@ using std::vector;
 // F***k Windows.h macros!
 #undef min
 #undef max
+#undef GetObject
 
 namespace MinScriptLang {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Basic facilities
+
+// I would like it to be higher, but above that, even at 128, it crashes with
+// native "stack overflow" in Debug configuration.
+static const size_t LOCAL_SCOPE_STACK_MAX_SIZE = 100;
 
 static const char* const ERROR_MESSAGE_PARSING_ERROR = "Parsing error.";
 static const char* const ERROR_MESSAGE_INVALID_NUMBER = "Invalid number.";
@@ -153,6 +158,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE = "E
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_DOT                 = "Expected symbol '.'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
 static const char* const ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT = "Expected unique constant.";
+static const char* const ERROR_MESSAGE_EXPECTED_1_ARGUMENT = "Expected 1 argument.";
 static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
 static const char* const ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
 static const char* const ERROR_MESSAGE_BREAK_WITHOUT_LOOP = "Break without a loop.";
@@ -161,9 +167,11 @@ static const char* const ERROR_MESSAGE_RETURN_WITHOUT_FUNCTION = "Return without
 static const char* const ERROR_MESSAGE_INCOMPATIBLE_TYPES = "Incompatible types.";
 static const char* const ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS = "Index out of bounds.";
 static const char* const ERROR_MESSAGE_PARAMETER_NAMES_MUST_BE_UNIQUE = "Parameter naems must be unique.";
-static const char* const ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT = "Cannot change environment.";
 static const char* const ERROR_MESSAGE_NO_LOCAL_SCOPE = "There is no local scope here.";
 static const char* const ERROR_MESSAGE_NO_THIS = "There is no 'this' here.";
+static const char* const ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT = "Repeating key in object.";
+static const char* const ERROR_MESSAGE_STACK_OVERFLOW = "Stack overflow.";
+static const char* const ERROR_MESSAGE_BASE_MUST_BE_OBJECT = "Base must be object.";
 
 struct Constant
 {
@@ -239,7 +247,7 @@ enum class Symbol
     // Keywords
     Null, False, True, If, Else, While, Do, For, Break, Continue,
     Switch, Case, Default, Function, Return,
-    Local, This, Global, Env, Count
+    Local, This, Global, Class, Count
 };
 static const char* SYMBOL_STR[] = {
     // Token types
@@ -251,7 +259,7 @@ static const char* SYMBOL_STR[] = {
     // Keywords
     "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue",
     "switch", "case", "default", "function", "return",
-    "local", "this", "global", "env",
+    "local", "this", "global", "class"
 };
 
 struct Token
@@ -351,7 +359,7 @@ private:
 class Tokenizer
 {
 public:
-    Tokenizer(const char* code, size_t codeLen);
+    Tokenizer(const char* code, size_t codeLen) : m_Code{code, codeLen} { }
     void GetNextToken(Token& out);
 
 private:
@@ -373,16 +381,16 @@ namespace AST { struct FunctionDefinition; }
 class Object;
 
 enum class SystemFunction {
-    Print, Count
+    TypeOf, Print, Count
 };
 static const char* SYSTEM_FUNCTION_NAMES[] = {
-    "print",
+    "TypeOf", "print",
 };
 
 class Value
 {
 public:
-    enum class Type { Null, Number, String, Function, SystemFunction, Object };
+    enum class Type { Null, Number, String, Function, SystemFunction, Object, Type, Count };
     
     shared_ptr<Object> m_ThisObject;
 
@@ -392,6 +400,7 @@ public:
     Value(const AST::FunctionDefinition* func) : m_Type{Type::Function}, m_Function{func} { }
     Value(SystemFunction func) : m_Type{Type::SystemFunction}, m_SystemFunction{func} { }
     Value(shared_ptr<Object> &&obj) : m_Type{Type::Object}, m_Object(obj) { }
+    Value(Type typeVal) : m_Type{Type::Type}, m_TypeValue(typeVal) { }
 
     Type GetType() const { return m_Type; }
     double GetNumber() const { assert(m_Type == Type::Number); return m_Number; }
@@ -399,8 +408,9 @@ public:
     const string& GetString() const { assert(m_Type == Type::String); return m_String; }
     const AST::FunctionDefinition* GetFunction() const { assert(m_Type == Type::Function && m_Function); return m_Function; }
     SystemFunction GetSystemFunction() const { assert(m_Type == Type::SystemFunction); return m_SystemFunction; }
-    Object* GetObject() const { assert(m_Type == Type::Object); return m_Object.get(); }
-    shared_ptr<Object> GetObjectPtr() const { assert(m_Type == Type::Object); return m_Object; }
+    Object* GetObject() const { assert(m_Type == Type::Object && m_Object); return m_Object.get(); }
+    shared_ptr<Object> GetObjectPtr() const { assert(m_Type == Type::Object && m_Object); return m_Object; }
+    Type GetTypeValue() const { assert(m_Type == Type::Type); return m_TypeValue; }
 
     bool IsEqual(const Value& rhs) const
     {
@@ -414,6 +424,7 @@ public:
         case Type::Function:       return m_Function == rhs.m_Function;
         case Type::SystemFunction: return m_SystemFunction == rhs.m_SystemFunction;
         case Type::Object:         return m_Object.get() == rhs.m_Object.get();
+        case Type::Type:           return m_TypeValue == rhs.m_TypeValue;
         default: assert(0); return false;
         }
     }
@@ -427,6 +438,7 @@ public:
         case Type::Function:       return true;
         case Type::SystemFunction: return true;
         case Type::Object:         return true;
+        case Type::Type:           return m_TypeValue != Type::Null;
         default: assert(0); return false;
         }
     }
@@ -440,10 +452,14 @@ private:
         double m_Number;
         const AST::FunctionDefinition* m_Function;
         SystemFunction m_SystemFunction;
+        Type m_TypeValue;
     };
     string m_String;
     shared_ptr<Object> m_Object;
 };
+
+static const char* VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Object", "Type" };
+static_assert(_countof(VALUE_TYPE_NAMES) == (size_t)Value::Type::Count);
 
 ////////////////////////////////////////////////////////////////////////////////
 // class Object definition
@@ -455,8 +471,8 @@ public:
     MapType m_Items;
 
     size_t GetCount() const { return m_Items.size(); }
-    bool HasKey(const string& key) const;
-    Value& GetOrCreateValue(const string& key); // Creates new null value if doesn't exist.
+    bool HasKey(const string& key) const { return m_Items.find(key) != m_Items.end(); }
+    Value& GetOrCreateValue(const string& key) { return m_Items[key]; }; // Creates new null value if doesn't exist.
     Value* TryGetValue(const string& key); // Returns null if doesn't exist.
     bool Remove(const string& key); // Returns true if has been found and removed.
 };
@@ -489,34 +505,36 @@ struct ExecuteContext
 {
 public:
     EnvironmentPimpl& Env;
-    Object& GlobalContext;
+    Object& GlobalScope;
 
-    struct LocalContextPush
+    struct LocalScopePush
     {
-        LocalContextPush(ExecuteContext& ctx, Object* localObj, shared_ptr<Object>&& thisObj) :
+        LocalScopePush(ExecuteContext& ctx, Object* localScope, shared_ptr<Object>&& thisObj, const PlaceInCode& place) :
             m_Ctx{ctx}
         {
-            ctx.LocalContexts.push_back(localObj);
-            ctx.This.push_back(std::move(thisObj));
+            if(ctx.LocalScopes.size() == LOCAL_SCOPE_STACK_MAX_SIZE)
+                throw ExecutionError{place, ERROR_MESSAGE_STACK_OVERFLOW};
+            ctx.LocalScopes.push_back(localScope);
+            ctx.Thises.push_back(std::move(thisObj));
         }
-        ~LocalContextPush()
+        ~LocalScopePush()
         {
-            m_Ctx.This.pop_back();
-            m_Ctx.LocalContexts.pop_back();
+            m_Ctx.Thises.pop_back();
+            m_Ctx.LocalScopes.pop_back();
         }
     private:
         ExecuteContext& m_Ctx;
     };
 
-    ExecuteContext(EnvironmentPimpl& env, Object& globalCtx) : Env{env}, GlobalContext{globalCtx} { }
-    bool IsLocal() const { return !LocalContexts.empty(); }
-    Object* GetLocalContext() { assert(IsLocal()); return LocalContexts.back(); }
-    const shared_ptr<Object>& GetThis() { assert(IsLocal()); return This.back(); }
-    Object& GetInnermostContext() const { return IsLocal() ? *LocalContexts.back() : GlobalContext; }
+    ExecuteContext(EnvironmentPimpl& env, Object& globalScope) : Env{env}, GlobalScope{globalScope} { }
+    bool IsLocal() const { return !LocalScopes.empty(); }
+    Object* GetCurrentLocalScope() { assert(IsLocal()); return LocalScopes.back(); }
+    const shared_ptr<Object>& GetThis() { assert(IsLocal()); return Thises.back(); }
+    Object& GetInnermostScope() const { return IsLocal() ? *LocalScopes.back() : GlobalScope; }
 
 private:
-    vector<Object*> LocalContexts;
-    vector<shared_ptr<Object>> This;
+    vector<Object*> LocalScopes;
+    vector<shared_ptr<Object>> Thises;
 };
 
 struct Statement
@@ -631,7 +649,7 @@ struct Expression : Statement
 {
     explicit Expression(const PlaceInCode& place) : Statement{place} { }
     virtual Value Evaluate(ExecuteContext& ctx) const = 0;
-    virtual LValue GetLValue(ExecuteContext& ctx) const;
+    virtual LValue GetLValue(ExecuteContext& ctx) const { EXECUTION_CHECK( false, ERROR_MESSAGE_EXPECTED_LVALUE ); }
     virtual void Execute(ExecuteContext& ctx) const { Evaluate(ctx); }
 };
 
@@ -649,7 +667,7 @@ struct ConstantValue : ConstantExpression
     virtual Value Evaluate(ExecuteContext& ctx) const { return Val; }
 };
 
-enum class IdentifierScope { None, Local, Global, Env, Count };
+enum class IdentifierScope { None, Local, Global, Count };
 struct Identifier : ConstantExpression
 {
     IdentifierScope Scope = IdentifierScope::Count;
@@ -734,21 +752,12 @@ struct TernaryOperator : Operator
     virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
-enum class MultiOperatorType
+struct CallOperator : Operator
 {
-    Call, Count
-};
-
-struct MultiOperator : Operator
-{
-    MultiOperatorType Type;
     vector<unique_ptr<Expression>> Operands;
-    MultiOperator(const PlaceInCode& place, MultiOperatorType type) : Operator{place}, Type(type) { }
+    CallOperator(const PlaceInCode& place) : Operator{place} { }
     virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
-
-private:
-    Value Call(ExecuteContext& ctx) const;
 };
 
 struct FunctionDefinition : public Expression
@@ -763,8 +772,9 @@ struct FunctionDefinition : public Expression
 
 struct ObjectExpression : public Expression
 {
-    vector<string> ItemNames;
-    std::vector<unique_ptr<Expression>> ItemValues;
+    unique_ptr<Expression> BaseExpression;
+    using ItemMap = std::map<string, unique_ptr<Expression>>;
+    ItemMap Items;
     ObjectExpression(const PlaceInCode& place) : Expression{place} { }
     virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
@@ -783,7 +793,7 @@ static inline void CheckNumberOperand(const AST::Expression* operand, const Valu
 class Parser
 {
 public:
-    Parser(Tokenizer& tokenizer);
+    Parser(Tokenizer& tokenizer) : m_Tokenizer(tokenizer) { }
     void ParseScript(AST::Script& outScript);
 
 private:
@@ -799,6 +809,8 @@ private:
     unique_ptr<AST::ConstantValue> TryParseConstantValue();
     unique_ptr<AST::Identifier> TryParseIdentifierValue();
     unique_ptr<AST::ConstantExpression> TryParseConstantExpr();
+    std::pair<string, unique_ptr<AST::FunctionDefinition>> TryParseFunctionSyntacticSugar();
+    unique_ptr<AST::Expression> TryParseClassSyntacticSugar();
     unique_ptr<AST::Expression> TryParseObjectMember(string& outMemberName);
     unique_ptr<AST::ObjectExpression> TryParseObject();
     unique_ptr<AST::Expression> TryParseExpr0();
@@ -827,8 +839,8 @@ private:
 class EnvironmentPimpl
 {
 public:
-    EnvironmentPimpl();
-    ~EnvironmentPimpl();
+    EnvironmentPimpl() : m_Script{PlaceInCode{0, 1, 1}} { }
+    ~EnvironmentPimpl() = default;
     void Execute(const char* code, size_t codeLen);
     const string& GetOutput() const { return m_Output; }
     void Print(const char* s, size_t sLen) { m_Output.append(s, s + sLen); }
@@ -836,7 +848,7 @@ public:
 
 private:
     AST::Script m_Script;
-    Object m_GlobalContext;
+    Object m_GlobalScope;
     string m_Output;
 };
 
@@ -852,11 +864,6 @@ const char* Error::what() const
 
 ////////////////////////////////////////////////////////////////////////////////
 // class Tokenizer implementation
-
-Tokenizer::Tokenizer(const char* code, size_t codeLen) :
-    m_Code{code, codeLen}
-{
-}
 
 void Tokenizer::GetNextToken(Token& out)
 {
@@ -1164,16 +1171,6 @@ bool Tokenizer::ParseString(Token& out)
 ////////////////////////////////////////////////////////////////////////////////
 // class Object implementation
 
-bool Object::HasKey(const string& key) const
-{
-    return m_Items.find(key) != m_Items.end();
-}
-
-Value& Object::GetOrCreateValue(const string& key)
-{
-    return m_Items[key];
-}
-
 Value* Object::TryGetValue(const string& key)
 {
     auto it = m_Items.find(key);
@@ -1196,12 +1193,61 @@ bool Object::Remove(const string& key)
 ////////////////////////////////////////////////////////////////////////////////
 // Built-in functions
 
-static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, size_t argCount)
+static shared_ptr<Object> CopyObject(const Object& src)
+{
+    auto dst = std::make_shared<Object>();
+    for(const auto& item : src.m_Items)
+        dst->m_Items.insert(item);
+    return dst;
+}
+
+static Value BuiltInTypeCtor_Null(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    EXECUTION_CHECK_PLACE(args.empty() || args.size() == 1 && args[0].GetType() == Value::Type::Null, place, "Null can be constructed only from no arguments or from another null value.");
+    return Value{};
+}
+static Value BuiltInTypeCtor_Number(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::Number, place, "Number can be constructed only from another number.");
+    return Value{args[0].GetNumber()};
+}
+static Value BuiltInTypeCtor_String(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    if(args.empty())
+        return Value{string{}};
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::String, place, "String can be constructed only from no arguments or from another string value.");
+    return Value{string{args[0].GetString()}};
+}
+static Value BuiltInTypeCtor_Object(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    if(args.empty())
+        return Value{std::make_shared<Object>()};
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::Object, place, "Object can be constructed only from no arguments or from another object value.");
+    return CopyObject(*args[0].GetObject());
+}
+static Value BuiltInTypeCtor_Function(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    EXECUTION_CHECK_PLACE(args.size() == 1 && (args[0].GetType() == Value::Type::Function || args[0].GetType() == Value::Type::SystemFunction),
+        place, "Function can be constructed only from another function value.");
+    return Value{args[0]};
+}
+static Value BuiltInTypeCtor_Type(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::Type, place, "Type can be constructed only from another type value.");
+    return Value{args[0]};
+}
+
+static Value BuiltInFunction_TypeOf(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    EXECUTION_CHECK_PLACE(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
+    return Value{args[0].GetType()};
+}
+
+static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     string s;
-    for(size_t i = 0; i < argCount; ++i)
+    for(const auto& val : args)
     {
-        const Value& val = args[i];
         switch(val.GetType())
         {
         case Value::Type::Null:
@@ -1223,20 +1269,23 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const Value* args, 
         case Value::Type::Object:
             ctx.Env.Print("object\n");
             break;
+        case Value::Type::Type:
+            Format(s, "%s\n", VALUE_TYPE_NAMES[(size_t)val.GetTypeValue()]);
+            ctx.Env.Print(s.data(), s.length());
+            break;
         default: assert(0);
         }
-
     }
     return Value{};
 }
 
-static Value BuiltInMember_Object_Count(AST::ExecuteContext& ctx, Value&& objVal)
+static Value BuiltInMember_Object_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
     assert(objVal.GetType() == Value::Type::Object && objVal.GetObject());
     return Value{(double)objVal.GetObject()->GetCount()};
 }
 
-static Value BuiltInMember_String_Count(AST::ExecuteContext& ctx, Value&& objVal)
+static Value BuiltInMember_String_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
     assert(objVal.GetType() == Value::Type::String);
     return Value{(double)objVal.GetString().length()};
@@ -1403,7 +1452,7 @@ void RangeBasedForLoop::DebugPrint(uint32_t indentLevel, const char* prefix) con
 void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
 {
     const Value rangeVal = RangeExpression->Evaluate(ctx);
-    Object& innermostCtxObj = ctx.GetInnermostContext();
+    Object& innermostCtxObj = ctx.GetInnermostScope();
     const bool useKey = !KeyVarName.empty();
 
     if(rangeVal.GetType() == Value::Type::String)
@@ -1553,11 +1602,6 @@ void Script::Execute(ExecuteContext& ctx) const
     }
 }
 
-LValue Expression::GetLValue(ExecuteContext& ctx) const
-{
-    EXECUTION_CHECK( false, ERROR_MESSAGE_EXPECTED_LVALUE );
-}
-
 void ConstantValue::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
     switch(Val.GetType())
@@ -1574,20 +1618,20 @@ void ConstantValue::DebugPrint(uint32_t indentLevel, const char* prefix) const
 
 void Identifier::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
-    static const char* PREFIX[] = { "", "local.", "global.", "env." };
+    static const char* PREFIX[] = { "", "local.", "global." };
     static_assert(_countof(PREFIX) == (size_t)IdentifierScope::Count);
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier: %s%s\n", DEBUG_PRINT_ARGS_BEG, PREFIX[(size_t)Scope], S.c_str());
 }
 
 Value Identifier::Evaluate(ExecuteContext& ctx) const
 {
-    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || ctx.IsLocal(), GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
+    EXECUTION_CHECK(Scope != IdentifierScope::Local || ctx.IsLocal(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
 
     if(ctx.IsLocal())
     {
         // Local variable
         if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local))
-            if(Value* val = ctx.GetLocalContext()->TryGetValue(S); val)
+            if(Value* val = ctx.GetCurrentLocalScope()->TryGetValue(S); val)
                 return *val;
         // This
         if(Scope == IdentifierScope::None && ctx.GetThis())
@@ -1601,17 +1645,17 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
         }
     }
     
-    // Global variable
     if(Scope == IdentifierScope::None || Scope == IdentifierScope::Global)
     {
-        Value* val = ctx.GlobalContext.TryGetValue(S);
+        // Global variable
+        Value* val = ctx.GlobalScope.TryGetValue(S);
         if(val)
             return *val;
-    }
-
-    // System function
-    if(Scope == IdentifierScope::None || Scope == IdentifierScope::Env)
-    {
+        // Type
+        for(size_t i = 0, count = (size_t)Value::Type::Count; i < count; ++i)
+            if(S == VALUE_TYPE_NAMES[i])
+                return Value{(Value::Type)i};
+        // System function
         for(size_t i = 0, count = (size_t)SystemFunction::Count; i < count; ++i)
             if(S == SYSTEM_FUNCTION_NAMES[i])
                 return Value{(SystemFunction)i};
@@ -1624,14 +1668,13 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
 {
     const bool isLocal = ctx.IsLocal();
-    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Env, GetPlace(), ERROR_MESSAGE_CANNOT_CHANGE_ENVIRONMENT);
-    EXECUTION_CHECK_PLACE(Scope != IdentifierScope::Local || isLocal, GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
+    EXECUTION_CHECK(Scope != IdentifierScope::Local || isLocal, ERROR_MESSAGE_NO_LOCAL_SCOPE);
 
     if(isLocal)
     {
         // Local variable
-        if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && ctx.GetLocalContext()->HasKey(S))
-            return LValue{*ctx.GetLocalContext(), S};
+        if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && ctx.GetCurrentLocalScope()->HasKey(S))
+            return LValue{*ctx.GetCurrentLocalScope(), S};
         // This
         if(Scope == IdentifierScope::None)
             if(Object* thisObj = ctx.GetThis().get(); thisObj && thisObj->HasKey(S))
@@ -1639,13 +1682,13 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
     }    
     
     // Global variable
-    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Global) && ctx.GlobalContext.HasKey(S))
-        return LValue{ctx.GlobalContext, S};
+    if((Scope == IdentifierScope::None || Scope == IdentifierScope::Global) && ctx.GlobalScope.HasKey(S))
+        return LValue{ctx.GlobalScope, S};
 
     // Not found: return reference to smallest scope.
     if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && isLocal)
-        return LValue{*ctx.GetLocalContext(), S};
-    return LValue{ctx.GlobalContext, S};
+        return LValue{*ctx.GetCurrentLocalScope(), S};
+    return LValue{ctx.GlobalScope, S};
 }
 
 void ThisExpression::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -1772,13 +1815,13 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
             return resultVal;
         }
         if(MemberName == "Count")
-            return BuiltInMember_Object_Count(ctx, std::move(objVal));
+            return BuiltInMember_Object_Count(ctx, GetPlace(), std::move(objVal));
         return Value{};
     }
     if(objVal.GetType() == Value::Type::String)
     {
         if(MemberName == "Count")
-            return BuiltInMember_String_Count(ctx, std::move(objVal));
+            return BuiltInMember_String_Count(ctx, GetPlace(), std::move(objVal));
         EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_MEMBER );
     }
     EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
@@ -1787,7 +1830,7 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
 LValue MemberAccessOperator::GetLValue(ExecuteContext& ctx) const
 {
     Value objVal = Operand->Evaluate(ctx);
-    EXECUTION_CHECK_PLACE(objVal.GetType() == Value::Type::Object, GetPlace(), ERROR_MESSAGE_EXPECTED_OBJECT);
+    EXECUTION_CHECK(objVal.GetType() == Value::Type::Object, ERROR_MESSAGE_EXPECTED_OBJECT);
     return LValue{*objVal.GetObject(), MemberName};
 }
 
@@ -1848,15 +1891,17 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     Value lhs = Operands[0]->Evaluate(ctx);
 
     // Logical operators with short circuit for right hand side operand.
-    if(Type == BinaryOperatorType::LogicalAnd || Type == BinaryOperatorType::LogicalOr)
+    if(Type == BinaryOperatorType::LogicalAnd)
     {
-        bool result = false;
-        switch(Type)
-        {
-        case BinaryOperatorType::LogicalAnd: result = lhs.IsTrue() ? Operands[1]->Evaluate(ctx).IsTrue() : false; break;
-        case BinaryOperatorType::LogicalOr:  result = lhs.IsTrue() ? true : Operands[1]->Evaluate(ctx).IsTrue(); break;
-        }
-        return Value{result ? 1.0 : 0.0};
+        if(!lhs.IsTrue())
+            return lhs;
+        return Operands[1]->Evaluate(ctx);
+    }
+    if(Type == BinaryOperatorType::LogicalOr)
+    {
+        if(lhs.IsTrue())
+            return lhs;
+        return Operands[1]->Evaluate(ctx);
     }
 
     // Remaining operators use both operands as r-values.
@@ -2082,11 +2127,9 @@ Value TernaryOperator::Evaluate(ExecuteContext& ctx) const
     return Operands[0]->Evaluate(ctx).IsTrue() ? Operands[1]->Evaluate(ctx) : Operands[2]->Evaluate(ctx);
 }
 
-void MultiOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void CallOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
 {
-    static const char* MULTI_OPERATOR_TYPE_NAMES[] = { "Call" };
-    static_assert(_countof(MULTI_OPERATOR_TYPE_NAMES) == (size_t)MultiOperatorType::Count, "MULTI_OPERATOR_TYPE_NAMES is invalid.");
-    printf(DEBUG_PRINT_FORMAT_STR_BEG "MultiOperator %s\n", DEBUG_PRINT_ARGS_BEG, MULTI_OPERATOR_TYPE_NAMES[(uint32_t)Type]);
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "CallOperator\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
     Operands[0]->DebugPrint(indentLevel, "Callee: ");
     for(size_t i = 1, count = Operands.size(); i < count; ++i)
@@ -2120,50 +2163,59 @@ void ObjectExpression::DebugPrint(uint32_t indentLevel, const char* prefix) cons
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Object\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
-    const size_t count = ItemNames.size();
-    for(size_t i = 0; i < count; ++i)
-        ItemValues[0]->DebugPrint(indentLevel, ItemNames[i].c_str());
+    for(const auto& [name, value] : Items)
+        value->DebugPrint(indentLevel, name.c_str());
 }
 
 Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
 {
-    auto obj = make_shared<Object>();
-    const size_t count = ItemNames.size();
-    for(size_t i = 0; i < count; ++i)
+    shared_ptr<Object> obj;
+    if(BaseExpression)
     {
-        Value val = ItemValues[i]->Evaluate(ctx);
+        Value baseObj = BaseExpression->Evaluate(ctx);
+        if(baseObj.GetType() != Value::Type::Object)
+            throw ExecutionError{GetPlace(), ERROR_MESSAGE_BASE_MUST_BE_OBJECT};
+        obj = CopyObject(*baseObj.GetObject());
+    }
+    else
+        obj = make_shared<Object>();
+    for(const auto& [name, valueExpr] : Items)
+    {
+        Value val = valueExpr->Evaluate(ctx);
         if(val.GetType() != Value::Type::Null)
-            obj->GetOrCreateValue(ItemNames[i]) = std::move(val);
+            obj->GetOrCreateValue(name) = std::move(val);
     }
     return Value{std::move(obj)};
 }
 
-Value MultiOperator::Evaluate(ExecuteContext& ctx) const
+Value CallOperator::Evaluate(ExecuteContext& ctx) const
 {
-    switch(Type)
-    {
-    case MultiOperatorType::Call: return Call(ctx);
-    default: assert(0); return Value{};
-    }
-}
-
-Value MultiOperator::Call(ExecuteContext& ctx) const
-{
-    const Value callee = Operands[0]->Evaluate(ctx);
+    Value callee = Operands[0]->Evaluate(ctx);
     const size_t argCount = Operands.size() - 1;
     vector<Value> arguments(argCount);
     for(size_t i = 0; i < argCount; ++i)
         arguments[i] = Operands[i + 1]->Evaluate(ctx);
 
+    // Calling an object: Call its function under '' key.
+    if(callee.GetType() == Value::Type::Object)
+    {
+        shared_ptr<Object> calleeObj = callee.GetObjectPtr();
+        if(Value* defaultVal = calleeObj->TryGetValue(string{}); defaultVal && defaultVal->GetType() == Value::Type::Function)
+        {
+            callee = *defaultVal;
+            callee.m_ThisObject = std::move(calleeObj);
+        }
+    }
+
     if(callee.GetType() == Value::Type::Function)
     {
         const AST::FunctionDefinition* const funcDef = callee.GetFunction();
         EXECUTION_CHECK( argCount == funcDef->Parameters.size(), ERROR_MESSAGE_INVALID_NUMBER_OF_ARGUMENTS );
-        Object localContext;
+        Object localScope;
         // Setup parameters
         for(size_t argIndex = 0; argIndex != argCount; ++argIndex)
-            localContext.GetOrCreateValue(funcDef->Parameters[argIndex]) = std::move(arguments[argIndex]);
-        ExecuteContext::LocalContextPush localContextPush{ctx, &localContext, shared_ptr<Object>{callee.m_ThisObject}};
+            localScope.GetOrCreateValue(funcDef->Parameters[argIndex]) = std::move(arguments[argIndex]);
+        ExecuteContext::LocalScopePush localContextPush{ctx, &localScope, shared_ptr<Object>{callee.m_ThisObject}, GetPlace()};
         try
         {
             callee.GetFunction()->Body.Execute(ctx);
@@ -2182,15 +2234,28 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
         }
         return Value{};
     }
-
     if(callee.GetType() == Value::Type::SystemFunction)
     {
         switch(callee.GetSystemFunction())
         {
-        case SystemFunction::Print:
-            return BuiltInFunction_Print(ctx, arguments.data(), arguments.size());
-        default:
-            assert(0); return Value{};
+        case SystemFunction::TypeOf: return BuiltInFunction_TypeOf(ctx, GetPlace(), std::move(arguments));
+        case SystemFunction::Print: return BuiltInFunction_Print(ctx, GetPlace(), std::move(arguments));
+        default: assert(0); return Value{};
+        }
+    }
+    if(callee.GetType() == Value::Type::Type)
+    {
+        switch(callee.GetTypeValue())
+        {
+        case Value::Type::Null: return BuiltInTypeCtor_Null(ctx, GetPlace(), std::move(arguments));
+        case Value::Type::Number: return BuiltInTypeCtor_Number(ctx, GetPlace(), std::move(arguments));
+        case Value::Type::String: return BuiltInTypeCtor_String(ctx, GetPlace(), std::move(arguments));
+        case Value::Type::Object: return BuiltInTypeCtor_Object(ctx, GetPlace(), std::move(arguments));
+        case Value::Type::Type: return BuiltInTypeCtor_Type(ctx, GetPlace(), std::move(arguments));
+        case Value::Type::Function:
+        case Value::Type::SystemFunction:
+            return BuiltInTypeCtor_Function(ctx, GetPlace(), std::move(arguments));
+        default: assert(0); return Value{};
         }
     }
 
@@ -2203,11 +2268,6 @@ Value MultiOperator::Call(ExecuteContext& ctx) const
 // class Parser implementation
 
 #define MUST_PARSE(result, errorMessage)   do { if(!(result)) throw ParsingError(GetCurrentTokenPlace(), (errorMessage)); } while(false)
-
-Parser::Parser(Tokenizer& tokenizer) :
-    m_Tokenizer(tokenizer)
-{
-}
 
 void Parser::ParseScript(AST::Script& outScript)
 {
@@ -2460,18 +2520,17 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
 
     // Syntactic sugar for functions:
     // 'function' IdentifierValue '(' [ TOKEN_IDENTIFIER ( ',' TOKE_IDENTIFIER )* ] ')' '{' Block '}'
-    if(m_Tokens[m_TokenIndex].Symbol == Symbol::Function &&
-        (m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Identifier || m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Local ||
-            m_Tokens[m_TokenIndex + 1].Symbol == Symbol::This || m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Global))
+    if(auto fnSyntacticSugar = TryParseFunctionSyntacticSugar(); fnSyntacticSugar.second)
     {
-        ++m_TokenIndex;
+        auto identifierExpr = std::make_unique<AST::Identifier>(place, AST::IdentifierScope::None, std::move(fnSyntacticSugar.first));
         auto assignmentOp = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperatorType::Assignment);
-        MUST_PARSE( assignmentOp->Operands[0] = TryParseIdentifierValue(), ERROR_MESSAGE_EXPECTED_IDENTIFIER );
-        auto funcDef = make_unique<AST::FunctionDefinition>(place);
-        ParseFunctionDefinition(*funcDef);
-        assignmentOp->Operands[1] = std::move(funcDef);
+        assignmentOp->Operands[0] = std::move(identifierExpr);
+        assignmentOp->Operands[1] = std::move(fnSyntacticSugar.second);
         return assignmentOp;
     }
+
+    if(auto cls = TryParseClassSyntacticSugar(); cls)
+        return cls;
     
     return unique_ptr<AST::Statement>{};
 }
@@ -2503,7 +2562,7 @@ unique_ptr<AST::ConstantValue> Parser::TryParseConstantValue()
 unique_ptr<AST::Identifier> Parser::TryParseIdentifierValue()
 {
     const Token& t = m_Tokens[m_TokenIndex];
-    if(t.Symbol == Symbol::Local || t.Symbol == Symbol::Global || t.Symbol == Symbol::Env)
+    if(t.Symbol == Symbol::Local || t.Symbol == Symbol::Global)
     {
         ++m_TokenIndex;
         MUST_PARSE( TryParseSymbol(Symbol::Dot), ERROR_MESSAGE_EXPECTED_SYMBOL_DOT );
@@ -2515,7 +2574,6 @@ unique_ptr<AST::Identifier> Parser::TryParseIdentifierValue()
         {
         case Symbol::Local: identifierScope = AST::IdentifierScope::Local; break;
         case Symbol::Global: identifierScope = AST::IdentifierScope::Global; break;
-        case Symbol::Env: identifierScope = AST::IdentifierScope::Env; break;
         }
         return make_unique<AST::Identifier>(t.Place, identifierScope, string(tIdentifier.String));
     }
@@ -2539,25 +2597,66 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
     return unique_ptr<AST::ConstantExpression>{};
 }
 
+std::pair<string, unique_ptr<AST::FunctionDefinition>> Parser::TryParseFunctionSyntacticSugar()
+{
+    if(PeekSymbols({Symbol::Function, Symbol::Identifier}))
+    {
+        ++m_TokenIndex;
+        std::pair<string, unique_ptr<AST::FunctionDefinition>> result;
+        result.first = m_Tokens[m_TokenIndex++].String;
+        result.second = make_unique<AST::FunctionDefinition>(GetCurrentTokenPlace());
+        ParseFunctionDefinition(*result.second);
+        return result;
+    }
+    return std::make_pair(string{}, unique_ptr<AST::FunctionDefinition>{});
+}
+
 unique_ptr<AST::Expression> Parser::TryParseObjectMember(string& outMemberName)
 {
-    if(m_TokenIndex + 3 < m_Tokens.size() &&
-        m_Tokens[m_TokenIndex].Symbol == Symbol::String &&
-        m_Tokens[m_TokenIndex + 1].Symbol == Symbol::Colon)
+    if(PeekSymbols({Symbol::String, Symbol::Colon}) ||
+        PeekSymbols({Symbol::Identifier, Symbol::Colon}))
     {
         outMemberName = m_Tokens[m_TokenIndex].String;
         m_TokenIndex += 2;
         return TryParseExpr16();
     }
+    if(auto fnSyntacticSugar = TryParseFunctionSyntacticSugar(); fnSyntacticSugar.second)
+    {
+        outMemberName = std::move(fnSyntacticSugar.first);
+        return std::move(fnSyntacticSugar.second);
+    }
     return unique_ptr<AST::Expression>{};
+}
+
+unique_ptr<AST::Expression> Parser::TryParseClassSyntacticSugar()
+{
+    const PlaceInCode beginPlace = GetCurrentTokenPlace();
+    if(TryParseSymbol(Symbol::Class))
+    {
+        string className = TryParseIdentifier();
+        MUST_PARSE( !className.empty(), ERROR_MESSAGE_EXPECTED_IDENTIFIER );
+        auto assignmentOp = std::make_unique<AST::BinaryOperator>(beginPlace, AST::BinaryOperatorType::Assignment);
+        assignmentOp->Operands[0] = std::make_unique<AST::Identifier>(beginPlace, AST::IdentifierScope::None, std::move(className));
+        unique_ptr<AST::Expression> baseExpr;
+        if(TryParseSymbol(Symbol::Colon))
+        {
+            baseExpr = TryParseExpr16();
+            MUST_PARSE( baseExpr, ERROR_MESSAGE_EXPECTED_EXPRESSION );
+        }
+        auto objExpr = TryParseObject();
+        objExpr->BaseExpression = std::move(baseExpr);
+        assignmentOp->Operands[1] = std::move(objExpr);
+        MUST_PARSE( assignmentOp->Operands[1], ERROR_MESSAGE_EXPECTED_OBJECT );
+        return assignmentOp;
+    }
+    return unique_ptr<AST::ObjectExpression>();
 }
 
 unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
 {
-    if((m_TokenIndex + 1 < m_Tokens.size() && // { }
-            m_Tokens[m_TokenIndex].Symbol == Symbol::CurlyBracketOpen &&
-            m_Tokens[m_TokenIndex + 1].Symbol == Symbol::CurlyBracketClose) ||
-        PeekSymbols({Symbol::CurlyBracketOpen, Symbol::String, Symbol::Colon})) // { 'key' :
+    if(PeekSymbols({Symbol::CurlyBracketOpen, Symbol::CurlyBracketClose}) || // { }
+        PeekSymbols({Symbol::CurlyBracketOpen, Symbol::String, Symbol::Colon}) || // { 'key' :
+        PeekSymbols({Symbol::CurlyBracketOpen, Symbol::Identifier, Symbol::Colon})) // { key :
     {
         auto objExpr = make_unique<AST::ObjectExpression>(GetCurrentTokenPlace());
         TryParseSymbol(Symbol::CurlyBracketOpen);
@@ -2566,8 +2665,7 @@ unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
             string memberName;
             unique_ptr<AST::Expression> memberValue;
             MUST_PARSE( memberValue = TryParseObjectMember(memberName), ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER );
-            objExpr->ItemNames.push_back(std::move(memberName));
-            objExpr->ItemValues.push_back(std::move(memberValue));
+            MUST_PARSE( objExpr->Items.insert(std::make_pair(std::move(memberName), std::move(memberValue))).second, ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT );
             if(!TryParseSymbol(Symbol::CurlyBracketClose))
             {
                 while(TryParseSymbol(Symbol::Comma))
@@ -2575,8 +2673,7 @@ unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
                     if(TryParseSymbol(Symbol::CurlyBracketClose))
                         return objExpr;
                     MUST_PARSE( memberValue = TryParseObjectMember(memberName), ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER );
-                    objExpr->ItemNames.push_back(std::move(memberName));
-                    objExpr->ItemValues.push_back(std::move(memberValue));
+                    MUST_PARSE( objExpr->Items.insert(std::make_pair(std::move(memberName), std::move(memberValue))).second, ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT );
                 }
                 MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
             }
@@ -2644,7 +2741,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr2()
         // Call: Expr0 '(' [ Expr16 ( ',' Expr16 )* ')'
         else if(TryParseSymbol(Symbol::RoundBracketOpen))
         {
-            auto op = make_unique<AST::MultiOperator>(place, AST::MultiOperatorType::Call);
+            auto op = make_unique<AST::CallOperator>(place);
             // Callee
             op->Operands.push_back(std::move(expr));
             // First argument
@@ -2977,15 +3074,6 @@ string Parser::TryParseIdentifier()
 ////////////////////////////////////////////////////////////////////////////////
 // class EnvironmentPimpl implementation
 
-EnvironmentPimpl::EnvironmentPimpl() :
-    m_Script{PlaceInCode{0, 1, 1}}
-{
-}
-
-EnvironmentPimpl::~EnvironmentPimpl()
-{
-}
-
 void EnvironmentPimpl::Execute(const char* code, size_t codeLen)
 {
     m_Script.Statements.clear();
@@ -2996,7 +3084,7 @@ void EnvironmentPimpl::Execute(const char* code, size_t codeLen)
         parser.ParseScript(m_Script);
     }
 
-    AST::ExecuteContext executeContext{*this, m_GlobalContext};
+    AST::ExecuteContext executeContext{*this, m_GlobalScope};
     try
     {
         m_Script.Execute(executeContext);

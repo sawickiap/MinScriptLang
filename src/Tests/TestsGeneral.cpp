@@ -213,6 +213,15 @@ TEST_CASE("Basic")
         REQUIRE(env.GetOutput() == "101\n102\n201\n"
             "301\n302\n401\n");
     }
+    SECTION("Logical operators returning value not bool")
+    {
+        const char* code = "five=5; six=6; zero=0; nth=null; \n"
+            "print(five && zero); print(zero && five); print(zero && zero); print(five && six); print(zero && nth); print(nth && zero); \n"
+            "print(five || zero); print(zero || five); print(zero || zero); print(five || six); print(zero || nth); print(nth || zero); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n0\n0\n6\n0\nnull\n"
+            "5\n5\n0\n5\nnull\n0\n");
+    }
     SECTION("Comma operator")
     {
         const char* code = "a=(1,2,4); print(a, 3, 5); print((a, 3, 5));";
@@ -543,12 +552,12 @@ TEST_CASE("Basic")
     }
     SECTION("local global in function definition")
     {
-        const char* code = "function Outer() { "
-            "   function InnerNone() { print('InnerNone'); } "
-            "   function local.InnerLocal() { print('InnerLocal'); } "
-            "   function global.InnerGlobal() { print('InnerGlobal'); } "
-            "   InnerNone(); InnerLocal(); InnerGlobal();"
-            "} Outer(); InnerGlobal();";
+        const char* code = "function Outer() { \n"
+            "   function InnerNone() { print('InnerNone'); } \n"
+            "   local.InnerLocal = function() { print('InnerLocal'); }; \n"
+            "   global.InnerGlobal = function() { print('InnerGlobal'); }; \n"
+            "   InnerNone(); InnerLocal(); InnerGlobal(); \n"
+            "} Outer(); InnerGlobal(); \n";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "InnerNone\nInnerLocal\nInnerGlobal\nInnerGlobal\n");
     }
@@ -712,6 +721,36 @@ TEST_CASE("Functions")
             "for(i=0; i<10; ++i) { Bad(); }";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
+    SECTION("Wrong number of parameters expected 0 passed 1")
+    {
+        const char* code = "function f() { print('a'); } f(2);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Wrong number of parameters expected 1 passed 0")
+    {
+        const char* code = "function f(a) { print(a); } f();";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Wrong number of parameters expected 1 passed 3")
+    {
+        const char* code = "function f(a) { print(a); } f(1, 2, 3);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Wrong number of parameters expected 4 passed 0")
+    {
+        const char* code = "function f(a, b, c, d) { print(a, b, c, d); } f();";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Wrong number of parameters expected 4 passed 2")
+    {
+        const char* code = "function f(a, b, c, d) { print(a, b, c, d); } f(1, 2);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Wrong number of parameters expected 4 passed 5")
+    {
+        const char* code = "function f(a, b, c, d) { print(a, b, c, d); } f('1', '2', '3' ,'4', '5');";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
 }
 
 TEST_CASE("Object")
@@ -734,6 +773,12 @@ TEST_CASE("Object")
             "object\n3\n"
             "object\n3\n"
             "4\n5\n");
+    }
+    SECTION("Object definition using identifiers")
+    {
+        const char* code = "obj={a:1, b:2, c:3}; print(obj.a, obj.b, obj.c);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n2\n3\n");
     }
     SECTION("Compound string in object definition")
     {
@@ -835,6 +880,11 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "2\n");
     }
+    SECTION("Object with repeating keys")
+    {
+        const char* code = "obj={'a':1, 'b':2, 'a':3};";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ParsingError );
+    }
     SECTION("Range-based for loop for objects")
     {
         const char* code =
@@ -896,6 +946,98 @@ TEST_CASE("Object")
     {
         const char* code = "function f() { print(this.x); } \n"
             "f();";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Function syntactic sugar in object definition")
+    {
+        const char* code = "obj={ var: 2, function fn() { print(var); } }; \n"
+            "obj.fn(); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "2\n");
+    }
+    SECTION("Calling object default function")
+    {
+        const char* code = "obj={ var: 2, function fn() { print('fn'); }, '':function(a) { print('Default', a); } }; \n"
+            "obj(3); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "Default\n3\n");
+    }
+    SECTION("Class syntactic sugar")
+    {
+        const char* code = "class C { \n"
+            "   var: 1, \n"
+            "   '': function(x) { var=x; }, \n"
+            "   function print() { global.print(this.var); } \n"
+            "} \n"
+            "C(2); C.print(); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "2\n");
+    }
+    SECTION("Class inheritance syntax")
+    {
+        const char* code = "class A { \n"
+            "   var: 1, \n"
+            "   '': function(x) { var=x; }, \n"
+            "   function print() { global.print(this.var); } \n"
+            "} \n"
+            "class B : A { \n"
+            "   '': function(x) { var=x+1; } \n"
+            "} \n"
+            " \n"
+            "B(2); B.print(); A.print(); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "3\n1\n");
+    }
+}
+
+TEST_CASE("Types")
+{
+    Environment env;
+    SECTION("Type identifier")
+    {
+        const char* code = "t1=Null; t2=Number; t3=String; t4=Object; \n"
+            "print(t1, t2, t3, t4);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "Null\nNumber\nString\nObject\n");
+    }
+    SECTION("TypeOf and comparisons")
+    {
+        const char* code = "tn1=Number; n2=123; tn2=TypeOf(n2); tnull=TypeOf(nonExistent); \n"
+            "print(tn1, tn2, tnull); \n"
+            "print(tn1==tn2, tn1!=tn2, tn2==tnull, tn2!=tnull); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "Number\nNumber\nNull\n"
+            "1\n0\n0\n1\n");
+    }
+    SECTION("Type conversion to bool")
+    {
+        const char* code = "tobj=TypeOf({a:1, b:2}); tnull=TypeOf(nonExistent); \n"
+            "print(tobj?1:0, tnull?1:0); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n0\n");
+    }
+    SECTION("Null construction")
+    {
+        const char* code = "v1=Null(); v2=Null(nonExistent); \n"
+            "print(v1, v2); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "null\nnull\n");
+    }
+    SECTION("Null construction invalid")
+    {
+        const char* code = "v1=Null(); v2=Null(123); \n"
+            "print(v1, v2); \n";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+}
+
+TEST_CASE("Extra slow")
+{
+    Environment env;
+    SECTION("Stack overflow")
+    {
+        const char* code = "function fib(x) { return fib(x+1) + fib(x+2); } \n"
+            "fib(1);";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
 }
