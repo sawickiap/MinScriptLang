@@ -1016,6 +1016,19 @@ TEST_CASE("Types")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n0\n");
     }
+    SECTION("Null construction")
+    {
+        const char* code = "v1=Null(); v2=Null(nonExistent); \n"
+            "print(v1, v2); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "null\nnull\n");
+    }
+    SECTION("Null construction invalid")
+    {
+        const char* code = "v1=Null(); v2=Null(123); \n"
+            "print(v1, v2); \n";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
 }
 
 TEST_CASE("Extra slow")

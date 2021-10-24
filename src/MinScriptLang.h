@@ -1201,6 +1201,42 @@ static shared_ptr<Object> CopyObject(const Object& src)
     return dst;
 }
 
+static Value BuiltInTypeCtor_Null(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    EXECUTION_CHECK_PLACE(args.empty() || args.size() == 1 && args[0].GetType() == Value::Type::Null, place, "Null can be constructed only from no arguments or from another null value.");
+    return Value{};
+}
+static Value BuiltInTypeCtor_Number(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::Number, place, "Number can be constructed only from another number.");
+    return Value{args[0].GetNumber()};
+}
+static Value BuiltInTypeCtor_String(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    if(args.empty())
+        return Value{string{}};
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::String, place, "String can be constructed only from no arguments or from another string value.");
+    return Value{string{args[0].GetString()}};
+}
+static Value BuiltInTypeCtor_Object(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    if(args.empty())
+        return Value{std::make_shared<Object>()};
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::Object, place, "Object can be constructed only from no arguments or from another object value.");
+    return CopyObject(*args[0].GetObject());
+}
+static Value BuiltInTypeCtor_Function(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    EXECUTION_CHECK_PLACE(args.size() == 1 && (args[0].GetType() == Value::Type::Function || args[0].GetType() == Value::Type::SystemFunction),
+        place, "Function can be constructed only from another function value.");
+    return Value{args[0]};
+}
+static Value BuiltInTypeCtor_Type(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::Type, place, "Type can be constructed only from another type value.");
+    return Value{args[0]};
+}
+
 static Value BuiltInFunction_TypeOf(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     EXECUTION_CHECK_PLACE(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
@@ -2198,13 +2234,27 @@ Value CallOperator::Evaluate(ExecuteContext& ctx) const
         }
         return Value{};
     }
-
     if(callee.GetType() == Value::Type::SystemFunction)
     {
         switch(callee.GetSystemFunction())
         {
         case SystemFunction::TypeOf: return BuiltInFunction_TypeOf(ctx, GetPlace(), std::move(arguments));
         case SystemFunction::Print: return BuiltInFunction_Print(ctx, GetPlace(), std::move(arguments));
+        default: assert(0); return Value{};
+        }
+    }
+    if(callee.GetType() == Value::Type::Type)
+    {
+        switch(callee.GetTypeValue())
+        {
+        case Value::Type::Null: return BuiltInTypeCtor_Null(ctx, GetPlace(), std::move(arguments));
+        case Value::Type::Number: return BuiltInTypeCtor_Number(ctx, GetPlace(), std::move(arguments));
+        case Value::Type::String: return BuiltInTypeCtor_String(ctx, GetPlace(), std::move(arguments));
+        case Value::Type::Object: return BuiltInTypeCtor_Object(ctx, GetPlace(), std::move(arguments));
+        case Value::Type::Type: return BuiltInTypeCtor_Type(ctx, GetPlace(), std::move(arguments));
+        case Value::Type::Function:
+        case Value::Type::SystemFunction:
+            return BuiltInTypeCtor_Function(ctx, GetPlace(), std::move(arguments));
         default: assert(0); return Value{};
         }
     }
