@@ -158,6 +158,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE = "E
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_DOT                 = "Expected symbol '.'.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
 static const char* const ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT = "Expected unique constant.";
+static const char* const ERROR_MESSAGE_EXPECTED_1_ARGUMENT = "Expected 1 argument.";
 static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
 static const char* const ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
 static const char* const ERROR_MESSAGE_BREAK_WITHOUT_LOOP = "Break without a loop.";
@@ -380,10 +381,10 @@ namespace AST { struct FunctionDefinition; }
 class Object;
 
 enum class SystemFunction {
-    Print, Count
+    TypeOf, Print, Count
 };
 static const char* SYSTEM_FUNCTION_NAMES[] = {
-    "print",
+    "TypeOf", "print",
 };
 
 class Value
@@ -1198,6 +1199,12 @@ static shared_ptr<Object> CopyObject(const Object& src)
     for(const auto& item : src.m_Items)
         dst->m_Items.insert(item);
     return dst;
+}
+
+static Value BuiltInFunction_TypeOf(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    EXECUTION_CHECK_PLACE(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
+    return Value{args[0].GetType()};
 }
 
 static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
@@ -2196,10 +2203,9 @@ Value CallOperator::Evaluate(ExecuteContext& ctx) const
     {
         switch(callee.GetSystemFunction())
         {
-        case SystemFunction::Print:
-            return BuiltInFunction_Print(ctx, GetPlace(), std::move(arguments));
-        default:
-            assert(0); return Value{};
+        case SystemFunction::TypeOf: return BuiltInFunction_TypeOf(ctx, GetPlace(), std::move(arguments));
+        case SystemFunction::Print: return BuiltInFunction_Print(ctx, GetPlace(), std::move(arguments));
+        default: assert(0); return Value{};
         }
     }
 

@@ -1000,6 +1000,15 @@ TEST_CASE("Types")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "Null\nNumber\nString\nObject\n");
     }
+    SECTION("TypeOf and comparisons")
+    {
+        const char* code = "tn1=Number; n2=123; tn2=TypeOf(n2); tnull=TypeOf(nonExistent); \n"
+            "print(tn1, tn2, tnull); \n"
+            "print(tn1==tn2, tn1!=tn2, tn2==tnull, tn2!=tnull); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "Number\nNumber\nNull\n"
+            "1\n0\n0\n1\n");
+    }
 }
 
 TEST_CASE("Extra slow")
