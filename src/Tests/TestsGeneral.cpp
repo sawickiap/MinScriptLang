@@ -1009,6 +1009,13 @@ TEST_CASE("Types")
         REQUIRE(env.GetOutput() == "Number\nNumber\nNull\n"
             "1\n0\n0\n1\n");
     }
+    SECTION("Type conversion to bool")
+    {
+        const char* code = "tobj=TypeOf({a:1, b:2}); tnull=TypeOf(nonExistent); \n"
+            "print(tobj?1:0, tnull?1:0); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n0\n");
+    }
 }
 
 TEST_CASE("Extra slow")
