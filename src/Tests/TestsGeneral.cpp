@@ -989,6 +989,19 @@ TEST_CASE("Object")
         REQUIRE(env.GetOutput() == "3\n1\n");
     }
 }
+
+TEST_CASE("Types")
+{
+    Environment env;
+    SECTION("Type identifier")
+    {
+        const char* code = "t1=Null; t2=Number; t3=String; t4=Object; \n"
+            "print(t1, t2, t3, t4);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "Null\nNumber\nString\nObject\n");
+    }
+}
+
 TEST_CASE("Extra slow")
 {
     Environment env;

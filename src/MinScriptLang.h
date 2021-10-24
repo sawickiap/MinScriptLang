@@ -389,7 +389,7 @@ static const char* SYSTEM_FUNCTION_NAMES[] = {
 class Value
 {
 public:
-    enum class Type { Null, Number, String, Function, SystemFunction, Object };
+    enum class Type { Null, Number, String, Function, SystemFunction, Object, Type, Count };
     
     shared_ptr<Object> m_ThisObject;
 
@@ -399,6 +399,7 @@ public:
     Value(const AST::FunctionDefinition* func) : m_Type{Type::Function}, m_Function{func} { }
     Value(SystemFunction func) : m_Type{Type::SystemFunction}, m_SystemFunction{func} { }
     Value(shared_ptr<Object> &&obj) : m_Type{Type::Object}, m_Object(obj) { }
+    Value(Type typeVal) : m_Type{Type::Type}, m_TypeValue(typeVal) { }
 
     Type GetType() const { return m_Type; }
     double GetNumber() const { assert(m_Type == Type::Number); return m_Number; }
@@ -408,6 +409,7 @@ public:
     SystemFunction GetSystemFunction() const { assert(m_Type == Type::SystemFunction); return m_SystemFunction; }
     Object* GetObject() const { assert(m_Type == Type::Object && m_Object); return m_Object.get(); }
     shared_ptr<Object> GetObjectPtr() const { assert(m_Type == Type::Object && m_Object); return m_Object; }
+    Type GetTypeValue() const { assert(m_Type == Type::Type); return m_TypeValue; }
 
     bool IsEqual(const Value& rhs) const
     {
@@ -421,6 +423,7 @@ public:
         case Type::Function:       return m_Function == rhs.m_Function;
         case Type::SystemFunction: return m_SystemFunction == rhs.m_SystemFunction;
         case Type::Object:         return m_Object.get() == rhs.m_Object.get();
+        case Type::Type:           return m_TypeValue == rhs.m_TypeValue;
         default: assert(0); return false;
         }
     }
@@ -434,6 +437,7 @@ public:
         case Type::Function:       return true;
         case Type::SystemFunction: return true;
         case Type::Object:         return true;
+        case Type::Type:           return m_TypeValue != Type::Null;
         default: assert(0); return false;
         }
     }
@@ -447,10 +451,14 @@ private:
         double m_Number;
         const AST::FunctionDefinition* m_Function;
         SystemFunction m_SystemFunction;
+        Type m_TypeValue;
     };
     string m_String;
     shared_ptr<Object> m_Object;
 };
+
+static const char* VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Object", "Type" };
+static_assert(_countof(VALUE_TYPE_NAMES) == (size_t)Value::Type::Count);
 
 ////////////////////////////////////////////////////////////////////////////////
 // class Object definition
@@ -1218,9 +1226,12 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
         case Value::Type::Object:
             ctx.Env.Print("object\n");
             break;
+        case Value::Type::Type:
+            Format(s, "%s\n", VALUE_TYPE_NAMES[(size_t)val.GetTypeValue()]);
+            ctx.Env.Print(s.data(), s.length());
+            break;
         default: assert(0);
         }
-
     }
     return Value{};
 }
@@ -1597,6 +1608,10 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
         Value* val = ctx.GlobalScope.TryGetValue(S);
         if(val)
             return *val;
+        // Type
+        for(size_t i = 0, count = (size_t)Value::Type::Count; i < count; ++i)
+            if(S == VALUE_TYPE_NAMES[i])
+                return Value{(Value::Type)i};
         // System function
         for(size_t i = 0, count = (size_t)SystemFunction::Count; i < count; ++i)
             if(S == SYSTEM_FUNCTION_NAMES[i])
