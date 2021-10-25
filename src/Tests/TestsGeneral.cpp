@@ -568,6 +568,13 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\nDUPA\n");
     }
+    SECTION("NaN")
+    {
+        const char* code = "f=123; n1=0/0; n2=n1; \n"
+            "print(n1==f, n1==n2, n1!=f, n1!=n2, n1<n2, n1?'T':'F');";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n0\n1\n1\n0\nT\n");
+    }
 }
 
 TEST_CASE("Null")
