@@ -1003,6 +1003,13 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "121\n124\nnull\n");
     }
+    SECTION("Object conversion to bool")
+    {
+        const char* code = "o1={a:123}; o2={}; \n"
+            "print(o1?'T':'F', o2?'T':'F');";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "T\nT\n");
+    }
 }
 
 TEST_CASE("Types")
