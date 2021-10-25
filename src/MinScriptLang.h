@@ -2184,6 +2184,8 @@ Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
         Value val = valueExpr->Evaluate(ctx);
         if(val.GetType() != Value::Type::Null)
             obj->GetOrCreateValue(name) = std::move(val);
+        else if(BaseExpression)
+            obj->Remove(name);
     }
     return Value{std::move(obj)};
 }

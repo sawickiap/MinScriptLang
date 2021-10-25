@@ -988,6 +988,14 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "3\n1\n");
     }
+    SECTION("Null member in derived class")
+    {
+        const char* code = "class Base { a: 121, b: 122, c: 123 }; \n"
+            "class Derived : Base { b: 124, c: null }; \n"
+            "print(Derived.a, Derived.b, Derived.c);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "121\n124\nnull\n");
+    }
 }
 
 TEST_CASE("Types")
