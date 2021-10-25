@@ -1029,6 +1029,67 @@ TEST_CASE("Types")
             "print(v1, v2); \n";
         REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
+    SECTION("Number construction")
+    {
+        const char* code = "v1=2; v2=Number(v1); \n"
+            "print(v1, v2); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "2\n2\n");
+    }
+    SECTION("Number construction invalid")
+    {
+        const char* code = "v2=Number('A'); \n"
+            "print(v2); \n";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("String construction")
+    {
+        const char* code = "v1='A'; v2=String(v1); \n"
+            "print(v1, v2); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "A\nA\n");
+    }
+    SECTION("String construction invalid")
+    {
+        const char* code = "v2=String('A', 'B', 123); \n";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Object construction")
+    {
+        const char* code = "v1={a:1, b:2}; v2=Object(v1); \n"
+            "print(v1.a, v2.a, v1==v2); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n1\n0\n");
+    }
+    SECTION("Object construction invalid")
+    {
+        const char* code = "v2=Object(123, 'A'); \n";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Function construction")
+    {
+        const char* code = "function f(){return 123;} v2=Function(f); v3=print;\n"
+            "print(f==v2, v2==v3, v2()); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n0\n123\n");
+    }
+    SECTION("Function construction invalid")
+    {
+        const char* code = "v2=Function(); \n";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Type construction")
+    {
+        const char* code = "v1=TypeOf(125); v2=Type(v1); v3=v2(123);\n"
+            "print(v1==v2, v3); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n123\n");
+    }
+    SECTION("Type construction invalid")
+    {
+        const char* code = "v2=Type(123); \n";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
 }
 
 TEST_CASE("Extra slow")
