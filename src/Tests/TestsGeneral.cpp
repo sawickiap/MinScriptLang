@@ -561,12 +561,25 @@ TEST_CASE("Basic")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "InnerNone\nInnerLocal\nInnerGlobal\nInnerGlobal\n");
     }
-    SECTION("Increment by null")
+    SECTION("Increment number by null")
     {
-        const char* code = "a=1; a+=null; print(a);"
-            "b='DUPA'; b+=null; print(b);";
-        env.Execute(code, strlen(code));
-        REQUIRE(env.GetOutput() == "1\nDUPA\n");
+        const char* code = "a=1; a+=null; print(a);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Increment string by null")
+    {
+        const char* code = "b='DUPA'; b+=null; print(b);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Add number to null")
+    {
+        const char* code = "a=1; a=a+null; print(a);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Add string to null")
+    {
+        const char* code = "b='DUPA'; b=null+b; print(b);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
     }
     SECTION("NaN")
     {
@@ -574,6 +587,30 @@ TEST_CASE("Basic")
             "print(n1==f, n1==n2, n1!=f, n1!=n2, n1<n2, n1?'T':'F');";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "0\n0\n1\n1\n0\nT\n");
+    }
+    SECTION("Comparing number to null")
+    {
+        const char* code = "num0=0; num1=1; \n"
+            "print(num0==nul, num0!=nul, num1==nul, num1!=nul, nul==nul, nul!=nul);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n1\n0\n1\n1\n0\n");
+    }
+    SECTION("Comparing string to null")
+    {
+        const char* code = "s0=''; s1='AAA'; \n"
+            "print(s0==nul, s0!=nul, s1==nul, s1!=nul, nul==nul, nul!=nul);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n1\n0\n1\n1\n0\n");
+    }
+    SECTION("Inequality comparison number with null")
+    {
+        const char* code = "print(123 > nul);";
+        REQUIRE_THROWS_AS(env.Execute(code, strlen(code)), ExecutionError);
+    }
+    SECTION("Inequality comparison string with null")
+    {
+        const char* code = "print('ABC' <= nul);";
+        REQUIRE_THROWS_AS(env.Execute(code, strlen(code)), ExecutionError);
     }
 }
 
@@ -638,21 +675,18 @@ TEST_CASE("Null")
     }
     SECTION("Add to null")
     {
-        const char* code = "print(x + 2); print(2 + null);";
-        env.Execute(code, strlen(code));
-        REQUIRE(env.GetOutput() == "2\n2\n");
+        const char* code = "print(x + 2);";
+        REQUIRE_THROWS_AS(env.Execute(code, strlen(code)), ExecutionError);
     }
     SECTION("Assign add null")
     {
         const char* code = "a += 3; a += 2; print(a); b += 'AAA'; b += 'BBB'; print(b);";
-        env.Execute(code, strlen(code));
-        REQUIRE(env.GetOutput() == "5\nAAABBB\n");
+        REQUIRE_THROWS_AS(env.Execute(code, strlen(code)), ExecutionError);
     }
     SECTION("Increment null")
     {
         const char* code = "a = null; print(a++); print(++a);";
-        env.Execute(code, strlen(code));
-        REQUIRE(env.GetOutput() == "0\n2\n");
+        REQUIRE_THROWS_AS(env.Execute(code, strlen(code)), ExecutionError);
     }
 }
 

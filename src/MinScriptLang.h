@@ -1724,12 +1724,6 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         LValue lval = Operand->GetLValue(ctx);
         EXECUTION_CHECK( !lval.HasCharIndex(), ERROR_MESSAGE_INVALID_LVALUE );
         Value* val = lval.Obj.TryGetValue(lval.Key);
-        // Incrementation can operate on null.
-        if(!val && (Type == UnaryOperatorType::Preincrementation || Type == UnaryOperatorType::Postincrementation))
-        {
-            val = &lval.Obj.GetOrCreateValue(lval.Key);
-            *val = Value{0.0};
-        }
         EXECUTION_CHECK( val != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
         EXECUTION_CHECK( val->GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
@@ -1913,12 +1907,6 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     // These ones support various types.
     if(Type == BinaryOperatorType::Add)
     {
-        // Adding null to number of string gives the other value.
-        if(lhsType == Value::Type::Null && (rhsType == Value::Type::Number || rhsType == Value::Type::String))
-            return rhs;
-        if((lhsType == Value::Type::Number || lhsType == Value::Type::String) && rhsType == Value::Type::Null)
-            return lhs;
-        
         if(lhsType == Value::Type::Number && rhsType == Value::Type::Number)
             return Value{lhs.GetNumber() + rhs.GetNumber()};
         if(lhsType == Value::Type::String && rhsType == Value::Type::String)
@@ -2062,28 +2050,12 @@ Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
     EXECUTION_CHECK( !lhs.HasCharIndex(), ERROR_MESSAGE_INVALID_LVALUE );
     Value* lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
 
-    // += can work on null if adding a number or string.
-    if(!lhsValPtr && Type == BinaryOperatorType::AssignmentAdd &&
-        (rhs.GetType() == Value::Type::Number || rhs.GetType() == Value::Type::String))
-    {
-        lhsValPtr = &lhs.Obj.GetOrCreateValue(lhs.Key);
-        if(rhs.GetType() == Value::Type::Number)
-            *lhsValPtr = Value{0.0};
-        else
-            *lhsValPtr = Value{string{}};
-    }
-
     // Others require existing value.
     EXECUTION_CHECK( lhsValPtr != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
 
     if(Type == BinaryOperatorType::AssignmentAdd)
     {
-        if((lhsValPtr->GetType() == Value::Type::Number || lhsValPtr->GetType() == Value::Type::String) &&
-            rhs.GetType() == Value::Type::Null)
-        {
-            // Increment by null - not changing value.
-        }
-        else if(lhsValPtr->GetType() == Value::Type::Number && rhs.GetType() == Value::Type::Number)
+        if(lhsValPtr->GetType() == Value::Type::Number && rhs.GetType() == Value::Type::Number)
             lhsValPtr->ChangeNumber(lhsValPtr->GetNumber() + rhs.GetNumber());
         else if(lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String)
             lhsValPtr->GetString() += rhs.GetString();
