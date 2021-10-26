@@ -96,6 +96,7 @@ private:
 #include <memory>
 #include <algorithm>
 #include <initializer_list>
+#include <variant>
 
 #include <cstdlib>
 #include <cassert>
@@ -379,6 +380,7 @@ private:
 
 namespace AST { struct FunctionDefinition; }
 class Object;
+class Array;
 
 enum class SystemFunction {
     TypeOf, Print, Count
@@ -390,7 +392,7 @@ static const char* SYSTEM_FUNCTION_NAMES[] = {
 class Value
 {
 public:
-    enum class Type { Null, Number, String, Function, SystemFunction, Object, Type, Count };
+    enum class Type { Null, Number, String, Function, SystemFunction, Object, Array, Type, Count };
     
     shared_ptr<Object> m_ThisObject;
 
@@ -400,6 +402,7 @@ public:
     Value(const AST::FunctionDefinition* func) : m_Type{Type::Function}, m_Function{func} { }
     Value(SystemFunction func) : m_Type{Type::SystemFunction}, m_SystemFunction{func} { }
     Value(shared_ptr<Object> &&obj) : m_Type{Type::Object}, m_Object(obj) { }
+    Value(shared_ptr<Array> &&arr) : m_Type{Type::Array}, m_Array(arr) { }
     Value(Type typeVal) : m_Type{Type::Type}, m_TypeValue(typeVal) { }
 
     Type GetType() const { return m_Type; }
@@ -410,6 +413,8 @@ public:
     SystemFunction GetSystemFunction() const { assert(m_Type == Type::SystemFunction); return m_SystemFunction; }
     Object* GetObject() const { assert(m_Type == Type::Object && m_Object); return m_Object.get(); }
     shared_ptr<Object> GetObjectPtr() const { assert(m_Type == Type::Object && m_Object); return m_Object; }
+    Array* GetArray() const { assert(m_Type == Type::Array && m_Array); return m_Array.get(); }
+    shared_ptr<Array> GetArrayPtr() const { assert(m_Type == Type::Array && m_Array); return m_Array; }
     Type GetTypeValue() const { assert(m_Type == Type::Type); return m_TypeValue; }
 
     bool IsEqual(const Value& rhs) const
@@ -424,6 +429,7 @@ public:
         case Type::Function:       return m_Function == rhs.m_Function;
         case Type::SystemFunction: return m_SystemFunction == rhs.m_SystemFunction;
         case Type::Object:         return m_Object.get() == rhs.m_Object.get();
+        case Type::Array:          return m_Array.get() == rhs.m_Array.get();
         case Type::Type:           return m_TypeValue == rhs.m_TypeValue;
         default: assert(0); return false;
         }
@@ -438,6 +444,7 @@ public:
         case Type::Function:       return true;
         case Type::SystemFunction: return true;
         case Type::Object:         return true;
+        case Type::Array:          return true;
         case Type::Type:           return m_TypeValue != Type::Null;
         default: assert(0); return false;
         }
@@ -456,9 +463,10 @@ private:
     };
     string m_String;
     shared_ptr<Object> m_Object;
+    shared_ptr<Array> m_Array;
 };
 
-static const char* VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Object", "Type" };
+static const char* VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Object", "Array", "Type" };
 static_assert(_countof(VALUE_TYPE_NAMES) == (size_t)Value::Type::Count);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -477,14 +485,28 @@ public:
     bool Remove(const string& key); // Returns true if has been found and removed.
 };
 
-struct LValue
+class Array
 {
-    Object& Obj;
-    string Key;
-    size_t CharIndex = SIZE_MAX; // SIZE_MAX if not indexing single character.
-    
-    bool HasCharIndex() const { return CharIndex != SIZE_MAX; }
+public:
+    vector<Value> Items;
 };
+
+struct ObjectMemberLValue
+{
+    Object* Obj;
+    string Key;
+};
+struct StringCharacterLValue
+{
+    string* Str;
+    size_t Index;
+};
+struct ArrayItemLValue
+{
+    Array* Arr;
+    size_t Index;
+};
+using LValue = std::variant<ObjectMemberLValue, StringCharacterLValue, ArrayItemLValue>;
 
 ////////////////////////////////////////////////////////////////////////////////
 // struct ReturnException definition
@@ -780,6 +802,14 @@ struct ObjectExpression : public Expression
     virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
+struct ArrayExpression : public Expression
+{
+    vector<unique_ptr<Expression>> Items;
+    ArrayExpression(const PlaceInCode& place) : Expression{ place } { }
+    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual Value Evaluate(ExecuteContext& ctx) const;
+};
+
 } // namespace AST
 
 static inline void CheckNumberOperand(const AST::Expression* operand, const Value& value)
@@ -813,6 +843,7 @@ private:
     unique_ptr<AST::Expression> TryParseClassSyntacticSugar();
     unique_ptr<AST::Expression> TryParseObjectMember(string& outMemberName);
     unique_ptr<AST::ObjectExpression> TryParseObject();
+    unique_ptr<AST::ArrayExpression> TryParseArray();
     unique_ptr<AST::Expression> TryParseExpr0();
     unique_ptr<AST::Expression> TryParseExpr2();
     unique_ptr<AST::Expression> TryParseExpr3();
@@ -1301,19 +1332,22 @@ namespace AST {
 
 void Statement::Assign(const LValue& lhs, Value&& rhs) const
 {
-    if(lhs.HasCharIndex())
+    if(const StringCharacterLValue* strCharLhs = std::get_if<StringCharacterLValue>(&lhs))
     {
-        Value* const lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
-        EXECUTION_CHECK( lhsValPtr != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
-        EXECUTION_CHECK( lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
-        EXECUTION_CHECK( lhs.CharIndex < lhsValPtr->GetString().length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
+        EXECUTION_CHECK( rhs.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
+        EXECUTION_CHECK( strCharLhs->Index < strCharLhs->Str->length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
         EXECUTION_CHECK( rhs.GetString().length() == 1, ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING );
-        lhsValPtr->GetString()[lhs.CharIndex] = rhs.GetString()[0];
+        (*strCharLhs->Str)[strCharLhs->Index] = rhs.GetString()[0];
     }
-    else if(rhs.GetType() == Value::Type::Null)
-        lhs.Obj.Remove(lhs.Key);
+    else if(const ObjectMemberLValue* objMemberLhs = std::get_if<ObjectMemberLValue>(&lhs))
+    {
+        if(rhs.GetType() == Value::Type::Null)
+            objMemberLhs->Obj->Remove(objMemberLhs->Key);
+        else
+            objMemberLhs->Obj->GetOrCreateValue(objMemberLhs->Key) = std::move(rhs);
+    }
     else
-        lhs.Obj.GetOrCreateValue(lhs.Key) = std::move(rhs);
+        assert(0);
 }
 
 void EmptyStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -1462,9 +1496,9 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
         for(size_t i = 0; i < count; ++i)
         {
             if(useKey)
-                Assign(LValue{innermostCtxObj, KeyVarName}, Value{(double)i});
+                Assign(LValue{ObjectMemberLValue{&innermostCtxObj, KeyVarName}}, Value{(double)i});
             const char ch = rangeStr[i];
-            Assign(LValue{innermostCtxObj, ValueVarName}, Value{string{&ch, &ch + 1}});
+            Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ValueVarName}}, Value{string{&ch, &ch + 1}});
             Body->Execute(ctx);
         }
     }
@@ -1473,8 +1507,8 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
         for(const auto& [key, value]: rangeVal.GetObject()->m_Items)
         {
             if(useKey)
-                Assign(LValue{innermostCtxObj, KeyVarName}, Value{string{key}});
-            Assign(LValue{innermostCtxObj, ValueVarName}, Value{value});
+                Assign(LValue{ObjectMemberLValue{&innermostCtxObj, KeyVarName}}, Value{string{key}});
+            Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ValueVarName}}, Value{value});
             Body->Execute(ctx);
         }
     }
@@ -1482,8 +1516,8 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
         EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
 
     if(useKey)
-        Assign(LValue{innermostCtxObj, KeyVarName}, Value{});
-    Assign(LValue{innermostCtxObj, ValueVarName}, Value{});
+        Assign(LValue{ObjectMemberLValue{&innermostCtxObj, KeyVarName}}, Value{});
+    Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ValueVarName}}, Value{});
 }
 
 void LoopBreakStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -1674,21 +1708,21 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
     {
         // Local variable
         if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && ctx.GetCurrentLocalScope()->HasKey(S))
-            return LValue{*ctx.GetCurrentLocalScope(), S};
+            return LValue{ObjectMemberLValue{&*ctx.GetCurrentLocalScope(), S}};
         // This
         if(Scope == IdentifierScope::None)
             if(Object* thisObj = ctx.GetThis().get(); thisObj && thisObj->HasKey(S))
-                return LValue{*thisObj, S};
+                return LValue{ObjectMemberLValue{thisObj, S}};
     }    
     
     // Global variable
     if((Scope == IdentifierScope::None || Scope == IdentifierScope::Global) && ctx.GlobalScope.HasKey(S))
-        return LValue{ctx.GlobalScope, S};
+        return LValue{ObjectMemberLValue{&ctx.GlobalScope, S}};
 
     // Not found: return reference to smallest scope.
     if((Scope == IdentifierScope::None || Scope == IdentifierScope::Local) && isLocal)
-        return LValue{*ctx.GetCurrentLocalScope(), S};
-    return LValue{ctx.GlobalScope, S};
+        return LValue{ObjectMemberLValue{ctx.GetCurrentLocalScope(), S}};
+    return LValue{ObjectMemberLValue{&ctx.GlobalScope, S}};
 }
 
 void ThisExpression::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -1722,8 +1756,9 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         Type == UnaryOperatorType::Postdecrementation)
     {
         LValue lval = Operand->GetLValue(ctx);
-        EXECUTION_CHECK( !lval.HasCharIndex(), ERROR_MESSAGE_INVALID_LVALUE );
-        Value* val = lval.Obj.TryGetValue(lval.Key);
+        const ObjectMemberLValue* objMemberLval = std::get_if<ObjectMemberLValue>(&lval);
+        EXECUTION_CHECK( objMemberLval, ERROR_MESSAGE_INVALID_LVALUE );
+        Value* val = objMemberLval->Obj->TryGetValue(objMemberLval->Key);
         EXECUTION_CHECK( val != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
         EXECUTION_CHECK( val->GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
@@ -1770,14 +1805,9 @@ LValue UnaryOperator::GetLValue(ExecuteContext& ctx) const
     if(Type == UnaryOperatorType::Preincrementation || Type == UnaryOperatorType::Predecrementation)
     {
         LValue lval = Operand->GetLValue(ctx);
-        EXECUTION_CHECK( !lval.HasCharIndex(), ERROR_MESSAGE_INVALID_LVALUE );
-        Value* val = lval.Obj.TryGetValue(lval.Key);
-        // Incrementation can operate on null.
-        if(!val && Type == UnaryOperatorType::Preincrementation)
-        {
-            val = &lval.Obj.GetOrCreateValue(lval.Key);
-            *val = Value{0.0};
-        }
+        const ObjectMemberLValue* objMemberLval = std::get_if<ObjectMemberLValue>(&lval);
+        EXECUTION_CHECK( objMemberLval, ERROR_MESSAGE_INVALID_LVALUE );
+        Value* val = objMemberLval->Obj->TryGetValue(objMemberLval->Key);
         EXECUTION_CHECK( val != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
         EXECUTION_CHECK( val->GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
@@ -1825,7 +1855,7 @@ LValue MemberAccessOperator::GetLValue(ExecuteContext& ctx) const
 {
     Value objVal = Operand->Evaluate(ctx);
     EXECUTION_CHECK(objVal.GetType() == Value::Type::Object, ERROR_MESSAGE_EXPECTED_OBJECT);
-    return LValue{*objVal.GetObject(), MemberName};
+    return LValue{ObjectMemberLValue{objVal.GetObject(), MemberName}};
 }
 
 Value UnaryOperator::BitwiseNot(Value&& operand) const
@@ -1974,6 +2004,13 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
             }
             return Value{};
         }
+        if(lhsType == Value::Type::Array)
+        {
+            EXECUTION_CHECK( rhsType == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+            size_t index;
+            EXECUTION_CHECK( NumberToIndex(index, rhs.GetNumber()) && index < lhs.GetArray()->Items.size(), ERROR_MESSAGE_INVALID_INDEX );
+            return lhs.GetArray()->Items[index];
+        }
         EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
     }
 
@@ -2001,22 +2038,33 @@ LValue BinaryOperator::GetLValue(ExecuteContext& ctx) const
 {
     if(Type == BinaryOperatorType::Indexing)
     {
-        LValue lval = Operands[0]->GetLValue(ctx);
-        EXECUTION_CHECK( !lval.HasCharIndex(), ERROR_MESSAGE_INVALID_LVALUE );
-        Value* leftVal = lval.Obj.TryGetValue(lval.Key);
+        const LValue lval = Operands[0]->GetLValue(ctx);
+        const ObjectMemberLValue* objMemberLval = std::get_if<ObjectMemberLValue>(&lval);
+        EXECUTION_CHECK( objMemberLval, ERROR_MESSAGE_INVALID_LVALUE );
+        Value* leftVal = objMemberLval->Obj->TryGetValue(objMemberLval->Key);
         EXECUTION_CHECK( leftVal, ERROR_MESSAGE_INVALID_LVALUE );
         const Value indexVal = Operands[1]->Evaluate(ctx);
         if(leftVal->GetType() == Value::Type::String)
         {
             EXECUTION_CHECK( indexVal.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
-            EXECUTION_CHECK( NumberToIndex(lval.CharIndex, indexVal.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
-            return lval;
+            size_t charIndex;
+            EXECUTION_CHECK( NumberToIndex(charIndex, indexVal.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
+            return LValue{StringCharacterLValue{&leftVal->GetString(), charIndex}};
         }
         if(leftVal->GetType() == Value::Type::Object)
         {
             EXECUTION_CHECK( indexVal.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
+            return LValue{ObjectMemberLValue{leftVal->GetObject(), indexVal.GetString()}};
+        }
+        /* TODO
+        if(leftVal->GetType() == Value::Type::Array)
+        {
+            EXECUTION_CHECK( indexVal.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+            size_t index = 0;
+            EXECUTION_CHECK( NumberToIndex(index, indexVal.GetNumber()) && index < leftVal->GetArray()->Items.size(), ERROR_MESSAGE_INVALID_INDEX );
             return LValue{*leftVal->GetObject(), indexVal.GetString()};
         }
+        */
     }
     return __super::GetLValue(ctx);
 }
@@ -2047,8 +2095,9 @@ Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
         return valCopy;
     }
 
-    EXECUTION_CHECK( !lhs.HasCharIndex(), ERROR_MESSAGE_INVALID_LVALUE );
-    Value* lhsValPtr = lhs.Obj.TryGetValue(lhs.Key);
+    const ObjectMemberLValue* objMemberLval = std::get_if<ObjectMemberLValue>(&lhs);
+    EXECUTION_CHECK( objMemberLval, ERROR_MESSAGE_INVALID_LVALUE );
+    Value* lhsValPtr = objMemberLval->Obj->TryGetValue(objMemberLval->Key);
 
     // Others require existing value.
     EXECUTION_CHECK( lhsValPtr != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
@@ -2160,6 +2209,26 @@ Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
             obj->Remove(name);
     }
     return Value{std::move(obj)};
+}
+
+void ArrayExpression::DebugPrint(uint32_t indentLevel, const char* prefix) const
+{
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "Array\n", DEBUG_PRINT_ARGS_BEG);
+    ++indentLevel;
+    string indexStr;
+    for(size_t i = 0, count = Items.size(); i < count; ++i)
+    {
+        Format(indexStr, "%zu", i);
+        Items[i]->DebugPrint(indentLevel, indexStr.c_str());
+    }
+}
+
+Value ArrayExpression::Evaluate(ExecuteContext& ctx) const
+{
+    auto result = std::make_shared<Array>();
+    for (const auto& item : Items)
+        result->Items.push_back(item->Evaluate(ctx));
+    return Value{std::move(result)};
 }
 
 Value CallOperator::Evaluate(ExecuteContext& ctx) const
@@ -2657,6 +2726,33 @@ unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
     return unique_ptr<AST::ObjectExpression>{};
 }
 
+unique_ptr<AST::ArrayExpression> Parser::TryParseArray()
+{
+    if(TryParseSymbol(Symbol::SquareBracketOpen))
+    {
+        auto arrExpr = make_unique<AST::ArrayExpression>(GetCurrentTokenPlace());
+        if(!TryParseSymbol(Symbol::SquareBracketClose))
+        {
+            unique_ptr<AST::Expression> itemValue;
+            MUST_PARSE( itemValue = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+            arrExpr->Items.push_back((std::move(itemValue)));
+            if(!TryParseSymbol(Symbol::SquareBracketClose))
+            {
+                while(TryParseSymbol(Symbol::Comma))
+                {
+                    if(TryParseSymbol(Symbol::SquareBracketClose))
+                        return arrExpr;
+                    MUST_PARSE( itemValue = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
+                    arrExpr->Items.push_back((std::move(itemValue)));
+                }
+                MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
+            }
+        }
+        return arrExpr;
+    }
+    return unique_ptr<AST::ArrayExpression>{};
+}
+
 unique_ptr<AST::Expression> Parser::TryParseExpr0()
 {
     const PlaceInCode place = GetCurrentTokenPlace();
@@ -2672,6 +2768,8 @@ unique_ptr<AST::Expression> Parser::TryParseExpr0()
 
     if(auto objExpr = TryParseObject())
         return objExpr;
+    if(auto arrExpr = TryParseArray())
+        return arrExpr;
 
     // 'function' '(' [ TOKEN_IDENTIFIER ( ',' TOKE_IDENTIFIER )* ] ')' '{' Block '}'
     if(m_Tokens[m_TokenIndex].Symbol == Symbol::Function && m_Tokens[m_TokenIndex + 1].Symbol == Symbol::RoundBracketOpen)
