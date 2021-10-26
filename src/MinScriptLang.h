@@ -161,6 +161,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'
 static const char* const ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT = "Expected unique constant.";
 static const char* const ERROR_MESSAGE_EXPECTED_1_ARGUMENT = "Expected 1 argument.";
 static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
+static const char* const ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST = "Object member doesn't exist.";
 static const char* const ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
 static const char* const ERROR_MESSAGE_BREAK_WITHOUT_LOOP = "Break without a loop.";
 static const char* const ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP = "Continue without a loop.";
@@ -506,7 +507,11 @@ struct ArrayItemLValue
     Array* Arr;
     size_t Index;
 };
-using LValue = std::variant<ObjectMemberLValue, StringCharacterLValue, ArrayItemLValue>;
+struct LValue : public std::variant<ObjectMemberLValue, StringCharacterLValue, ArrayItemLValue>
+{
+    Value* GetValueRef(const PlaceInCode& place) const; // Always returns non-null or throws exception.
+    Value GetValue(const PlaceInCode& place) const;
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // struct ReturnException definition
@@ -670,7 +675,7 @@ struct Script : Block
 struct Expression : Statement
 {
     explicit Expression(const PlaceInCode& place) : Statement{place} { }
-    virtual Value Evaluate(ExecuteContext& ctx) const = 0;
+    virtual Value Evaluate(ExecuteContext& ctx) const { return GetLValue(ctx).GetValue(GetPlace()); }
     virtual LValue GetLValue(ExecuteContext& ctx) const { EXECUTION_CHECK( false, ERROR_MESSAGE_EXPECTED_LVALUE ); }
     virtual void Execute(ExecuteContext& ctx) const { Evaluate(ctx); }
 };
@@ -1222,6 +1227,49 @@ bool Object::Remove(const string& key)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// struct LValue implementation
+
+Value* LValue::GetValueRef(const PlaceInCode& place) const
+{
+    if(const ObjectMemberLValue* objMemberLval = std::get_if<ObjectMemberLValue>(this))
+    {
+        if(Value* val = objMemberLval->Obj->TryGetValue(objMemberLval->Key))
+            return val;
+        EXECUTION_CHECK_PLACE(false, place, ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST);
+    }
+    if(const ArrayItemLValue* arrItemLval = std::get_if<ArrayItemLValue>(this))
+    {
+        EXECUTION_CHECK_PLACE(arrItemLval->Index < arrItemLval->Arr->Items.size(), place, ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
+        return &arrItemLval->Arr->Items[arrItemLval->Index];
+    }
+    EXECUTION_CHECK_PLACE(false, place, ERROR_MESSAGE_INVALID_LVALUE);
+    return nullptr;
+}
+
+Value LValue::GetValue(const PlaceInCode& place) const
+{
+    if(const ObjectMemberLValue* objMemberLval = std::get_if<ObjectMemberLValue>(this))
+    {
+        if(const Value* val = objMemberLval->Obj->TryGetValue(objMemberLval->Key))
+            return *val;
+        EXECUTION_CHECK_PLACE(false, place, ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST);
+    }
+    if(const StringCharacterLValue* strCharLval = std::get_if<StringCharacterLValue>(this))
+    {
+        EXECUTION_CHECK_PLACE(strCharLval->Index < strCharLval->Str->length(), place, ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
+        const char ch = (*strCharLval->Str)[strCharLval->Index];
+        return Value{string{&ch, &ch + 1}};
+    }
+    if(const ArrayItemLValue* arrItemLval = std::get_if<ArrayItemLValue>(this))
+    {
+        EXECUTION_CHECK_PLACE(arrItemLval->Index < arrItemLval->Arr->Items.size(), place, ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
+        return Value{arrItemLval->Arr->Items[arrItemLval->Index]};
+    }
+    assert(0);
+    return Value{};
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Built-in functions
 
 static shared_ptr<Object> CopyObject(const Object& src)
@@ -1332,19 +1380,24 @@ namespace AST {
 
 void Statement::Assign(const LValue& lhs, Value&& rhs) const
 {
-    if(const StringCharacterLValue* strCharLhs = std::get_if<StringCharacterLValue>(&lhs))
-    {
-        EXECUTION_CHECK( rhs.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
-        EXECUTION_CHECK( strCharLhs->Index < strCharLhs->Str->length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
-        EXECUTION_CHECK( rhs.GetString().length() == 1, ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING );
-        (*strCharLhs->Str)[strCharLhs->Index] = rhs.GetString()[0];
-    }
-    else if(const ObjectMemberLValue* objMemberLhs = std::get_if<ObjectMemberLValue>(&lhs))
+    if(const ObjectMemberLValue* objMemberLhs = std::get_if<ObjectMemberLValue>(&lhs))
     {
         if(rhs.GetType() == Value::Type::Null)
             objMemberLhs->Obj->Remove(objMemberLhs->Key);
         else
             objMemberLhs->Obj->GetOrCreateValue(objMemberLhs->Key) = std::move(rhs);
+    }
+    else if(const ArrayItemLValue* arrItemLhs = std::get_if<ArrayItemLValue>(&lhs))
+    {
+        EXECUTION_CHECK( arrItemLhs->Index < arrItemLhs->Arr->Items.size(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
+        arrItemLhs->Arr->Items[arrItemLhs->Index] = std::move(rhs);
+    }
+    else if(const StringCharacterLValue* strCharLhs = std::get_if<StringCharacterLValue>(&lhs))
+    {
+        EXECUTION_CHECK( strCharLhs->Index < strCharLhs->Str->length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
+        EXECUTION_CHECK( rhs.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
+        EXECUTION_CHECK( rhs.GetString().length() == 1, ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING );
+        (*strCharLhs->Str)[strCharLhs->Index] = rhs.GetString()[0];
     }
     else
         assert(0);
@@ -1755,11 +1808,7 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         Type == UnaryOperatorType::Postincrementation ||
         Type == UnaryOperatorType::Postdecrementation)
     {
-        LValue lval = Operand->GetLValue(ctx);
-        const ObjectMemberLValue* objMemberLval = std::get_if<ObjectMemberLValue>(&lval);
-        EXECUTION_CHECK( objMemberLval, ERROR_MESSAGE_INVALID_LVALUE );
-        Value* val = objMemberLval->Obj->TryGetValue(objMemberLval->Key);
-        EXECUTION_CHECK( val != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
+        Value* val = Operand->GetLValue(ctx).GetValueRef(GetPlace());
         EXECUTION_CHECK( val->GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
         {
@@ -1904,11 +1953,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     case BinaryOperatorType::AssignmentBitwiseAnd:
     case BinaryOperatorType::AssignmentBitwiseXor:
     case BinaryOperatorType::AssignmentBitwiseOr:
-    {
-        LValue lhs = Operands[0]->GetLValue(ctx);
-        Value rhs = Operands[1]->Evaluate(ctx);
-        return Assignment(std::move(lhs), std::move(rhs));
-    }
+        return Assignment(Operands[0]->GetLValue(ctx), Operands[1]->Evaluate(ctx));
     }
     
     // Remaining operators use r-values.
@@ -2038,33 +2083,27 @@ LValue BinaryOperator::GetLValue(ExecuteContext& ctx) const
 {
     if(Type == BinaryOperatorType::Indexing)
     {
-        const LValue lval = Operands[0]->GetLValue(ctx);
-        const ObjectMemberLValue* objMemberLval = std::get_if<ObjectMemberLValue>(&lval);
-        EXECUTION_CHECK( objMemberLval, ERROR_MESSAGE_INVALID_LVALUE );
-        Value* leftVal = objMemberLval->Obj->TryGetValue(objMemberLval->Key);
-        EXECUTION_CHECK( leftVal, ERROR_MESSAGE_INVALID_LVALUE );
+        Value* leftValRef = Operands[0]->GetLValue(ctx).GetValueRef(GetPlace());
         const Value indexVal = Operands[1]->Evaluate(ctx);
-        if(leftVal->GetType() == Value::Type::String)
+        if(leftValRef->GetType() == Value::Type::String)
         {
             EXECUTION_CHECK( indexVal.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
             size_t charIndex;
             EXECUTION_CHECK( NumberToIndex(charIndex, indexVal.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
-            return LValue{StringCharacterLValue{&leftVal->GetString(), charIndex}};
+            return LValue{StringCharacterLValue{&leftValRef->GetString(), charIndex}};
         }
-        if(leftVal->GetType() == Value::Type::Object)
+        if(leftValRef->GetType() == Value::Type::Object)
         {
             EXECUTION_CHECK( indexVal.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
-            return LValue{ObjectMemberLValue{leftVal->GetObject(), indexVal.GetString()}};
+            return LValue{ObjectMemberLValue{leftValRef->GetObject(), indexVal.GetString()}};
         }
-        /* TODO
-        if(leftVal->GetType() == Value::Type::Array)
+        if(leftValRef->GetType() == Value::Type::Array)
         {
             EXECUTION_CHECK( indexVal.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
-            size_t index = 0;
-            EXECUTION_CHECK( NumberToIndex(index, indexVal.GetNumber()) && index < leftVal->GetArray()->Items.size(), ERROR_MESSAGE_INVALID_INDEX );
-            return LValue{*leftVal->GetObject(), indexVal.GetString()};
+            size_t itemIndex;
+            EXECUTION_CHECK( NumberToIndex(itemIndex, indexVal.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
+            return LValue{ArrayItemLValue{leftValRef->GetArray(), itemIndex}};
         }
-        */
     }
     return __super::GetLValue(ctx);
 }
@@ -2090,17 +2129,12 @@ Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
     // This one is able to create new value.
     if(Type == BinaryOperatorType::Assignment)
     {
-        Value valCopy = rhs;
-        Assign(lhs, std::move(rhs));
-        return valCopy;
+        Assign(lhs, Value{rhs});
+        return rhs;
     }
 
-    const ObjectMemberLValue* objMemberLval = std::get_if<ObjectMemberLValue>(&lhs);
-    EXECUTION_CHECK( objMemberLval, ERROR_MESSAGE_INVALID_LVALUE );
-    Value* lhsValPtr = objMemberLval->Obj->TryGetValue(objMemberLval->Key);
-
     // Others require existing value.
-    EXECUTION_CHECK( lhsValPtr != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
+    Value* const lhsValPtr = lhs.GetValueRef(GetPlace());
 
     if(Type == BinaryOperatorType::AssignmentAdd)
     {
