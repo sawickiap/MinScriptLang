@@ -1348,6 +1348,9 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
         case Value::Type::Object:
             ctx.Env.Print("object\n");
             break;
+        case Value::Type::Array:
+            ctx.Env.Print("array\n");
+            break;
         case Value::Type::Type:
             Format(s, "%s\n", VALUE_TYPE_NAMES[(size_t)val.GetTypeValue()]);
             ctx.Env.Print(s.data(), s.length());
@@ -2779,7 +2782,7 @@ unique_ptr<AST::ArrayExpression> Parser::TryParseArray()
                     MUST_PARSE( itemValue = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION );
                     arrExpr->Items.push_back((std::move(itemValue)));
                 }
-                MUST_PARSE( TryParseSymbol(Symbol::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE );
+                MUST_PARSE( TryParseSymbol(Symbol::SquareBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE );
             }
         }
         return arrExpr;

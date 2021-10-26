@@ -1148,6 +1148,32 @@ TEST_CASE("Types")
     }
 }
 
+TEST_CASE("Array")
+{
+    Environment env;
+    SECTION("Empty array definition")
+    {
+        const char* code = "a1=[]; print(a1); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "array\n");
+    }
+    SECTION("Array definition and indexing as rvalue")
+    {
+        const char* code = "a1=[1, 2, 3]; \n"
+            "print(a1[0], a1[1], a1[2]); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n2\n3\n");
+    }
+    SECTION("Array definition and indexing as lvalue")
+    {
+        const char* code = "a1=[1, 2, 3, 4, 5]; \n"
+            "a1[0]=10; a1[1]+=10; a1[2]*=10; a1[3]++; ++a1[4];\n"
+            "print(a1[0], a1[1], a1[2], a1[3], a1[4]); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "10\n12\n30\n5\n6\n");
+    }
+}
+
 TEST_CASE("Extra slow")
 {
     Environment env;
