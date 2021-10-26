@@ -1279,7 +1279,15 @@ static shared_ptr<Object> CopyObject(const Object& src)
         dst->m_Items.insert(item);
     return dst;
 }
-
+static shared_ptr<Array> CopyArray(const Array& src)
+{
+    auto dst = std::make_shared<Array>();
+    const size_t count = src.Items.size();
+    dst->Items.resize(count);
+    for(size_t i = 0; i < count; ++i)
+        dst->Items[i] = Value{src.Items[i]};
+    return dst;
+}
 static Value BuiltInTypeCtor_Null(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     EXECUTION_CHECK_PLACE(args.empty() || args.size() == 1 && args[0].GetType() == Value::Type::Null, place, "Null can be constructed only from no arguments or from another null value.");
@@ -1302,7 +1310,14 @@ static Value BuiltInTypeCtor_Object(AST::ExecuteContext& ctx, const PlaceInCode&
     if(args.empty())
         return Value{std::make_shared<Object>()};
     EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::Object, place, "Object can be constructed only from no arguments or from another object value.");
-    return CopyObject(*args[0].GetObject());
+    return Value{CopyObject(*args[0].GetObject())};
+}
+static Value BuiltInTypeCtor_Array(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    if(args.empty())
+        return Value{std::make_shared<Array>()};
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::Array, place, "Array can be constructed only from no arguments or from another array value.");
+    return Value{CopyArray(*args[0].GetArray())};
 }
 static Value BuiltInTypeCtor_Function(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
@@ -2331,6 +2346,7 @@ Value CallOperator::Evaluate(ExecuteContext& ctx) const
         case Value::Type::Number: return BuiltInTypeCtor_Number(ctx, GetPlace(), std::move(arguments));
         case Value::Type::String: return BuiltInTypeCtor_String(ctx, GetPlace(), std::move(arguments));
         case Value::Type::Object: return BuiltInTypeCtor_Object(ctx, GetPlace(), std::move(arguments));
+        case Value::Type::Array: return BuiltInTypeCtor_Array(ctx, GetPlace(), std::move(arguments));
         case Value::Type::Type: return BuiltInTypeCtor_Type(ctx, GetPlace(), std::move(arguments));
         case Value::Type::Function:
         case Value::Type::SystemFunction:

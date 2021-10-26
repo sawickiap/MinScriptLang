@@ -1172,6 +1172,32 @@ TEST_CASE("Array")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "10\n12\n30\n5\n6\n");
     }
+    SECTION("Invalid array indexing with other value type")
+    {
+        const char* code = "a=[1, 2, 3]; print(a[Number]); \n";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Invalid array indexing out of bounds")
+    {
+        const char* code = "a=[1, 2, 3]; print(a[100]); \n";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
+    SECTION("Passing and returning array by reference")
+    {
+        const char* code = "a1=[1, 2, 3]; a2=a1; \n"
+            "function f(arg) { arg[1]++; return arg; } \n"
+            "a3=f(a2); \n"
+            "print(a1[0], a1[1], a1[2], a3[1], a1==a3, a1!=a3); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n3\n3\n3\n1\n0\n");
+    }
+    SECTION("Array constructor to copy")
+    {
+        const char* code = "a1=[1, 2, 3]; a2=Array(a1); a0=Array(); \n"
+            "print(a2[0], a2[1], a2[2], a1==a2, a1==a0); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n2\n3\n0\n0\n");
+    }
 }
 
 TEST_CASE("Extra slow")
