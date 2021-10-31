@@ -396,7 +396,20 @@ static const char* SYSTEM_FUNCTION_NAMES[] = {
 };
 static_assert(_countof(SYSTEM_FUNCTION_NAMES) == (size_t)SystemFunction::Count);
 
-using ThisType = std::variant<std::monostate, shared_ptr<Object>, shared_ptr<Array>>;
+struct ThisType : public std::variant<std::monostate, shared_ptr<Object>, shared_ptr<Array>>
+{
+    bool IsEmpty() const { return std::get_if<std::monostate>(this) != nullptr; }
+    Object* GetObject() const
+    {
+        const shared_ptr<Object>* objectPtr = std::get_if<shared_ptr<Object>>(this);
+        return objectPtr ? objectPtr->get() : nullptr;
+    }
+    Array* GetArray() const
+    {
+        const shared_ptr<Array>* arrayPtr = std::get_if<shared_ptr<Array>>(this);
+        return arrayPtr ? arrayPtr->get() : nullptr;
+    }
+};
 
 class Value
 {
@@ -1406,30 +1419,30 @@ static Value BuiltInMember_String_Count(AST::ExecuteContext& ctx, const PlaceInC
 
 static Value BuiltInFunction_Array_Add(AST::ExecuteContext& ctx, const PlaceInCode& place, const ThisType& th, std::vector<Value>&& args)
 {
-    const shared_ptr<Array>* arr = std::get_if<shared_ptr<Array>>(&th);
-    EXECUTION_CHECK_PLACE(arr && *arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
+    Array* arr = th.GetArray();
+    EXECUTION_CHECK_PLACE(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
     EXECUTION_CHECK_PLACE(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
-    (*arr)->Items.push_back(std::move(args[0]));
+    arr->Items.push_back(std::move(args[0]));
     return Value{};
 }
 static Value BuiltInFunction_Array_Insert(AST::ExecuteContext& ctx, const PlaceInCode& place, const ThisType& th, std::vector<Value>&& args)
 {
-    const shared_ptr<Array>* arr = std::get_if<shared_ptr<Array>>(&th);
-    EXECUTION_CHECK_PLACE(arr && *arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
+    Array* arr = th.GetArray();
+    EXECUTION_CHECK_PLACE(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
     EXECUTION_CHECK_PLACE(args.size() == 2, place, ERROR_MESSAGE_EXPECTED_2_ARGUMENTS);
     size_t index = 0;
     EXECUTION_CHECK_PLACE(args[0].GetType() == Value::Type::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
-    (*arr)->Items.insert((*arr)->Items.begin() + index, std::move(args[1]));
+    arr->Items.insert(arr->Items.begin() + index, std::move(args[1]));
     return Value{};
 }
 static Value BuiltInFunction_Array_Remove(AST::ExecuteContext& ctx, const PlaceInCode& place, const ThisType& th, std::vector<Value>&& args)
 {
-    const shared_ptr<Array>* arr = std::get_if<shared_ptr<Array>>(&th);
-    EXECUTION_CHECK_PLACE(arr && *arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
+    Array* arr = th.GetArray();
+    EXECUTION_CHECK_PLACE(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
     EXECUTION_CHECK_PLACE(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
     size_t index = 0;
     EXECUTION_CHECK_PLACE(args[0].GetType() == Value::Type::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
-    (*arr)->Items.erase((*arr)->Items.begin() + index);
+    arr->Items.erase(arr->Items.begin() + index);
     return Value{};
 }
 

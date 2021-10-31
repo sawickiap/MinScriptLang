@@ -1264,6 +1264,11 @@ TEST_CASE("Array")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "6\n102\n2\n4\n101\n5\n100\n");
     }
+    SECTION("Incorrect calling array method for object")
+    {
+        const char* code = "a=[1, 2, 3]; obj={fn: a.Add}; obj.fn(1);";
+        REQUIRE_THROWS_AS( env.Execute(code, strlen(code)), ExecutionError );
+    }
 }
 
 TEST_CASE("Extra slow")
