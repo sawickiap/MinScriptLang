@@ -31,3 +31,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 #include "PCH.h"
+
+void WriteDataToFile(const char* filePath, const char* data, size_t byteCount)
+{
+    FILE* f = nullptr;
+    errno_t err = fopen_s(&f, filePath, "wb");
+    if(err == 0)
+    {
+        fwrite(data, 1, byteCount, f);
+        fclose(f);
+    }
+    else
+        assert(err == 0);
+}

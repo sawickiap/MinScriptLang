@@ -48,3 +48,5 @@ SOFTWARE.
 #include <cassert>
 #include <cstdint>
 #include <cmath>
+
+void WriteDataToFile(const char* filePath, const char* data, size_t byteCount);

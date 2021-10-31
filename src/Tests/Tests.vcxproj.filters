@@ -4,7 +4,11 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="PCH.cpp" />
     <ClCompile Include="MinScriptLangUsage.cpp" />
-    <ClCompile Include="TestsGeneral.cpp" />
+    <ClCompile Include="TestsBasic.cpp" />
+    <ClCompile Include="TestsFunctions.cpp" />
+    <ClCompile Include="TestsObjects.cpp" />
+    <ClCompile Include="TestsTypes.cpp" />
+    <ClCompile Include="TestsArrays.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PCH.h" />
