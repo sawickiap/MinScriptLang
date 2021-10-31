@@ -88,6 +88,10 @@ private:
     do { if(!(condition)) throw ExecutionError(GetPlace(), (errorMessage)); } while(false)
 #define EXECUTION_CHECK_PLACE(condition, place, errorMessage) \
     do { if(!(condition)) throw ExecutionError((place), (errorMessage)); } while(false)
+#define EXECUTION_FAIL(errorMessage) \
+    do { throw ExecutionError(GetPlace(), (errorMessage)); } while(false)
+#define EXECUTION_FAIL_PLACE(place, errorMessage) \
+    do { throw ExecutionError((place), (errorMessage)); } while(false)
 
 class EnvironmentPimpl;
 
@@ -1292,15 +1296,14 @@ Value* LValue::GetValueRef(const PlaceInCode& place) const
     {
         if(Value* val = objMemberLval->Obj->TryGetValue(objMemberLval->Key))
             return val;
-        EXECUTION_CHECK_PLACE(false, place, ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST);
+        EXECUTION_FAIL_PLACE(place, ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST);
     }
     if(const ArrayItemLValue* arrItemLval = std::get_if<ArrayItemLValue>(this))
     {
         EXECUTION_CHECK_PLACE(arrItemLval->Index < arrItemLval->Arr->Items.size(), place, ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
         return &arrItemLval->Arr->Items[arrItemLval->Index];
     }
-    EXECUTION_CHECK_PLACE(false, place, ERROR_MESSAGE_INVALID_LVALUE);
-    return nullptr;
+    EXECUTION_FAIL_PLACE(place, ERROR_MESSAGE_INVALID_LVALUE);
 }
 
 Value LValue::GetValue(const PlaceInCode& place) const
@@ -1309,7 +1312,7 @@ Value LValue::GetValue(const PlaceInCode& place) const
     {
         if(const Value* val = objMemberLval->Obj->TryGetValue(objMemberLval->Key))
             return *val;
-        EXECUTION_CHECK_PLACE(false, place, ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST);
+        EXECUTION_FAIL_PLACE(place, ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST);
     }
     if(const StringCharacterLValue* strCharLval = std::get_if<StringCharacterLValue>(this))
     {
@@ -1689,7 +1692,7 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
         }
     }
     else
-        EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
+        EXECUTION_FAIL(ERROR_MESSAGE_INVALID_TYPE);
 
     if(useKey)
         Assign(LValue{ObjectMemberLValue{&innermostCtxObj, KeyVarName}}, Value{});
@@ -1991,7 +1994,7 @@ LValue UnaryOperator::GetLValue(ExecuteContext& ctx) const
         default: assert(0);
         }
     }
-    EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_LVALUE );
+    EXECUTION_FAIL(ERROR_MESSAGE_INVALID_LVALUE);
 }
 
 void MemberAccessOperator::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
@@ -2020,7 +2023,7 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
     {
         if(MemberName == "Count")
             return BuiltInMember_String_Count(ctx, GetPlace(), std::move(objVal));
-        EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_MEMBER );
+        EXECUTION_FAIL(ERROR_MESSAGE_INVALID_MEMBER);
     }
     if(objVal.GetType() == ValueType::Array)
     {
@@ -2029,9 +2032,9 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
         else if(MemberName == "Add") return Value{std::move(arrayThis), SystemFunction::Array_Add};
         else if(MemberName == "Insert") return Value{std::move(arrayThis), SystemFunction::Array_Insert};
         else if(MemberName == "Remove") return Value{std::move(arrayThis), SystemFunction::Array_Remove};
-        EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_MEMBER );
+        EXECUTION_FAIL(ERROR_MESSAGE_INVALID_MEMBER);
     }
-    EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
+    EXECUTION_FAIL(ERROR_MESSAGE_INVALID_TYPE);
 }
 
 LValue MemberAccessOperator::GetLValue(ExecuteContext& ctx) const
@@ -2120,8 +2123,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
             return Value{lhs.GetNumber() + rhs.GetNumber()};
         if(lhsType == ValueType::String && rhsType == ValueType::String)
             return Value{lhs.GetString() + rhs.GetString()};
-        
-        EXECUTION_CHECK( false, ERROR_MESSAGE_INCOMPATIBLE_TYPES );
+        EXECUTION_FAIL(ERROR_MESSAGE_INCOMPATIBLE_TYPES);
     }
     if(Type == BinaryOperatorType::Equal)
     {
@@ -2159,7 +2161,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
             }
         }
         else
-            EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
+            EXECUTION_FAIL(ERROR_MESSAGE_INVALID_TYPE);
         return Value{result ? 1.0 : 0.0};
     }
     if(Type == BinaryOperatorType::Indexing)
@@ -2190,7 +2192,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
             EXECUTION_CHECK( NumberToIndex(index, rhs.GetNumber()) && index < lhs.GetArray()->Items.size(), ERROR_MESSAGE_INVALID_INDEX );
             return lhs.GetArray()->Items[index];
         }
-        EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
+        EXECUTION_FAIL(ERROR_MESSAGE_INVALID_TYPE);
     }
 
     // Remaining operators require numbers.
@@ -2277,7 +2279,7 @@ Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
         else if(lhsValPtr->GetType() == ValueType::String && rhs.GetType() == ValueType::String)
             lhsValPtr->GetString() += rhs.GetString();
         else
-            EXECUTION_CHECK( false, ERROR_MESSAGE_INCOMPATIBLE_TYPES );
+            EXECUTION_FAIL(ERROR_MESSAGE_INCOMPATIBLE_TYPES);
         return *lhsValPtr;
     }
 
@@ -2437,11 +2439,11 @@ Value CallOperator::Evaluate(ExecuteContext& ctx) const
         }
         catch(BreakException)
         {
-            EXECUTION_CHECK( false, ERROR_MESSAGE_BREAK_WITHOUT_LOOP );
+            EXECUTION_FAIL(ERROR_MESSAGE_BREAK_WITHOUT_LOOP);
         }
         catch(ContinueException)
         {
-            EXECUTION_CHECK( false, ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP );
+            EXECUTION_FAIL(ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP);
         }
         return Value{};
     }
@@ -2474,7 +2476,7 @@ Value CallOperator::Evaluate(ExecuteContext& ctx) const
         }
     }
 
-    EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_FUNCTION );
+    EXECUTION_FAIL(ERROR_MESSAGE_INVALID_FUNCTION);
 }
 
 } // namespace AST
