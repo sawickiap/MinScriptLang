@@ -1583,6 +1583,17 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
             Body->Execute(ctx);
         }
     }
+    else if(rangeVal.GetType() == Value::Type::Array)
+    {
+        const Array* const arr = rangeVal.GetArray();
+        for(size_t i = 0, count = arr->Items.size(); i < count; ++i)
+        {
+            if(useKey)
+                Assign(LValue{ObjectMemberLValue{&innermostCtxObj, KeyVarName}}, Value{(double)i});
+            Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ValueVarName}}, Value{arr->Items[i]});
+            Body->Execute(ctx);
+        }
+    }
     else
         EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
 

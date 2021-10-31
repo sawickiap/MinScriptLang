@@ -1222,6 +1222,24 @@ TEST_CASE("Array")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\nnull\nnull\n");
     }
+    SECTION("Range-based for loop for array")
+    {
+        const char* code = "a=[1, 2, 3]; \n"
+            "for(val : a) print(val); \n"
+            "print(val); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n2\n3\n"
+            "null\n");
+    }
+    SECTION("Range-based for loop for array with iterator")
+    {
+        const char* code = "a=[1, 2, 3]; \n"
+            "for(i, val : a) { { print(i, val); } ;;; } \n"
+            "print(i, val); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n1\n1\n2\n2\n3\n"
+            "null\nnull\n");
+    }
 }
 
 TEST_CASE("Extra slow")
