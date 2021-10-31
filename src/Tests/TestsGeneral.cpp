@@ -483,11 +483,13 @@ TEST_CASE("Basic")
         const char* code =
             "s='ABCD'; \n"
             "for(ch : s) print(ch); \n"
-            "for(i, ch : s) print(i, ch); \n";
+            "for(i, ch : s) print(i, ch); \n"
+            "print(i, ch);\n";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() ==
             "A\nB\nC\nD\n"
-            "0\nA\n1\nB\n2\nC\n3\nD\n");
+            "0\nA\n1\nB\n2\nC\n3\nD\n"
+            "null\nnull\n");
     }
     SECTION("Switch basic")
     {
@@ -931,9 +933,11 @@ TEST_CASE("Object")
         const char* code =
             "obj={'a':1, 'bbbb':4, 'cc':10}; \n"
             "sum = 0; for(val: obj) sum += val; print(sum);\n"
-            "sumKeyLen = 0; sumVal = 0; for(key, val: obj) { sumKeyLen += key.Count; sumVal += val; } print(sumKeyLen, sumVal); \n";
+            "sumKeyLen = 0; sumVal = 0; for(key, val: obj) { sumKeyLen += key.Count; sumVal += val; } print(sumKeyLen, sumVal); \n"
+            "print(key, val); \n";
         env.Execute(code, strlen(code));
-        REQUIRE(env.GetOutput() == "15\n7\n15\n");
+        REQUIRE(env.GetOutput() == "15\n7\n15\n"
+            "null\nnull\n");
     }
     SECTION("Implicit this")
     {
