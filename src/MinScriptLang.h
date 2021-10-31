@@ -937,8 +937,7 @@ public:
     ~EnvironmentPimpl() = default;
     void Execute(const string_view& code);
     const string& GetOutput() const { return m_Output; }
-    void Print(const char* s, size_t sLen) { m_Output.append(s, s + sLen); }
-    void Print(const char* s) { Print(s, strlen(s)); }
+    void Print(const string_view& s) { m_Output.append(s); }
 
 private:
     AST::Script m_Script;
@@ -1407,12 +1406,12 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
             break;
         case Value::Type::Number:
             Format(s, "%g\n", val.GetNumber());
-            ctx.Env.Print(s.data(), s.length());
+            ctx.Env.Print(s);
             break;
         case Value::Type::String:
             if(!val.GetString().empty())
-                ctx.Env.Print(val.GetString().data(), val.GetString().length());
-            ctx.Env.Print("\n", 1);
+                ctx.Env.Print(val.GetString());
+            ctx.Env.Print("\n");
             break;
         case Value::Type::Function:
         case Value::Type::SystemFunction:
@@ -1429,7 +1428,7 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
             const size_t typeIndex = (size_t)val.GetTypeValue();
             const string_view& typeName = VALUE_TYPE_NAMES[typeIndex];
             Format(s, "%.*s\n", (int)typeName.length(), typeName.data());
-            ctx.Env.Print(s.data(), s.length());
+            ctx.Env.Print(s);
         }
             break;
         default: assert(0);
