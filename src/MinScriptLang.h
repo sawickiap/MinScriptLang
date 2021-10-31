@@ -42,6 +42,7 @@ SOFTWARE.
 /////////////////////////////////////////////////////////////////////////////////
 
 #include <string>
+#include <string_view>
 #include <exception>
 #include <cstdint>
 
@@ -94,7 +95,7 @@ class Environment
 public:
     Environment();
     ~Environment();
-    void Execute(const char* code, size_t codeLen);
+    void Execute(const std::string_view& code);
     const std::string& GetOutput() const;
 private:
     EnvironmentPimpl* pimpl;
@@ -141,6 +142,7 @@ using std::shared_ptr;
 using std::make_unique;
 using std::make_shared;
 using std::string;
+using std::string_view;
 using std::vector;
 
 // F***k Windows.h macros!
@@ -355,20 +357,19 @@ struct ContinueException { };
 class CodeReader
 {
 public:
-    CodeReader(const char* code, size_t codeLen) :
+    CodeReader(const string_view& code) :
         m_Code{code},
-        m_CodeLen{codeLen},
         m_Place{0, 1, 1}
     {
     }
 
-    bool IsEnd() const { return m_Place.Index >= m_CodeLen; }
+    bool IsEnd() const { return m_Place.Index >= m_Code.length(); }
     const PlaceInCode& GetCurrentPlace() const { return m_Place; }
-    const char* GetCurrentCode() const { return m_Code + m_Place.Index; }
-    size_t GetCurrentLen() const { return m_CodeLen - m_Place.Index; }
+    const char* GetCurrentCode() const { return m_Code.data() + m_Place.Index; }
+    size_t GetCurrentLen() const { return m_Code.length() - m_Place.Index; }
     char GetCurrentChar() const { return m_Code[m_Place.Index]; }
-    bool Peek(char ch) const { return m_Place.Index < m_CodeLen && m_Code[m_Place.Index] == ch; }
-    bool Peek(const char* s, size_t sLen) const { return m_Place.Index + sLen <= m_CodeLen && memcmp(m_Code + m_Place.Index, s, sLen) == 0; }
+    bool Peek(char ch) const { return m_Place.Index < m_Code.length() && m_Code[m_Place.Index] == ch; }
+    bool Peek(const char* s, size_t sLen) const { return m_Place.Index + sLen <= m_Code.length() && memcmp(m_Code.data() + m_Place.Index, s, sLen) == 0; }
 
     void MoveOneChar()
     {
@@ -384,8 +385,7 @@ public:
     }
 
 private:
-    const char* const m_Code;
-    const size_t m_CodeLen;
+    const string_view m_Code;
     PlaceInCode m_Place;
 };
 
@@ -395,7 +395,7 @@ private:
 class Tokenizer
 {
 public:
-    Tokenizer(const char* code, size_t codeLen) : m_Code{code, codeLen} { }
+    Tokenizer(const string_view& code) : m_Code{code} { }
     void GetNextToken(Token& out);
 
 private:
@@ -934,7 +934,7 @@ class EnvironmentPimpl
 public:
     EnvironmentPimpl() : m_Script{PlaceInCode{0, 1, 1}} { }
     ~EnvironmentPimpl() = default;
-    void Execute(const char* code, size_t codeLen);
+    void Execute(const string_view& code);
     const string& GetOutput() const { return m_Output; }
     void Print(const char* s, size_t sLen) { m_Output.append(s, s + sLen); }
     void Print(const char* s) { Print(s, strlen(s)); }
@@ -3314,12 +3314,12 @@ string Parser::TryParseIdentifier()
 ////////////////////////////////////////////////////////////////////////////////
 // class EnvironmentPimpl implementation
 
-void EnvironmentPimpl::Execute(const char* code, size_t codeLen)
+void EnvironmentPimpl::Execute(const string_view& code)
 {
     m_Script.Statements.clear();
 
     {
-        Tokenizer tokenizer{code, codeLen};
+        Tokenizer tokenizer{code};
         Parser parser{tokenizer};
         parser.ParseScript(m_Script);
     }
@@ -3340,7 +3340,7 @@ void EnvironmentPimpl::Execute(const char* code, size_t codeLen)
 
 Environment::Environment() : pimpl{new EnvironmentPimpl{}} { }
 Environment::~Environment() { delete pimpl; }
-void Environment::Execute(const char* code, size_t codeLen) { pimpl->Execute(code, codeLen); }
+void Environment::Execute(const string_view& code) { pimpl->Execute(code); }
 const std::string& Environment::GetOutput() const { return pimpl->GetOutput(); }
 
 } // namespace MinScriptLang
