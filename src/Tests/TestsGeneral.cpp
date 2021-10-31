@@ -1211,6 +1211,13 @@ TEST_CASE("Array")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n2\n3\n");
     }
+    SECTION("Null as array item")
+    {
+        const char* code = "a=[1, 2, 3]; a[1]=null; a[2]=null; \n"
+            "print(a[0], a[1], a[2]);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\nnull\nnull\n");
+    }
 }
 
 TEST_CASE("Extra slow")
