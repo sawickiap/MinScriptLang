@@ -61,7 +61,7 @@ public:
     Error(const PlaceInCode& place) : m_Place{place} { }
     const PlaceInCode& GetPlace() const { return m_Place; }
     virtual const char* what() const override;
-    virtual const char* GetMessage() const = 0;
+    virtual std::string_view GetMessage_() const = 0;
 private:
     const PlaceInCode m_Place;
     mutable std::string m_What;
@@ -71,7 +71,7 @@ class ParsingError : public Error
 {
 public:
     ParsingError(const PlaceInCode& place, const std::string_view& message) : Error{place}, m_Message{message} { }
-    virtual const char* GetMessage() const override { return m_Message.data(); }
+    virtual std::string_view GetMessage_() const override { return m_Message; }
 private:
     const std::string_view m_Message; // Externally owned
 };
@@ -81,7 +81,7 @@ class ExecutionError : public Error
 public:
     ExecutionError(const PlaceInCode& place, std::string&& message) : Error{place}, m_Message{std::move(message)} { }
     ExecutionError(const PlaceInCode& place, const std::string_view& message) : Error{place}, m_Message{message} { }
-    virtual const char* GetMessage() const override { return m_Message.c_str(); }
+    virtual std::string_view GetMessage_() const override { return m_Message; }
 private:
     const std::string m_Message;
 };
@@ -434,7 +434,7 @@ enum class Symbol
     // Keywords
     Null, False, True, If, Else, While, Do, For, Break, Continue,
     Switch, Case, Default, Function, Return,
-    Local, This, Global, Class, Throw, Count
+    Local, This, Global, Class, Throw, Try, Catch, Finally, Count
 };
 static constexpr string_view SYMBOL_STR[] = {
     // Token types
@@ -446,7 +446,7 @@ static constexpr string_view SYMBOL_STR[] = {
     // Keywords
     "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue",
     "switch", "case", "default", "function", "return",
-    "local", "this", "global", "class", "throw"
+    "local", "this", "global", "class", "throw", "try", "catch", "finally"
 };
 
 struct Token
@@ -777,6 +777,17 @@ struct ThrowStatement : public Statement
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
+struct TryStatement : public Statement
+{
+    unique_ptr<Statement> TryBlock;
+    unique_ptr<Statement> CatchBlock; // Optional
+    unique_ptr<Statement> FinallyBlock; // Optional
+    string ExceptionVarName;
+    explicit TryStatement(const PlaceInCode& place) : Statement{place} { }
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
+    virtual void Execute(ExecuteContext& ctx) const;
+};
+
 struct Script : Block
 {
     explicit Script(const PlaceInCode& place) : Block{place} { }
@@ -1007,7 +1018,7 @@ private:
 const char* Error::what() const
 {
     if(m_What.empty())
-        Format(m_What, "(%u,%u): %s", m_Place.Row, m_Place.Column, GetMessage());
+        Format(m_What, "(%u,%u): %.*s", m_Place.Row, m_Place.Column, (int)GetMessage_().length(), GetMessage_().data());
     return m_What.c_str();
 }
 
@@ -1619,11 +1630,11 @@ void WhileLoop::Execute(ExecuteContext& ctx) const
             {
                 Body->Execute(ctx);
             }
-            catch(BreakException)
+            catch(const BreakException&)
             {
                 break;
             }
-            catch(ContinueException)
+            catch(const ContinueException&)
             {
                 continue;
             }
@@ -1636,11 +1647,11 @@ void WhileLoop::Execute(ExecuteContext& ctx) const
             {
                 Body->Execute(ctx);
             }
-            catch(BreakException)
+            catch(const BreakException&)
             {
                 break;
             }
-            catch(ContinueException)
+            catch(const ContinueException&)
             {
                 continue;
             }
@@ -1680,11 +1691,11 @@ void ForLoop::Execute(ExecuteContext& ctx) const
         {
             Body->Execute(ctx);
         }
-        catch(BreakException)
+        catch(const BreakException&)
         {
             break;
         }
-        catch(ContinueException)
+        catch(const ContinueException&)
         {
         }
         if(IterationExpression)
@@ -1719,7 +1730,17 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
                 Assign(LValue{ObjectMemberLValue{&innermostCtxObj, KeyVarName}}, Value{(double)i});
             const char ch = rangeStr[i];
             Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ValueVarName}}, Value{string{&ch, &ch + 1}});
-            Body->Execute(ctx);
+            try
+            {
+                Body->Execute(ctx);
+            }
+            catch(const BreakException&)
+            {
+                break;
+            }
+            catch(const ContinueException&)
+            {
+            }
         }
     }
     else if(rangeVal.GetType() == ValueType::Object)
@@ -1729,7 +1750,17 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
             if(useKey)
                 Assign(LValue{ObjectMemberLValue{&innermostCtxObj, KeyVarName}}, Value{string{key}});
             Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ValueVarName}}, Value{value});
-            Body->Execute(ctx);
+            try
+            {
+                Body->Execute(ctx);
+            }
+            catch(const BreakException&)
+            {
+                break;
+            }
+            catch(const ContinueException&)
+            {
+            }
         }
     }
     else if(rangeVal.GetType() == ValueType::Array)
@@ -1740,7 +1771,17 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
             if(useKey)
                 Assign(LValue{ObjectMemberLValue{&innermostCtxObj, KeyVarName}}, Value{(double)i});
             Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ValueVarName}}, Value{arr->Items[i]});
-            Body->Execute(ctx);
+            try
+            {
+                Body->Execute(ctx);
+            }
+            catch(const BreakException&)
+            {
+                break;
+            }
+            catch(const ContinueException&)
+            {
+            }
         }
     }
     else
@@ -1843,7 +1884,7 @@ void SwitchStatement::Execute(ExecuteContext& ctx) const
             {
                 ItemBlocks[itemIndex]->Execute(ctx);
             }
-            catch(BreakException)
+            catch(const BreakException&)
             {
                 break;
             }
@@ -1860,6 +1901,76 @@ void ThrowStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix)
 void ThrowStatement::Execute(ExecuteContext& ctx) const
 {
     throw ValueException{ThrownExpression->Evaluate(ctx)};
+}
+
+void TryStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
+{
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "try\n", DEBUG_PRINT_ARGS_BEG);
+    ++indentLevel;
+    TryBlock->DebugPrint(indentLevel, "TryBlock: ");
+    if(CatchBlock)
+        CatchBlock->DebugPrint(indentLevel, "CatchBlock: ");
+    if(FinallyBlock)
+        FinallyBlock->DebugPrint(indentLevel, "FinallyBlock: ");
+}
+
+void TryStatement::Execute(ExecuteContext& ctx) const
+{
+    try
+    {
+        TryBlock->Execute(ctx);
+    }
+    catch(ValueException &ex)
+    {
+        if(CatchBlock)
+        {
+            Object& innermostCtxObj = ctx.GetInnermostScope();
+            Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, std::move(ex.m_Value));
+            CatchBlock->Execute(ctx);
+            Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, Value{});
+        }
+    }
+    catch(const ExecutionError& err)
+    {
+        if(CatchBlock)
+        {
+            auto exObj = std::make_shared<Object>();
+            exObj->GetOrCreateValue("Type") = Value{"ExecutionError"};
+            exObj->GetOrCreateValue("Index") = Value{(double)err.GetPlace().Index};
+            exObj->GetOrCreateValue("Row") = Value{(double)err.GetPlace().Row};
+            exObj->GetOrCreateValue("Column") = Value{(double)err.GetPlace().Column};
+            exObj->GetOrCreateValue("Message") = Value{string{err.GetMessage_()}};
+            Object& innermostCtxObj = ctx.GetInnermostScope();
+            Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, Value{std::move(exObj)});
+            CatchBlock->Execute(ctx);
+            Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, Value{});
+        }
+    }
+    catch(const BreakException&)
+    {
+        if(FinallyBlock)
+            FinallyBlock->Execute(ctx);
+        throw;
+    }
+    catch(const ContinueException&)
+    {
+        if(FinallyBlock)
+            FinallyBlock->Execute(ctx);
+        throw;
+    }
+    catch(ReturnException&)
+    {
+        if(FinallyBlock)
+            FinallyBlock->Execute(ctx);
+        throw;
+    }
+    catch(const ParsingError&)
+    {
+        assert(0 && "ParsingError not expected during execution.");
+    }
+
+    if(FinallyBlock)
+        FinallyBlock->Execute(ctx);
 }
 
 void Script::Execute(ExecuteContext& ctx) const
@@ -2790,11 +2901,32 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
         return stmt;
     }
 
-    // 'throw' Expr17
+    // 'throw' Expr17 ';'
     if(TryParseSymbol(Symbol::Throw))
     {
         auto stmt = std::make_unique<AST::ThrowStatement>(place);
         MUST_PARSE(stmt->ThrownExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+        MUST_PARSE(TryParseSymbol(Symbol::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON);
+        return stmt;
+    }
+
+    // 'try' Statement ( ( 'catch' '(' TOKEN_IDENTIFIER ')' Statement [ 'finally' Statement ] ) | ( 'finally' Statement ) )
+    if(TryParseSymbol(Symbol::Try))
+    {
+        auto stmt = std::make_unique<AST::TryStatement>(place);
+        MUST_PARSE(stmt->TryBlock = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+        if(TryParseSymbol(Symbol::Finally))
+            MUST_PARSE(stmt->FinallyBlock = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+        else
+        {
+            MUST_PARSE(TryParseSymbol(Symbol::Catch), "Expected 'catch' or 'finally'.");
+            MUST_PARSE(TryParseSymbol(Symbol::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN);
+            MUST_PARSE(!(stmt->ExceptionVarName = TryParseIdentifier()).empty(), ERROR_MESSAGE_EXPECTED_IDENTIFIER);
+            MUST_PARSE(TryParseSymbol(Symbol::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE);
+            MUST_PARSE(stmt->CatchBlock = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+            if(TryParseSymbol(Symbol::Finally))
+                MUST_PARSE(stmt->FinallyBlock = TryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+        }
         return stmt;
     }
 

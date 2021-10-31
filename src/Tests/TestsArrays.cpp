@@ -159,4 +159,10 @@ TEST_CASE("Arrays")
         const char* code = "a=[1, 2, 3]; obj={fn: a.Add}; obj.fn(1);";
         REQUIRE_THROWS_AS( env.Execute(code), ExecutionError );
     }
+    SECTION("Break in range-based for loop")
+    {
+        const char* code = "for(i:[1,2,3,4,5,6]) { print(i); if(i==3) break; }";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "1\n2\n3\n");
+    }
 }

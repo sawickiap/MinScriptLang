@@ -633,11 +633,6 @@ TEST_CASE("Basic")
         const char* code = "print('ABC' <= nul);";
         REQUIRE_THROWS_AS(env.Execute(code), ExecutionError);
     }
-}
-
-TEST_CASE("Null")
-{
-    Environment env;
     SECTION("Null assignment")
     {
         const char* code = 
@@ -719,5 +714,117 @@ TEST_CASE("Null")
     {
         const char* code = "throw 1; \n";
         REQUIRE_THROWS_AS( env.Execute(code), ValueException );
+    }
+    SECTION("Try catch")
+    {
+        const char* code = "try { throw 1; print('Should not get here'); } catch(ex) print(ex); \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "1\n");
+    }
+    SECTION("Throwing from function and loop")
+    {
+        const char* code = "function f() { \n"
+            "  for(i = 0; i < 10; ++i) { \n"
+            "    if(i == 6) throw 'AAA'; \n"
+            " } \n"
+            "} \n"
+            "try { f(); } \n"
+            "catch(ex) { print(ex); } \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "AAA\n");
+    }
+    SECTION("Catching execution error")
+    {
+        const char* code = "try { a='AAA' + 5 + null; } \n"
+            "catch(ex) { \n"
+            "  print(ex.Type); \n"
+            "  print(ex.Index < 1000); \n"
+            "  print(ex.Row); \n"
+            "  print(ex.Column < 1000); \n"
+            "  print(TypeOf(ex.Message)); \n"
+            "} \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "ExecutionError\n1\n1\n1\nString\n");
+    }
+    SECTION("Try finally without exception")
+    {
+        const char* code = "try print('A'); finally print('B'); \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "A\nB\n");
+    }
+    SECTION("Try catch finally with exception")
+    {
+        const char* code = "try { print('A'); throw 1; } catch(ex) print('EX'); finally print('B'); \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "A\nEX\nB\n");
+    }
+    SECTION("Try finally for break")
+    {
+        const char* code = "for(i : [1, 2, 3, 4, 5]) {\n"
+            "  try {\n"
+            "    print(i * 100); \n"
+            "    if(i == 4) break; \n"
+            "  } \n"
+            "  finally { \n"
+            "    print(i); \n"
+            "  } \n"
+            "} \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "100\n1\n200\n2\n300\n3\n400\n4\n");
+    }
+    SECTION("Try finally for continue")
+    {
+        const char* code = "for(i : [1, 2, 3, 4, 5]) {\n"
+            "  try {\n"
+            "    if(i == 4) continue; \n"
+            "    print(i * 100); \n"
+            "  } \n"
+            "  finally { \n"
+            "    print(i); \n"
+            "  } \n"
+            "} \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "100\n1\n200\n2\n300\n3\n4\n500\n5\n");
+    }
+    SECTION("Try catch finally for return")
+    {
+        const char* code = "function fn() {\n"
+            "  try {\n"
+            "    print('Try'); \n"
+            "    return 1; \n"
+            "  } \n"
+            "  catch(ex) print('Catch'); \n"
+            "  finally print('Finally'); \n"
+            "} \n"
+            "print(fn()); \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "Try\nFinally\n1\n");
+    }
+    SECTION("Break in catch")
+    {
+        const char* code = "a=[1, 2, 3]; \n"
+            "for(i = 0; i < 10; ++i) { \n"
+            "  try { \n"
+            "    print(i); \n"
+            "    a[i] += 100; \n"
+            "  } \n"
+            "  catch(ex) break; \n"
+            "} \n"
+            "print(a[2]); \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "0\n1\n2\n3\n103\n");
+    }
+    SECTION("Rethrowing an exception")
+    {
+        const char* code =
+            "try { \n"
+            "  try { \n"
+            "    throw [555, 666, 777]; \n"
+            "  } \n"
+            "  catch(ex) { print('CATCH'); throw ex; } \n"
+            "} \n"
+            "catch(ex) print(ex[1]); \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "CATCH\n666\n");
     }
 }
