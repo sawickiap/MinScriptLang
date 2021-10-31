@@ -715,4 +715,9 @@ TEST_CASE("Null")
             "fib(1);";
         REQUIRE_THROWS_AS( env.Execute(code), ExecutionError );
     }
+    SECTION("Throw statement")
+    {
+        const char* code = "throw 1; \n";
+        REQUIRE_THROWS_AS( env.Execute(code), ValueException );
+    }
 }

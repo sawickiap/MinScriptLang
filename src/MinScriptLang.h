@@ -44,7 +44,9 @@ SOFTWARE.
 #include <string>
 #include <string_view>
 #include <exception>
+#include <memory>
 #include <cstdint>
+#include <variant>
 
 namespace MinScriptLang {
 
@@ -82,6 +84,149 @@ public:
     virtual const char* GetMessage() const override { return m_Message.c_str(); }
 private:
     const std::string m_Message;
+};
+
+namespace AST { struct FunctionDefinition; }
+class Object;
+class Array;
+enum class SystemFunction;
+    
+struct ThisType : public std::variant<std::monostate, std::shared_ptr<Object>, std::shared_ptr<Array>>
+{
+    bool IsEmpty() const { return std::get_if<std::monostate>(this) != nullptr; }
+    Object* GetObject_() const
+    {
+        const std::shared_ptr<Object>* objectPtr = std::get_if<std::shared_ptr<Object>>(this);
+        return objectPtr ? objectPtr->get() : nullptr;
+    }
+    Array* GetArray() const
+    {
+        const std::shared_ptr<Array>* arrayPtr = std::get_if<std::shared_ptr<Array>>(this);
+        return arrayPtr ? arrayPtr->get() : nullptr;
+    }
+};
+
+enum class ValueType { Null, Number, String, Function, SystemFunction, Object, Array, Type, Count };
+
+class Value
+{
+public:
+    ThisType m_This;
+
+    Value() { }
+    Value(double number) : m_Type(ValueType::Number), m_Variant(number) { }
+    Value(std::string&& str) : m_Type(ValueType::String), m_Variant(std::move(str)) { }
+    Value(const AST::FunctionDefinition* func) : m_Type{ValueType::Function}, m_Variant{func} { }
+    Value(SystemFunction func) : m_Type{ValueType::SystemFunction}, m_Variant{func} { }
+    Value(ThisType&& th, SystemFunction func) : m_This{th}, m_Type{ValueType::SystemFunction}, m_Variant{func} { }
+    Value(std::shared_ptr<Object> &&obj) : m_Type{ValueType::Object}, m_Variant(obj) { }
+    Value(std::shared_ptr<Array> &&arr) : m_Type{ValueType::Array}, m_Variant(arr) { }
+    Value(ValueType typeVal) : m_Type{ValueType::Type}, m_Variant(typeVal) { }
+
+    ValueType GetType() const { return m_Type; }
+    double GetNumber() const
+    {
+        assert(m_Type == ValueType::Number);
+        return std::get<double>(m_Variant);
+    }
+    std::string& GetString()
+    {
+        assert(m_Type == ValueType::String);
+        return std::get<std::string>(m_Variant);
+    }
+    const std::string& GetString() const
+    {
+        assert(m_Type == ValueType::String);
+        return std::get<std::string>(m_Variant);
+    }
+    const AST::FunctionDefinition* GetFunction() const
+    {
+        assert(m_Type == ValueType::Function && std::get<const AST::FunctionDefinition*>(m_Variant));
+        return std::get<const AST::FunctionDefinition*>(m_Variant);
+    }
+    SystemFunction GetSystemFunction() const
+    {
+        assert(m_Type == ValueType::SystemFunction);
+        return std::get<SystemFunction>(m_Variant);
+    }
+    Object* GetObject_() const
+    {
+        assert(m_Type == ValueType::Object && std::get<std::shared_ptr<Object>>(m_Variant));
+        return std::get<std::shared_ptr<Object>>(m_Variant).get();
+    }
+    std::shared_ptr<Object> GetObjectPtr() const
+    {
+        assert(m_Type == ValueType::Object && std::get<std::shared_ptr<Object>>(m_Variant));
+        return std::get<std::shared_ptr<Object>>(m_Variant);
+    }
+    Array* GetArray() const
+    {
+        assert(m_Type == ValueType::Array && std::get<std::shared_ptr<Array>>(m_Variant));
+        return std::get<std::shared_ptr<Array>>(m_Variant).get();
+    }
+    std::shared_ptr<Array> GetArrayPtr() const
+    {
+        assert(m_Type == ValueType::Array && std::get<std::shared_ptr<Array>>(m_Variant));
+        return std::get<std::shared_ptr<Array>>(m_Variant);
+    }
+    ValueType GetTypeValue() const
+    {
+        assert(m_Type == ValueType::Type);
+        return std::get<ValueType>(m_Variant);
+    }
+
+    bool IsEqual(const Value& rhs) const
+    {
+        if(m_Type != rhs.m_Type)
+            return false;
+        switch(m_Type)
+        {
+        case ValueType::Null:           return true;
+        case ValueType::Number:         return std::get<double>(m_Variant) == std::get<double>(rhs.m_Variant);
+        case ValueType::String:         return std::get<std::string>(m_Variant) == std::get<std::string>(rhs.m_Variant);
+        case ValueType::Function:       return std::get<const AST::FunctionDefinition*>(m_Variant) == std::get<const AST::FunctionDefinition*>(rhs.m_Variant);
+        case ValueType::SystemFunction: return std::get<SystemFunction>(m_Variant) == std::get<SystemFunction>(rhs.m_Variant);
+        case ValueType::Object:         return std::get<std::shared_ptr<Object>>(m_Variant).get() == std::get<std::shared_ptr<Object>>(rhs.m_Variant).get();
+        case ValueType::Array:          return std::get<std::shared_ptr<Array>>(m_Variant).get() == std::get<std::shared_ptr<Array>>(rhs.m_Variant).get();
+        case ValueType::Type:           return std::get<ValueType>(m_Variant) == std::get<ValueType>(rhs.m_Variant);
+        default: assert(0); return false;
+        }
+    }
+    bool IsTrue() const
+    {
+        switch(m_Type)
+        {
+        case ValueType::Null:           return false;
+        case ValueType::Number:         return std::get<double>(m_Variant) != 0.f;
+        case ValueType::String:         return !std::get<std::string>(m_Variant).empty();
+        case ValueType::Function:       return true;
+        case ValueType::SystemFunction: return true;
+        case ValueType::Object:         return true;
+        case ValueType::Array:          return true;
+        case ValueType::Type:           return std::get<ValueType>(m_Variant) != ValueType::Null;
+        default: assert(0); return false;
+        }
+    }
+
+    void ChangeNumber(double number) { assert(m_Type == ValueType::Number); std::get<double>(m_Variant) = number; }
+
+private:
+    ValueType m_Type = ValueType::Null;
+    using VariantType = std::variant<
+        std::monostate, // ValueType::Null
+        double, // ValueType::Number
+        std::string, // ValueType::String
+        const AST::FunctionDefinition*, // ValueType::Function
+        SystemFunction, // ValueType::SystemFunction
+        std::shared_ptr<Object>, // ValueType::Object
+        std::shared_ptr<Array>, // ValueType::Array
+        ValueType>; // ValueType::Type
+    VariantType m_Variant;
+};
+
+struct ValueException
+{
+    Value m_Value;
 };
 
 #define EXECUTION_CHECK(condition, errorMessage) \
@@ -130,11 +275,8 @@ private:
 #include <vector>
 #include <map>
 #include <unordered_map>
-#include <string>
-#include <memory>
 #include <algorithm>
 #include <initializer_list>
-#include <variant>
 
 #include <cstdlib>
 #include <cassert>
@@ -153,7 +295,6 @@ using std::vector;
 // F***k Windows.h macros!
 #undef min
 #undef max
-#undef GetObject
 
 namespace MinScriptLang {
 
@@ -233,6 +374,9 @@ private:
     string m_String;
 };
 
+static constexpr string_view VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Object", "Array", "Type" };
+static_assert(_countof(VALUE_TYPE_NAMES) == (size_t)ValueType::Count);
+
 enum class Symbol
 {
     // Token types
@@ -290,7 +434,7 @@ enum class Symbol
     // Keywords
     Null, False, True, If, Else, While, Do, For, Break, Continue,
     Switch, Case, Default, Function, Return,
-    Local, This, Global, Class, Count
+    Local, This, Global, Class, Throw, Count
 };
 static constexpr string_view SYMBOL_STR[] = {
     // Token types
@@ -302,7 +446,7 @@ static constexpr string_view SYMBOL_STR[] = {
     // Keywords
     "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue",
     "switch", "case", "default", "function", "return",
-    "local", "this", "global", "class"
+    "local", "this", "global", "class", "throw"
 };
 
 struct Token
@@ -418,10 +562,6 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // class Value definition
 
-namespace AST { struct FunctionDefinition; }
-class Object;
-class Array;
-
 enum class SystemFunction {
     TypeOf, Print,
     Array_Add, Array_Insert, Array_Remove,
@@ -432,142 +572,6 @@ static constexpr string_view SYSTEM_FUNCTION_NAMES[] = {
     "Add", "Insert", "Remove",
 };
 static_assert(_countof(SYSTEM_FUNCTION_NAMES) == (size_t)SystemFunction::Count);
-
-struct ThisType : public std::variant<std::monostate, shared_ptr<Object>, shared_ptr<Array>>
-{
-    bool IsEmpty() const { return std::get_if<std::monostate>(this) != nullptr; }
-    Object* GetObject() const
-    {
-        const shared_ptr<Object>* objectPtr = std::get_if<shared_ptr<Object>>(this);
-        return objectPtr ? objectPtr->get() : nullptr;
-    }
-    Array* GetArray() const
-    {
-        const shared_ptr<Array>* arrayPtr = std::get_if<shared_ptr<Array>>(this);
-        return arrayPtr ? arrayPtr->get() : nullptr;
-    }
-};
-
-enum class ValueType { Null, Number, String, Function, SystemFunction, Object, Array, Type, Count };
-static constexpr string_view VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Object", "Array", "Type" };
-static_assert(_countof(VALUE_TYPE_NAMES) == (size_t)ValueType::Count);
-
-
-class Value
-{
-public:
-    ThisType m_This;
-
-    Value() { }
-    Value(double number) : m_Type(ValueType::Number), m_Variant(number) { }
-    Value(string&& str) : m_Type(ValueType::String), m_Variant(std::move(str)) { }
-    Value(const AST::FunctionDefinition* func) : m_Type{ValueType::Function}, m_Variant{func} { }
-    Value(SystemFunction func) : m_Type{ValueType::SystemFunction}, m_Variant{func} { }
-    Value(ThisType&& th, SystemFunction func) : m_This{th}, m_Type{ValueType::SystemFunction}, m_Variant{func} { }
-    Value(shared_ptr<Object> &&obj) : m_Type{ValueType::Object}, m_Variant(obj) { }
-    Value(shared_ptr<Array> &&arr) : m_Type{ValueType::Array}, m_Variant(arr) { }
-    Value(ValueType typeVal) : m_Type{ValueType::Type}, m_Variant(typeVal) { }
-
-    ValueType GetType() const { return m_Type; }
-    double GetNumber() const
-    {
-        assert(m_Type == ValueType::Number);
-        return std::get<double>(m_Variant);
-    }
-    string& GetString()
-    {
-        assert(m_Type == ValueType::String);
-        return std::get<string>(m_Variant);
-    }
-    const string& GetString() const
-    {
-        assert(m_Type == ValueType::String);
-        return std::get<string>(m_Variant);
-    }
-    const AST::FunctionDefinition* GetFunction() const
-    {
-        assert(m_Type == ValueType::Function && std::get<const AST::FunctionDefinition*>(m_Variant));
-        return std::get<const AST::FunctionDefinition*>(m_Variant);
-    }
-    SystemFunction GetSystemFunction() const
-    {
-        assert(m_Type == ValueType::SystemFunction);
-        return std::get<SystemFunction>(m_Variant);
-    }
-    Object* GetObject() const
-    {
-        assert(m_Type == ValueType::Object && std::get<shared_ptr<Object>>(m_Variant));
-        return std::get<shared_ptr<Object>>(m_Variant).get();
-    }
-    shared_ptr<Object> GetObjectPtr() const
-    {
-        assert(m_Type == ValueType::Object && std::get<shared_ptr<Object>>(m_Variant));
-        return std::get<shared_ptr<Object>>(m_Variant);
-    }
-    Array* GetArray() const
-    {
-        assert(m_Type == ValueType::Array && std::get<shared_ptr<Array>>(m_Variant));
-        return std::get<shared_ptr<Array>>(m_Variant).get();
-    }
-    shared_ptr<Array> GetArrayPtr() const
-    {
-        assert(m_Type == ValueType::Array && std::get<shared_ptr<Array>>(m_Variant));
-        return std::get<shared_ptr<Array>>(m_Variant);
-    }
-    ValueType GetTypeValue() const
-    {
-        assert(m_Type == ValueType::Type);
-        return std::get<ValueType>(m_Variant);
-    }
-
-    bool IsEqual(const Value& rhs) const
-    {
-        if(m_Type != rhs.m_Type)
-            return false;
-        switch(m_Type)
-        {
-        case ValueType::Null:           return true;
-        case ValueType::Number:         return std::get<double>(m_Variant) == std::get<double>(rhs.m_Variant);
-        case ValueType::String:         return std::get<string>(m_Variant) == std::get<string>(rhs.m_Variant);
-        case ValueType::Function:       return std::get<const AST::FunctionDefinition*>(m_Variant) == std::get<const AST::FunctionDefinition*>(rhs.m_Variant);
-        case ValueType::SystemFunction: return std::get<SystemFunction>(m_Variant) == std::get<SystemFunction>(rhs.m_Variant);
-        case ValueType::Object:         return std::get<shared_ptr<Object>>(m_Variant).get() == std::get<shared_ptr<Object>>(rhs.m_Variant).get();
-        case ValueType::Array:          return std::get<shared_ptr<Array>>(m_Variant).get() == std::get<shared_ptr<Array>>(rhs.m_Variant).get();
-        case ValueType::Type:           return std::get<ValueType>(m_Variant) == std::get<ValueType>(rhs.m_Variant);
-        default: assert(0); return false;
-        }
-    }
-    bool IsTrue() const
-    {
-        switch(m_Type)
-        {
-        case ValueType::Null:           return false;
-        case ValueType::Number:         return std::get<double>(m_Variant) != 0.f;
-        case ValueType::String:         return !std::get<string>(m_Variant).empty();
-        case ValueType::Function:       return true;
-        case ValueType::SystemFunction: return true;
-        case ValueType::Object:         return true;
-        case ValueType::Array:          return true;
-        case ValueType::Type:           return std::get<ValueType>(m_Variant) != ValueType::Null;
-        default: assert(0); return false;
-        }
-    }
-
-    void ChangeNumber(double number) { assert(m_Type == ValueType::Number); std::get<double>(m_Variant) = number; }
-
-private:
-    ValueType m_Type = ValueType::Null;
-    using VariantType = std::variant<
-        std::monostate, // ValueType::Null
-        double, // ValueType::Number
-        string, // ValueType::String
-        const AST::FunctionDefinition*, // ValueType::Function
-        SystemFunction, // ValueType::SystemFunction
-        shared_ptr<Object>, // ValueType::Object
-        shared_ptr<Array>, // ValueType::Array
-        ValueType>; // ValueType::Type
-    VariantType m_Variant;
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 // class Object definition
@@ -761,6 +765,14 @@ struct SwitchStatement : public Statement
     vector<unique_ptr<AST::ConstantValue>> ItemValues; // null means default block.
     vector<unique_ptr<AST::Block>> ItemBlocks; // Can be null if empty.
     explicit SwitchStatement(const PlaceInCode& place) : Statement{place} { }
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
+    virtual void Execute(ExecuteContext& ctx) const;
+};
+
+struct ThrowStatement : public Statement
+{
+    unique_ptr<Expression> ThrownExpression;
+    explicit ThrowStatement(const PlaceInCode& place) : Statement{place} { }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
@@ -1410,7 +1422,7 @@ static Value BuiltInTypeCtor_Object(AST::ExecuteContext& ctx, const PlaceInCode&
     if(args.empty())
         return Value{std::make_shared<Object>()};
     EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == ValueType::Object, place, "Object can be constructed only from no arguments or from another object value.");
-    return Value{CopyObject(*args[0].GetObject())};
+    return Value{CopyObject(*args[0].GetObject_())};
 }
 static Value BuiltInTypeCtor_Array(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
@@ -1482,8 +1494,8 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
 
 static Value BuiltInMember_Object_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
-    EXECUTION_CHECK_PLACE(objVal.GetType() == ValueType::Object && objVal.GetObject(), place, ERROR_MESSAGE_EXPECTED_OBJECT);
-    return Value{(double)objVal.GetObject()->GetCount()};
+    EXECUTION_CHECK_PLACE(objVal.GetType() == ValueType::Object && objVal.GetObject_(), place, ERROR_MESSAGE_EXPECTED_OBJECT);
+    return Value{(double)objVal.GetObject_()->GetCount()};
 }
 static Value BuiltInMember_Array_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
@@ -1712,7 +1724,7 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
     }
     else if(rangeVal.GetType() == ValueType::Object)
     {
-        for(const auto& [key, value]: rangeVal.GetObject()->m_Items)
+        for(const auto& [key, value]: rangeVal.GetObject_()->m_Items)
         {
             if(useKey)
                 Assign(LValue{ObjectMemberLValue{&innermostCtxObj, KeyVarName}}, Value{string{key}});
@@ -1837,6 +1849,17 @@ void SwitchStatement::Execute(ExecuteContext& ctx) const
             }
         }
     }
+}
+
+void ThrowStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
+{
+    printf(DEBUG_PRINT_FORMAT_STR_BEG "throw\n", DEBUG_PRINT_ARGS_BEG);
+    ThrownExpression->DebugPrint(indentLevel + 1, "ThrownExpression: ");
+}
+
+void ThrowStatement::Execute(ExecuteContext& ctx) const
+{
+    throw ValueException{ThrownExpression->Evaluate(ctx)};
 }
 
 void Script::Execute(ExecuteContext& ctx) const
@@ -2048,7 +2071,7 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
     Value objVal = Operand->Evaluate(ctx);
     if(objVal.GetType() == ValueType::Object)
     {
-        const Value* memberVal = objVal.GetObject()->TryGetValue(MemberName);
+        const Value* memberVal = objVal.GetObject_()->TryGetValue(MemberName);
         if(memberVal)
         {
             Value resultVal = *memberVal;
@@ -2081,7 +2104,7 @@ LValue MemberAccessOperator::GetLValue(ExecuteContext& ctx) const
 {
     Value objVal = Operand->Evaluate(ctx);
     EXECUTION_CHECK(objVal.GetType() == ValueType::Object, ERROR_MESSAGE_EXPECTED_OBJECT);
-    return LValue{ObjectMemberLValue{objVal.GetObject(), MemberName}};
+    return LValue{ObjectMemberLValue{objVal.GetObject_(), MemberName}};
 }
 
 Value UnaryOperator::BitwiseNot(Value&& operand) const
@@ -2217,7 +2240,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
         if(lhsType == ValueType::Object)
         {
             EXECUTION_CHECK( rhsType == ValueType::String, ERROR_MESSAGE_EXPECTED_STRING );
-            if(Value* val = lhs.GetObject()->TryGetValue(rhs.GetString()))
+            if(Value* val = lhs.GetObject_()->TryGetValue(rhs.GetString()))
             {
                 Value resultVal = *val;
                 resultVal.m_This = ThisType{lhs.GetObjectPtr()};
@@ -2271,7 +2294,7 @@ LValue BinaryOperator::GetLValue(ExecuteContext& ctx) const
         if(leftValRef->GetType() == ValueType::Object)
         {
             EXECUTION_CHECK( indexVal.GetType() == ValueType::String, ERROR_MESSAGE_EXPECTED_STRING );
-            return LValue{ObjectMemberLValue{leftValRef->GetObject(), indexVal.GetString()}};
+            return LValue{ObjectMemberLValue{leftValRef->GetObject_(), indexVal.GetString()}};
         }
         if(leftValRef->GetType() == ValueType::Array)
         {
@@ -2406,7 +2429,7 @@ Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
         Value baseObj = BaseExpression->Evaluate(ctx);
         if(baseObj.GetType() != ValueType::Object)
             throw ExecutionError{GetPlace(), ERROR_MESSAGE_BASE_MUST_BE_OBJECT};
-        obj = CopyObject(*baseObj.GetObject());
+        obj = CopyObject(*baseObj.GetObject_());
     }
     else
         obj = make_shared<Object>();
@@ -2764,6 +2787,14 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
                 }
             }
         }
+        return stmt;
+    }
+
+    // 'throw' Expr17
+    if(TryParseSymbol(Symbol::Throw))
+    {
+        auto stmt = std::make_unique<AST::ThrowStatement>(place);
+        MUST_PARSE(stmt->ThrownExpression = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
         return stmt;
     }
 
