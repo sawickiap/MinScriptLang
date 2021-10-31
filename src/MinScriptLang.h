@@ -689,9 +689,12 @@ struct ConstantExpression : Expression
 struct ConstantValue : ConstantExpression
 {
     Value Val;
-    ConstantValue(const PlaceInCode& place, Value&& val) : ConstantExpression{place}, Val{std::move(val)} { }
+    ConstantValue(const PlaceInCode& place, Value&& val) : ConstantExpression{place}, Val{std::move(val)}
+    {
+        assert(Val.GetType() == Value::Type::Null || Val.GetType() == Value::Type::Number || Val.GetType() == Value::Type::String);
+    }
     virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const { return Val; }
+    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{Val}; }
 };
 
 enum class IdentifierScope { None, Local, Global, Count };
@@ -1725,10 +1728,7 @@ void ConstantValue::DebugPrint(uint32_t indentLevel, const char* prefix) const
     case Value::Type::Null: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant null\n", DEBUG_PRINT_ARGS_BEG); break;
     case Value::Type::Number: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant number: %g\n", DEBUG_PRINT_ARGS_BEG, Val.GetNumber()); break;
     case Value::Type::String: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant string: %s\n", DEBUG_PRINT_ARGS_BEG, Val.GetString().c_str()); break;
-    case Value::Type::Function: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant function\n", DEBUG_PRINT_ARGS_BEG); break;
-    case Value::Type::SystemFunction: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant system function: %s\n", DEBUG_PRINT_ARGS_BEG, SYSTEM_FUNCTION_NAMES[(size_t)Val.GetSystemFunction()]); break;
-    case Value::Type::Object: assert(0 && "TODO");
-    default: assert(0);
+    default: assert(0 && "ConstantValue should not be used with this type.");
     }
 }
 
