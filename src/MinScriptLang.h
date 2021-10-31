@@ -68,16 +68,17 @@ private:
 class ParsingError : public Error
 {
 public:
-    ParsingError(const PlaceInCode& place, const char* message) : Error{place}, m_Message{message} { }
-    virtual const char* GetMessage() const override { return m_Message; }
+    ParsingError(const PlaceInCode& place, const std::string_view& message) : Error{place}, m_Message{message} { }
+    virtual const char* GetMessage() const override { return m_Message.data(); }
 private:
-    const char* const m_Message; // Externally owned
+    const std::string_view m_Message; // Externally owned
 };
 
 class ExecutionError : public Error
 {
 public:
     ExecutionError(const PlaceInCode& place, std::string&& message) : Error{place}, m_Message{std::move(message)} { }
+    ExecutionError(const PlaceInCode& place, const std::string_view& message) : Error{place}, m_Message{message} { }
     virtual const char* GetMessage() const override { return m_Message.c_str(); }
 private:
     const std::string m_Message;
@@ -159,57 +160,57 @@ namespace MinScriptLang {
 // native "stack overflow" in Debug configuration.
 static const size_t LOCAL_SCOPE_STACK_MAX_SIZE = 100;
 
-static const char* const ERROR_MESSAGE_PARSING_ERROR = "Parsing error.";
-static const char* const ERROR_MESSAGE_INVALID_NUMBER = "Invalid number.";
-static const char* const ERROR_MESSAGE_INVALID_STRING = "Invalid string.";
-static const char* const ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE = "Invalid escape sequence in a string.";
-static const char* const ERROR_MESSAGE_INVALID_TYPE = "Invalid type.";
-static const char* const ERROR_MESSAGE_INVALID_MEMBER = "Invalid member.";
-static const char* const ERROR_MESSAGE_INVALID_INDEX = "Invalid index.";
-static const char* const ERROR_MESSAGE_INVALID_LVALUE = "Invalid l-value.";
-static const char* const ERROR_MESSAGE_INVALID_FUNCTION = "Invalid function.";
-static const char* const ERROR_MESSAGE_INVALID_NUMBER_OF_ARGUMENTS = "Invalid number of arguments.";
-static const char* const ERROR_MESSAGE_UNRECOGNIZED_TOKEN = "Unrecognized token.";
-static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT = "Unexpected end of file inside multiline comment.";
-static const char* const ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING = "Unexpected end of file inside string.";
-static const char* const ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expression.";
-static const char* const ERROR_MESSAGE_EXPECTED_STATEMENT = "Expected statement.";
-static const char* const ERROR_MESSAGE_EXPECTED_CONSTANT_VALUE = "Expected constant value.";
-static const char* const ERROR_MESSAGE_EXPECTED_IDENTIFIER = "Expected identifier.";
-static const char* const ERROR_MESSAGE_EXPECTED_LVALUE = "Expected l-value.";
-static const char* const ERROR_MESSAGE_EXPECTED_NUMBER = "Expected number.";
-static const char* const ERROR_MESSAGE_EXPECTED_STRING = "Expected string.";
-static const char* const ERROR_MESSAGE_EXPECTED_OBJECT = "Expected object.";
-static const char* const ERROR_MESSAGE_EXPECTED_ARRAY = "Expected array.";
-static const char* const ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER = "Expected object member.";
-static const char* const ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING = "Expected single character string.";
-static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL                     = "Expected symbol.";
-static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_COLON               = "Expected symbol ':'.";
-static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Expected symbol ';'.";
-static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN  = "Expected symbol '('.";
-static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Expected symbol ')'.";
-static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN  = "Expected symbol '{'.";
-static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
-static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE = "Expected symbol ']'.";
-static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_DOT                 = "Expected symbol '.'.";
-static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
-static const char* const ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT = "Expected unique constant.";
-static const char* const ERROR_MESSAGE_EXPECTED_1_ARGUMENT = "Expected 1 argument.";
-static const char* const ERROR_MESSAGE_EXPECTED_2_ARGUMENTS = "Expected 2 arguments.";
-static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
-static const char* const ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST = "Object member doesn't exist.";
-static const char* const ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
-static const char* const ERROR_MESSAGE_BREAK_WITHOUT_LOOP = "Break without a loop.";
-static const char* const ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP = "Continue without a loop.";
-static const char* const ERROR_MESSAGE_RETURN_WITHOUT_FUNCTION = "Return without a function.";
-static const char* const ERROR_MESSAGE_INCOMPATIBLE_TYPES = "Incompatible types.";
-static const char* const ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS = "Index out of bounds.";
-static const char* const ERROR_MESSAGE_PARAMETER_NAMES_MUST_BE_UNIQUE = "Parameter naems must be unique.";
-static const char* const ERROR_MESSAGE_NO_LOCAL_SCOPE = "There is no local scope here.";
-static const char* const ERROR_MESSAGE_NO_THIS = "There is no 'this' here.";
-static const char* const ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT = "Repeating key in object.";
-static const char* const ERROR_MESSAGE_STACK_OVERFLOW = "Stack overflow.";
-static const char* const ERROR_MESSAGE_BASE_MUST_BE_OBJECT = "Base must be object.";
+static constexpr string_view ERROR_MESSAGE_PARSING_ERROR = "Parsing error.";
+static constexpr string_view ERROR_MESSAGE_INVALID_NUMBER = "Invalid number.";
+static constexpr string_view ERROR_MESSAGE_INVALID_STRING = "Invalid string.";
+static constexpr string_view ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE = "Invalid escape sequence in a string.";
+static constexpr string_view ERROR_MESSAGE_INVALID_TYPE = "Invalid type.";
+static constexpr string_view ERROR_MESSAGE_INVALID_MEMBER = "Invalid member.";
+static constexpr string_view ERROR_MESSAGE_INVALID_INDEX = "Invalid index.";
+static constexpr string_view ERROR_MESSAGE_INVALID_LVALUE = "Invalid l-value.";
+static constexpr string_view ERROR_MESSAGE_INVALID_FUNCTION = "Invalid function.";
+static constexpr string_view ERROR_MESSAGE_INVALID_NUMBER_OF_ARGUMENTS = "Invalid number of arguments.";
+static constexpr string_view ERROR_MESSAGE_UNRECOGNIZED_TOKEN = "Unrecognized token.";
+static constexpr string_view ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT = "Unexpected end of file inside multiline comment.";
+static constexpr string_view ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING = "Unexpected end of file inside string.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expression.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_STATEMENT = "Expected statement.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_CONSTANT_VALUE = "Expected constant value.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_IDENTIFIER = "Expected identifier.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_LVALUE = "Expected l-value.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_NUMBER = "Expected number.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_STRING = "Expected string.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_OBJECT = "Expected object.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_ARRAY = "Expected array.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER = "Expected object member.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING = "Expected single character string.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_SYMBOL                     = "Expected symbol.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_SYMBOL_COLON               = "Expected symbol ':'.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON           = "Expected symbol ';'.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN  = "Expected symbol '('.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Expected symbol ')'.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN  = "Expected symbol '{'.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE = "Expected symbol ']'.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_SYMBOL_DOT                 = "Expected symbol '.'.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT = "Expected unique constant.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_1_ARGUMENT = "Expected 1 argument.";
+static constexpr string_view ERROR_MESSAGE_EXPECTED_2_ARGUMENTS = "Expected 2 arguments.";
+static constexpr string_view ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
+static constexpr string_view ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST = "Object member doesn't exist.";
+static constexpr string_view ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
+static constexpr string_view ERROR_MESSAGE_BREAK_WITHOUT_LOOP = "Break without a loop.";
+static constexpr string_view ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP = "Continue without a loop.";
+static constexpr string_view ERROR_MESSAGE_RETURN_WITHOUT_FUNCTION = "Return without a function.";
+static constexpr string_view ERROR_MESSAGE_INCOMPATIBLE_TYPES = "Incompatible types.";
+static constexpr string_view ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS = "Index out of bounds.";
+static constexpr string_view ERROR_MESSAGE_PARAMETER_NAMES_MUST_BE_UNIQUE = "Parameter naems must be unique.";
+static constexpr string_view ERROR_MESSAGE_NO_LOCAL_SCOPE = "There is no local scope here.";
+static constexpr string_view ERROR_MESSAGE_NO_THIS = "There is no 'this' here.";
+static constexpr string_view ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT = "Repeating key in object.";
+static constexpr string_view ERROR_MESSAGE_STACK_OVERFLOW = "Stack overflow.";
+static constexpr string_view ERROR_MESSAGE_BASE_MUST_BE_OBJECT = "Base must be object.";
 
 struct Constant
 {
@@ -400,7 +401,7 @@ public:
 
 private:
     static bool ParseCharHex(uint8_t& out, char ch);
-    static bool ParseCharsHex(uint32_t& out, const char* chars, uint8_t charCount);
+    static bool ParseCharsHex(uint32_t& out, const string_view& chars);
     static bool AppendUtf8Char(string& inout, uint32_t charVal);
 
     CodeReader m_Code;
@@ -422,7 +423,7 @@ enum class SystemFunction {
     Array_Add, Array_Insert, Array_Remove,
     Count
 };
-static const char* SYSTEM_FUNCTION_NAMES[] = {
+static constexpr string_view SYSTEM_FUNCTION_NAMES[] = {
     "TypeOf", "print",
     "Add", "Insert", "Remove",
 };
@@ -521,7 +522,7 @@ private:
     shared_ptr<Array> m_Array;
 };
 
-static const char* VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Object", "Array", "Type" };
+static constexpr string_view VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Object", "Array", "Type" };
 static_assert(_countof(VALUE_TYPE_NAMES) == (size_t)Value::Type::Count);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -623,7 +624,7 @@ struct Statement
     explicit Statement(const PlaceInCode& place) : m_Place{place} { }
     virtual ~Statement() { }
     const PlaceInCode& GetPlace() const { return m_Place; }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const = 0;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const = 0;
     virtual void Execute(ExecuteContext& ctx) const = 0;
 protected:
     void Assign(const LValue& lhs, Value&& rhs) const;
@@ -634,7 +635,7 @@ private:
 struct EmptyStatement : public Statement
 {
     explicit EmptyStatement(const PlaceInCode& place) : Statement{place} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual void Execute(ExecuteContext& ctx) const { }
 };
 
@@ -645,7 +646,7 @@ struct Condition : public Statement
     unique_ptr<Expression> ConditionExpression;
     unique_ptr<Statement> Statements[2]; // [0] executed if true, [1] executed if false, optional.
     explicit Condition(const PlaceInCode& place) : Statement{place} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -657,7 +658,7 @@ struct WhileLoop : public Statement
     unique_ptr<Expression> ConditionExpression;
     unique_ptr<Statement> Body;
     explicit WhileLoop(const PlaceInCode& place, WhileLoopType type) : Statement{place}, Type{type} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -668,7 +669,7 @@ struct ForLoop : public Statement
     unique_ptr<Expression> IterationExpression; // Optional
     unique_ptr<Statement> Body;
     explicit ForLoop(const PlaceInCode& place) : Statement{place} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -679,7 +680,7 @@ struct RangeBasedForLoop : public Statement
     unique_ptr<Expression> RangeExpression;
     unique_ptr<Statement> Body;
     explicit RangeBasedForLoop(const PlaceInCode& place) : Statement{place} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -688,7 +689,7 @@ struct LoopBreakStatement : public Statement
 {
     LoopBreakType Type;
     explicit LoopBreakStatement(const PlaceInCode& place, LoopBreakType type) : Statement{place}, Type{type} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -696,7 +697,7 @@ struct ReturnStatement : public Statement
 {
     unique_ptr<Expression> ReturnedValue; // Can be null.
     explicit ReturnStatement(const PlaceInCode& place) : Statement{place} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -704,7 +705,7 @@ struct Block : public Statement
 {
     explicit Block(const PlaceInCode& place) : Statement{place} { }
     vector<unique_ptr<Statement>> Statements;
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -716,7 +717,7 @@ struct SwitchStatement : public Statement
     vector<unique_ptr<AST::ConstantValue>> ItemValues; // null means default block.
     vector<unique_ptr<AST::Block>> ItemBlocks; // Can be null if empty.
     explicit SwitchStatement(const PlaceInCode& place) : Statement{place} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual void Execute(ExecuteContext& ctx) const;
 };
 
@@ -747,7 +748,7 @@ struct ConstantValue : ConstantExpression
     {
         assert(Val.GetType() == Value::Type::Null || Val.GetType() == Value::Type::Number || Val.GetType() == Value::Type::String);
     }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const { return Value{Val}; }
 };
 
@@ -757,7 +758,7 @@ struct Identifier : ConstantExpression
     IdentifierScope Scope = IdentifierScope::Count;
     string S;
     Identifier(const PlaceInCode& place, IdentifierScope scope, string&& s) : ConstantExpression{place}, Scope(scope), S(std::move(s)) { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
 };
@@ -765,7 +766,7 @@ struct Identifier : ConstantExpression
 struct ThisExpression : ConstantExpression
 {
     ThisExpression(const PlaceInCode& place) : ConstantExpression{place} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
@@ -785,7 +786,7 @@ struct UnaryOperator : Operator
     UnaryOperatorType Type;
     unique_ptr<Expression> Operand;
     UnaryOperator(const PlaceInCode& place, UnaryOperatorType type) : Operator{place}, Type(type) { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
 
@@ -798,7 +799,7 @@ struct MemberAccessOperator : Operator
     unique_ptr<Expression> Operand;
     string MemberName;
     MemberAccessOperator(const PlaceInCode& place) : Operator{place} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
 };
@@ -818,7 +819,7 @@ struct BinaryOperator : Operator
     BinaryOperatorType Type;
     unique_ptr<Expression> Operands[2];
     BinaryOperator(const PlaceInCode& place, BinaryOperatorType type) : Operator{place}, Type(type) { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
 
@@ -832,7 +833,7 @@ struct TernaryOperator : Operator
 {
     unique_ptr<Expression> Operands[3];
     explicit TernaryOperator(const PlaceInCode& place) : Operator{place} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
@@ -840,7 +841,7 @@ struct CallOperator : Operator
 {
     vector<unique_ptr<Expression>> Operands;
     CallOperator(const PlaceInCode& place) : Operator{place} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
@@ -849,7 +850,7 @@ struct FunctionDefinition : public Expression
     vector<string> Parameters;
     Block Body;
     FunctionDefinition(const PlaceInCode& place) : Expression{place}, Body{place} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const { return Value{this}; }
     bool AreParameterNamesUnique() const;
 };
@@ -860,7 +861,7 @@ struct ObjectExpression : public Expression
     using ItemMap = std::map<string, unique_ptr<Expression>>;
     ItemMap Items;
     ObjectExpression(const PlaceInCode& place) : Expression{place} { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
@@ -868,7 +869,7 @@ struct ArrayExpression : public Expression
 {
     vector<unique_ptr<Expression>> Items;
     ArrayExpression(const PlaceInCode& place) : Expression{ place } { }
-    virtual void DebugPrint(uint32_t indentLevel, const char* prefix) const;
+    virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const;
 };
 
@@ -1042,10 +1043,10 @@ bool Tokenizer::ParseCharHex(uint8_t& out, char ch)
     return true;
 }
 
-bool Tokenizer::ParseCharsHex(uint32_t& out, const char* chars, uint8_t charCount)
+bool Tokenizer::ParseCharsHex(uint32_t& out, const string_view& chars)
 {
     out = 0;
-    for(uint8_t i = 0; i < charCount; ++i)
+    for(size_t i = 0, count = chars.length(); i < count; ++i)
     {
         uint8_t charVal = 0;
         if(!ParseCharHex(charVal, chars[i]))
@@ -1220,7 +1221,7 @@ bool Tokenizer::ParseString(Token& out)
             case 'x':
             {
                 uint32_t val = 0;
-                if(tokenLen + 2 >= currCodeLen || !ParseCharsHex(val, currCode + tokenLen + 1, 2))
+                if(tokenLen + 2 >= currCodeLen || !ParseCharsHex(val, string_view{currCode + tokenLen + 1, 2}))
                     throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE);
                 out.String += (char)(uint8_t)val;
                 tokenLen += 3;
@@ -1229,7 +1230,7 @@ bool Tokenizer::ParseString(Token& out)
             case 'u':
             {
                 uint32_t val = 0;
-                if(tokenLen + 4 >= currCodeLen || !ParseCharsHex(val, currCode + tokenLen + 1, 4))
+                if(tokenLen + 4 >= currCodeLen || !ParseCharsHex(val, string_view{currCode + tokenLen + 1, 4}))
                     throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE);
                 if(!AppendUtf8Char(out.String, val))
                     throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE);
@@ -1239,7 +1240,7 @@ bool Tokenizer::ParseString(Token& out)
             case 'U':
             {
                 uint32_t val = 0;
-                if(tokenLen + 8 >= currCodeLen || !ParseCharsHex(val, currCode + tokenLen + 1, 8))
+                if(tokenLen + 8 >= currCodeLen || !ParseCharsHex(val, string_view{currCode + tokenLen + 1, 8}))
                     throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE);
                 if(!AppendUtf8Char(out.String, val))
                     throw ParsingError(out.Place, ERROR_MESSAGE_INVALID_ESCAPE_SEQUENCE);
@@ -1424,8 +1425,12 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
             ctx.Env.Print("array\n");
             break;
         case Value::Type::Type:
-            Format(s, "%s\n", VALUE_TYPE_NAMES[(size_t)val.GetTypeValue()]);
+        {
+            const size_t typeIndex = (size_t)val.GetTypeValue();
+            const string_view& typeName = VALUE_TYPE_NAMES[typeIndex];
+            Format(s, "%.*s\n", (int)typeName.length(), typeName.data());
             ctx.Env.Print(s.data(), s.length());
+        }
             break;
         default: assert(0);
         }
@@ -1483,8 +1488,8 @@ static Value BuiltInFunction_Array_Remove(AST::ExecuteContext& ctx, const PlaceI
 
 namespace AST {
 
-#define DEBUG_PRINT_FORMAT_STR_BEG "(%u,%u) %s%s"
-#define DEBUG_PRINT_ARGS_BEG GetPlace().Row, GetPlace().Column, GetDebugPrintIndent(indentLevel), prefix
+#define DEBUG_PRINT_FORMAT_STR_BEG "(%u,%u) %s%.*s"
+#define DEBUG_PRINT_ARGS_BEG GetPlace().Row, GetPlace().Column, GetDebugPrintIndent(indentLevel), (int)prefix.length(), prefix.data()
 
 void Statement::Assign(const LValue& lhs, Value&& rhs) const
 {
@@ -1511,12 +1516,12 @@ void Statement::Assign(const LValue& lhs, Value&& rhs) const
         assert(0);
 }
 
-void EmptyStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void EmptyStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Empty\n", DEBUG_PRINT_ARGS_BEG);
 }
 
-void Condition::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void Condition::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "If\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
@@ -1534,7 +1539,7 @@ void Condition::Execute(ExecuteContext& ctx) const
         Statements[1]->Execute(ctx);
 }
 
-void WhileLoop::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void WhileLoop::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     const char* name = nullptr;
     switch(Type)
@@ -1592,7 +1597,7 @@ void WhileLoop::Execute(ExecuteContext& ctx) const
     }
 }
 
-void ForLoop::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void ForLoop::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "For\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
@@ -1633,7 +1638,7 @@ void ForLoop::Execute(ExecuteContext& ctx) const
     }
 }
 
-void RangeBasedForLoop::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void RangeBasedForLoop::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     if(!KeyVarName.empty())
         printf(DEBUG_PRINT_FORMAT_STR_BEG "Range-based for: %s, %s\n", DEBUG_PRINT_ARGS_BEG, KeyVarName.c_str(), ValueVarName.c_str());
@@ -1692,7 +1697,7 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
     Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ValueVarName}}, Value{});
 }
 
-void LoopBreakStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void LoopBreakStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     static const char* LOOP_BREAK_TYPE_NAMES[] = { "Break", "Continue" };
     static_assert(_countof(LOOP_BREAK_TYPE_NAMES) == (size_t)LoopBreakType::Count, "TYPE_NAMES is invalid.");
@@ -1712,7 +1717,7 @@ void LoopBreakStatement::Execute(ExecuteContext& ctx) const
     }
 }
 
-void ReturnStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void ReturnStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "return\n", DEBUG_PRINT_ARGS_BEG);
     if(ReturnedValue)
@@ -1727,12 +1732,12 @@ void ReturnStatement::Execute(ExecuteContext& ctx) const
         throw ReturnException{GetPlace(), Value{}};
 }
 
-void Block::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void Block::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Block\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
     for(const auto& stmtPtr : Statements)
-        stmtPtr->DebugPrint(indentLevel, "");
+        stmtPtr->DebugPrint(indentLevel, string_view{});
 }
 
 void Block::Execute(ExecuteContext& ctx) const
@@ -1741,7 +1746,7 @@ void Block::Execute(ExecuteContext& ctx) const
         stmtPtr->Execute(ctx);
 }
 
-void SwitchStatement::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void SwitchStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "switch\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
@@ -1808,7 +1813,7 @@ void Script::Execute(ExecuteContext& ctx) const
     }
 }
 
-void ConstantValue::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void ConstantValue::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     switch(Val.GetType())
     {
@@ -1819,7 +1824,7 @@ void ConstantValue::DebugPrint(uint32_t indentLevel, const char* prefix) const
     }
 }
 
-void Identifier::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void Identifier::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     static const char* PREFIX[] = { "", "local.", "global." };
     static_assert(_countof(PREFIX) == (size_t)IdentifierScope::Count);
@@ -1899,7 +1904,7 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
     return LValue{ObjectMemberLValue{&ctx.GlobalScope, S}};
 }
 
-void ThisExpression::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void ThisExpression::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "This\n", DEBUG_PRINT_ARGS_BEG);
 }
@@ -1910,7 +1915,7 @@ Value ThisExpression::Evaluate(ExecuteContext& ctx) const
     return Value{shared_ptr<Object>{*std::get_if<shared_ptr<Object>>(&ctx.GetThis())}};
 }
 
-void UnaryOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void UnaryOperator::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     static const char* UNARY_OPERATOR_TYPE_NAMES[] = {
         "Preincrementation", "Predecrementation", "Postincrementation", "Postdecrementation",
@@ -1990,7 +1995,7 @@ LValue UnaryOperator::GetLValue(ExecuteContext& ctx) const
     EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_LVALUE );
 }
 
-void MemberAccessOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void MemberAccessOperator::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "MemberAccessOperator Member=%s\n", DEBUG_PRINT_ARGS_BEG, MemberName.c_str());
     Operand->DebugPrint(indentLevel + 1, "Operand: ");
@@ -2044,7 +2049,7 @@ Value UnaryOperator::BitwiseNot(Value&& operand) const
     return Value{(double)resultInt};
 }
 
-void BinaryOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void BinaryOperator::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     static const char* BINARY_OPERATOR_TYPE_NAMES[] = {
         "Mul", "Div", "Mod", "Add", "Sub", "Shift left", "Shift right",
@@ -2298,7 +2303,7 @@ Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
     return *lhsValPtr;
 }
 
-void TernaryOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void TernaryOperator::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "TernaryOperator\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
@@ -2312,7 +2317,7 @@ Value TernaryOperator::Evaluate(ExecuteContext& ctx) const
     return Operands[0]->Evaluate(ctx).IsTrue() ? Operands[1]->Evaluate(ctx) : Operands[2]->Evaluate(ctx);
 }
 
-void CallOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void CallOperator::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "CallOperator\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
@@ -2321,7 +2326,7 @@ void CallOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
         Operands[i]->DebugPrint(indentLevel, "Argument: ");
 }
 
-void FunctionDefinition::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void FunctionDefinition::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Function(", DEBUG_PRINT_ARGS_BEG);
     if(!Parameters.empty())
@@ -2344,12 +2349,12 @@ bool FunctionDefinition::AreParameterNamesUnique() const
     return true;
 }
 
-void ObjectExpression::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void ObjectExpression::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Object\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
     for(const auto& [name, value] : Items)
-        value->DebugPrint(indentLevel, name.c_str());
+        value->DebugPrint(indentLevel, name);
 }
 
 Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
@@ -2375,15 +2380,15 @@ Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
     return Value{std::move(obj)};
 }
 
-void ArrayExpression::DebugPrint(uint32_t indentLevel, const char* prefix) const
+void ArrayExpression::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
 {
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Array\n", DEBUG_PRINT_ARGS_BEG);
     ++indentLevel;
-    string indexStr;
+    string itemPrefix;
     for(size_t i = 0, count = Items.size(); i < count; ++i)
     {
-        Format(indexStr, "%zu", i);
-        Items[i]->DebugPrint(indentLevel, indexStr.c_str());
+        Format(itemPrefix, "%zu: ", i);
+        Items[i]->DebugPrint(indentLevel, itemPrefix);
     }
 }
 
