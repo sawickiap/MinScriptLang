@@ -1240,6 +1240,13 @@ TEST_CASE("Array")
         REQUIRE(env.GetOutput() == "0\n1\n1\n2\n2\n3\n"
             "null\nnull\n");
     }
+    SECTION("Array conversion to bool")
+    {
+        const char* code = "a0=[]; a3=[1, 2, 3]; n=null;\n"
+            "print(a0?'Y':'N', a3?'Y':'N', n?'Y':'N'); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "Y\nY\nN\n");
+    }
 }
 
 TEST_CASE("Extra slow")
