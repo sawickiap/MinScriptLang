@@ -1247,6 +1247,23 @@ TEST_CASE("Array")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "Y\nY\nN\n");
     }
+    SECTION("Array Count property")
+    {
+        const char* code = "a0=[]; a3=[1, 2, 3]; \n"
+            "print(a0.Count, a3.Count); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "0\n3\n");
+    }
+    SECTION("Array methods Add Insert Remove")
+    {
+        const char* code = "a=[1, 2, 3]; \n"
+            "a.Add(4); a.Add(5); a.Add(6); /* 1, 2, 3, 4, 5, 6 */ \n"
+            "a.Remove(0); a.Remove(a.Count-1); a.Remove(1); /* 2, 4, 5 */ \n"
+            "a.Insert(3, 100); a.Insert(2, 101); a.Insert(0, 102); /* 102, 2, 4, 101, 5, 100 */ \n"
+            "print(a.Count, a[0], a[1], a[2], a[3], a[4], a[5]); \n";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "6\n102\n2\n4\n101\n5\n100\n");
+    }
 }
 
 TEST_CASE("Extra slow")

@@ -146,6 +146,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_LVALUE = "Expected l-value.";
 static const char* const ERROR_MESSAGE_EXPECTED_NUMBER = "Expected number.";
 static const char* const ERROR_MESSAGE_EXPECTED_STRING = "Expected string.";
 static const char* const ERROR_MESSAGE_EXPECTED_OBJECT = "Expected object.";
+static const char* const ERROR_MESSAGE_EXPECTED_ARRAY = "Expected array.";
 static const char* const ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER = "Expected object member.";
 static const char* const ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING = "Expected single character string.";
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL                     = "Expected symbol.";
@@ -160,6 +161,7 @@ static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_DOT                 = "Ex
 static const char* const ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
 static const char* const ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT = "Expected unique constant.";
 static const char* const ERROR_MESSAGE_EXPECTED_1_ARGUMENT = "Expected 1 argument.";
+static const char* const ERROR_MESSAGE_EXPECTED_2_ARGUMENTS = "Expected 2 arguments.";
 static const char* const ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
 static const char* const ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST = "Object member doesn't exist.";
 static const char* const ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
@@ -384,24 +386,31 @@ class Object;
 class Array;
 
 enum class SystemFunction {
-    TypeOf, Print, Count
+    TypeOf, Print,
+    Array_Add, Array_Insert, Array_Remove,
+    Count
 };
 static const char* SYSTEM_FUNCTION_NAMES[] = {
     "TypeOf", "print",
+    "Add", "Insert", "Remove",
 };
+static_assert(_countof(SYSTEM_FUNCTION_NAMES) == (size_t)SystemFunction::Count);
+
+using ThisType = std::variant<std::monostate, shared_ptr<Object>, shared_ptr<Array>>;
 
 class Value
 {
 public:
     enum class Type { Null, Number, String, Function, SystemFunction, Object, Array, Type, Count };
     
-    shared_ptr<Object> m_ThisObject;
+    ThisType m_This;
 
     Value() { }
     Value(double number) : m_Type(Type::Number), m_Number(number) { }
     Value(string&& str) : m_Type(Type::String), m_String(std::move(str)) { }
     Value(const AST::FunctionDefinition* func) : m_Type{Type::Function}, m_Function{func} { }
     Value(SystemFunction func) : m_Type{Type::SystemFunction}, m_SystemFunction{func} { }
+    Value(ThisType&& th, SystemFunction func) : m_This{th}, m_Type{Type::SystemFunction}, m_SystemFunction{func} { }
     Value(shared_ptr<Object> &&obj) : m_Type{Type::Object}, m_Object(obj) { }
     Value(shared_ptr<Array> &&arr) : m_Type{Type::Array}, m_Array(arr) { }
     Value(Type typeVal) : m_Type{Type::Type}, m_TypeValue(typeVal) { }
@@ -536,7 +545,7 @@ public:
 
     struct LocalScopePush
     {
-        LocalScopePush(ExecuteContext& ctx, Object* localScope, shared_ptr<Object>&& thisObj, const PlaceInCode& place) :
+        LocalScopePush(ExecuteContext& ctx, Object* localScope, ThisType&& thisObj, const PlaceInCode& place) :
             m_Ctx{ctx}
         {
             if(ctx.LocalScopes.size() == LOCAL_SCOPE_STACK_MAX_SIZE)
@@ -556,12 +565,12 @@ public:
     ExecuteContext(EnvironmentPimpl& env, Object& globalScope) : Env{env}, GlobalScope{globalScope} { }
     bool IsLocal() const { return !LocalScopes.empty(); }
     Object* GetCurrentLocalScope() { assert(IsLocal()); return LocalScopes.back(); }
-    const shared_ptr<Object>& GetThis() { assert(IsLocal()); return Thises.back(); }
+    const ThisType& GetThis() { assert(IsLocal()); return Thises.back(); }
     Object& GetInnermostScope() const { return IsLocal() ? *LocalScopes.back() : GlobalScope; }
 
 private:
     vector<Object*> LocalScopes;
-    vector<shared_ptr<Object>> Thises;
+    vector<ThisType> Thises;
 };
 
 struct Statement
@@ -1381,14 +1390,47 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
 
 static Value BuiltInMember_Object_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
-    assert(objVal.GetType() == Value::Type::Object && objVal.GetObject());
+    EXECUTION_CHECK_PLACE(objVal.GetType() == Value::Type::Object && objVal.GetObject(), place, ERROR_MESSAGE_EXPECTED_OBJECT);
     return Value{(double)objVal.GetObject()->GetCount()};
 }
-
+static Value BuiltInMember_Array_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
+{
+    EXECUTION_CHECK_PLACE(objVal.GetType() == Value::Type::Array && objVal.GetArray(), place, ERROR_MESSAGE_EXPECTED_ARRAY);
+    return Value{(double)objVal.GetArray()->Items.size()};
+}
 static Value BuiltInMember_String_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
-    assert(objVal.GetType() == Value::Type::String);
+    EXECUTION_CHECK_PLACE(objVal.GetType() == Value::Type::String, place, ERROR_MESSAGE_EXPECTED_STRING);
     return Value{(double)objVal.GetString().length()};
+}
+
+static Value BuiltInFunction_Array_Add(AST::ExecuteContext& ctx, const PlaceInCode& place, const ThisType& th, std::vector<Value>&& args)
+{
+    const shared_ptr<Array>* arr = std::get_if<shared_ptr<Array>>(&th);
+    EXECUTION_CHECK_PLACE(arr && *arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
+    EXECUTION_CHECK_PLACE(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
+    (*arr)->Items.push_back(std::move(args[0]));
+    return Value{};
+}
+static Value BuiltInFunction_Array_Insert(AST::ExecuteContext& ctx, const PlaceInCode& place, const ThisType& th, std::vector<Value>&& args)
+{
+    const shared_ptr<Array>* arr = std::get_if<shared_ptr<Array>>(&th);
+    EXECUTION_CHECK_PLACE(arr && *arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
+    EXECUTION_CHECK_PLACE(args.size() == 2, place, ERROR_MESSAGE_EXPECTED_2_ARGUMENTS);
+    size_t index = 0;
+    EXECUTION_CHECK_PLACE(args[0].GetType() == Value::Type::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
+    (*arr)->Items.insert((*arr)->Items.begin() + index, std::move(args[1]));
+    return Value{};
+}
+static Value BuiltInFunction_Array_Remove(AST::ExecuteContext& ctx, const PlaceInCode& place, const ThisType& th, std::vector<Value>&& args)
+{
+    const shared_ptr<Array>* arr = std::get_if<shared_ptr<Array>>(&th);
+    EXECUTION_CHECK_PLACE(arr && *arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
+    EXECUTION_CHECK_PLACE(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
+    size_t index = 0;
+    EXECUTION_CHECK_PLACE(args[0].GetType() == Value::Type::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
+    (*arr)->Items.erase((*arr)->Items.begin() + index);
+    return Value{};
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1750,13 +1792,16 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
             if(Value* val = ctx.GetCurrentLocalScope()->TryGetValue(S); val)
                 return *val;
         // This
-        if(Scope == IdentifierScope::None && ctx.GetThis())
+        if(Scope == IdentifierScope::None)
         {
-            if(Value* val = ctx.GetThis()->TryGetValue(S); val)
+            if(const shared_ptr<Object>* thisObj = std::get_if<shared_ptr<Object>>(&ctx.GetThis()); thisObj)
             {
-                Value valWithThis = *val;
-                valWithThis.m_ThisObject = ctx.GetThis();
-                return valWithThis;
+                if(Value* val = (*thisObj)->TryGetValue(S); val)
+                {
+                    Value valWithThis = *val;
+                    valWithThis.m_This = ThisType{*thisObj};
+                    return valWithThis;
+                }
             }
         }
     }
@@ -1793,8 +1838,10 @@ LValue Identifier::GetLValue(ExecuteContext& ctx) const
             return LValue{ObjectMemberLValue{&*ctx.GetCurrentLocalScope(), S}};
         // This
         if(Scope == IdentifierScope::None)
-            if(Object* thisObj = ctx.GetThis().get(); thisObj && thisObj->HasKey(S))
-                return LValue{ObjectMemberLValue{thisObj, S}};
+        {
+            if(const shared_ptr<Object>* thisObj = std::get_if<shared_ptr<Object>>(&ctx.GetThis()); thisObj && (*thisObj)->HasKey(S))
+                return LValue{ObjectMemberLValue{(*thisObj).get(), S}};
+        }
     }    
     
     // Global variable
@@ -1814,8 +1861,8 @@ void ThisExpression::DebugPrint(uint32_t indentLevel, const char* prefix) const
 
 Value ThisExpression::Evaluate(ExecuteContext& ctx) const
 {
-    EXECUTION_CHECK(ctx.IsLocal() && ctx.GetThis(), ERROR_MESSAGE_NO_THIS);
-    return Value{shared_ptr<Object>{ctx.GetThis()}};
+    EXECUTION_CHECK(ctx.IsLocal() && std::get_if<shared_ptr<Object>>(&ctx.GetThis()), ERROR_MESSAGE_NO_THIS);
+    return Value{shared_ptr<Object>{*std::get_if<shared_ptr<Object>>(&ctx.GetThis())}};
 }
 
 void UnaryOperator::DebugPrint(uint32_t indentLevel, const char* prefix) const
@@ -1913,7 +1960,7 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
         if(memberVal)
         {
             Value resultVal = *memberVal;
-            resultVal.m_ThisObject = objVal.GetObjectPtr();
+            resultVal.m_This = ThisType{objVal.GetObjectPtr()};
             return resultVal;
         }
         if(MemberName == "Count")
@@ -1924,6 +1971,15 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
     {
         if(MemberName == "Count")
             return BuiltInMember_String_Count(ctx, GetPlace(), std::move(objVal));
+        EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_MEMBER );
+    }
+    if(objVal.GetType() == Value::Type::Array)
+    {
+        auto arrayThis = ThisType{objVal.GetArrayPtr()};
+        if(MemberName == "Count") return BuiltInMember_Array_Count(ctx, GetPlace(), std::move(objVal));
+        else if(MemberName == "Add") return Value{std::move(arrayThis), SystemFunction::Array_Add};
+        else if(MemberName == "Insert") return Value{std::move(arrayThis), SystemFunction::Array_Insert};
+        else if(MemberName == "Remove") return Value{std::move(arrayThis), SystemFunction::Array_Remove};
         EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_MEMBER );
     }
     EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_TYPE );
@@ -2073,7 +2129,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
             if(Value* val = lhs.GetObject()->TryGetValue(rhs.GetString()))
             {
                 Value resultVal = *val;
-                resultVal.m_ThisObject = lhs.GetObjectPtr();
+                resultVal.m_This = ThisType{lhs.GetObjectPtr()};
                 return resultVal;
             }
             return Value{};
@@ -2309,7 +2365,7 @@ Value CallOperator::Evaluate(ExecuteContext& ctx) const
         if(Value* defaultVal = calleeObj->TryGetValue(string{}); defaultVal && defaultVal->GetType() == Value::Type::Function)
         {
             callee = *defaultVal;
-            callee.m_ThisObject = std::move(calleeObj);
+            callee.m_This = ThisType{std::move(calleeObj)};
         }
     }
 
@@ -2321,7 +2377,7 @@ Value CallOperator::Evaluate(ExecuteContext& ctx) const
         // Setup parameters
         for(size_t argIndex = 0; argIndex != argCount; ++argIndex)
             localScope.GetOrCreateValue(funcDef->Parameters[argIndex]) = std::move(arguments[argIndex]);
-        ExecuteContext::LocalScopePush localContextPush{ctx, &localScope, shared_ptr<Object>{callee.m_ThisObject}, GetPlace()};
+        ExecuteContext::LocalScopePush localContextPush{ctx, &localScope, ThisType{callee.m_This}, GetPlace()};
         try
         {
             callee.GetFunction()->Body.Execute(ctx);
@@ -2346,6 +2402,9 @@ Value CallOperator::Evaluate(ExecuteContext& ctx) const
         {
         case SystemFunction::TypeOf: return BuiltInFunction_TypeOf(ctx, GetPlace(), std::move(arguments));
         case SystemFunction::Print: return BuiltInFunction_Print(ctx, GetPlace(), std::move(arguments));
+        case SystemFunction::Array_Add: return BuiltInFunction_Array_Add(ctx, GetPlace(), callee.m_This, std::move(arguments));
+        case SystemFunction::Array_Insert: return BuiltInFunction_Array_Insert(ctx, GetPlace(), callee.m_This, std::move(arguments));
+        case SystemFunction::Array_Remove: return BuiltInFunction_Array_Remove(ctx, GetPlace(), callee.m_This, std::move(arguments));
         default: assert(0); return Value{};
         }
     }
