@@ -459,26 +459,66 @@ public:
     ThisType m_This;
 
     Value() { }
-    Value(double number) : m_Type(ValueType::Number), m_Number(number) { }
-    Value(string&& str) : m_Type(ValueType::String), m_String(std::move(str)) { }
-    Value(const AST::FunctionDefinition* func) : m_Type{ValueType::Function}, m_Function{func} { }
-    Value(SystemFunction func) : m_Type{ValueType::SystemFunction}, m_SystemFunction{func} { }
-    Value(ThisType&& th, SystemFunction func) : m_This{th}, m_Type{ValueType::SystemFunction}, m_SystemFunction{func} { }
-    Value(shared_ptr<Object> &&obj) : m_Type{ValueType::Object}, m_Object(obj) { }
-    Value(shared_ptr<Array> &&arr) : m_Type{ValueType::Array}, m_Array(arr) { }
-    Value(ValueType typeVal) : m_Type{ValueType::Type}, m_TypeValue(typeVal) { }
+    Value(double number) : m_Type(ValueType::Number), m_Variant(number) { }
+    Value(string&& str) : m_Type(ValueType::String), m_Variant(std::move(str)) { }
+    Value(const AST::FunctionDefinition* func) : m_Type{ValueType::Function}, m_Variant{func} { }
+    Value(SystemFunction func) : m_Type{ValueType::SystemFunction}, m_Variant{func} { }
+    Value(ThisType&& th, SystemFunction func) : m_This{th}, m_Type{ValueType::SystemFunction}, m_Variant{func} { }
+    Value(shared_ptr<Object> &&obj) : m_Type{ValueType::Object}, m_Variant(obj) { }
+    Value(shared_ptr<Array> &&arr) : m_Type{ValueType::Array}, m_Variant(arr) { }
+    Value(ValueType typeVal) : m_Type{ValueType::Type}, m_Variant(typeVal) { }
 
     ValueType GetType() const { return m_Type; }
-    double GetNumber() const { assert(m_Type == ValueType::Number); return m_Number; }
-    string& GetString() { assert(m_Type == ValueType::String); return m_String; }
-    const string& GetString() const { assert(m_Type == ValueType::String); return m_String; }
-    const AST::FunctionDefinition* GetFunction() const { assert(m_Type == ValueType::Function && m_Function); return m_Function; }
-    SystemFunction GetSystemFunction() const { assert(m_Type == ValueType::SystemFunction); return m_SystemFunction; }
-    Object* GetObject() const { assert(m_Type == ValueType::Object && m_Object); return m_Object.get(); }
-    shared_ptr<Object> GetObjectPtr() const { assert(m_Type == ValueType::Object && m_Object); return m_Object; }
-    Array* GetArray() const { assert(m_Type == ValueType::Array && m_Array); return m_Array.get(); }
-    shared_ptr<Array> GetArrayPtr() const { assert(m_Type == ValueType::Array && m_Array); return m_Array; }
-    ValueType GetTypeValue() const { assert(m_Type == ValueType::Type); return m_TypeValue; }
+    double GetNumber() const
+    {
+        assert(m_Type == ValueType::Number);
+        return std::get<double>(m_Variant);
+    }
+    string& GetString()
+    {
+        assert(m_Type == ValueType::String);
+        return std::get<string>(m_Variant);
+    }
+    const string& GetString() const
+    {
+        assert(m_Type == ValueType::String);
+        return std::get<string>(m_Variant);
+    }
+    const AST::FunctionDefinition* GetFunction() const
+    {
+        assert(m_Type == ValueType::Function && std::get<const AST::FunctionDefinition*>(m_Variant));
+        return std::get<const AST::FunctionDefinition*>(m_Variant);
+    }
+    SystemFunction GetSystemFunction() const
+    {
+        assert(m_Type == ValueType::SystemFunction);
+        return std::get<SystemFunction>(m_Variant);
+    }
+    Object* GetObject() const
+    {
+        assert(m_Type == ValueType::Object && std::get<shared_ptr<Object>>(m_Variant));
+        return std::get<shared_ptr<Object>>(m_Variant).get();
+    }
+    shared_ptr<Object> GetObjectPtr() const
+    {
+        assert(m_Type == ValueType::Object && std::get<shared_ptr<Object>>(m_Variant));
+        return std::get<shared_ptr<Object>>(m_Variant);
+    }
+    Array* GetArray() const
+    {
+        assert(m_Type == ValueType::Array && std::get<shared_ptr<Array>>(m_Variant));
+        return std::get<shared_ptr<Array>>(m_Variant).get();
+    }
+    shared_ptr<Array> GetArrayPtr() const
+    {
+        assert(m_Type == ValueType::Array && std::get<shared_ptr<Array>>(m_Variant));
+        return std::get<shared_ptr<Array>>(m_Variant);
+    }
+    ValueType GetTypeValue() const
+    {
+        assert(m_Type == ValueType::Type);
+        return std::get<ValueType>(m_Variant);
+    }
 
     bool IsEqual(const Value& rhs) const
     {
@@ -487,13 +527,13 @@ public:
         switch(m_Type)
         {
         case ValueType::Null:           return true;
-        case ValueType::Number:         return m_Number == rhs.m_Number;
-        case ValueType::String:         return m_String == rhs.m_String;
-        case ValueType::Function:       return m_Function == rhs.m_Function;
-        case ValueType::SystemFunction: return m_SystemFunction == rhs.m_SystemFunction;
-        case ValueType::Object:         return m_Object.get() == rhs.m_Object.get();
-        case ValueType::Array:          return m_Array.get() == rhs.m_Array.get();
-        case ValueType::Type:           return m_TypeValue == rhs.m_TypeValue;
+        case ValueType::Number:         return std::get<double>(m_Variant) == std::get<double>(rhs.m_Variant);
+        case ValueType::String:         return std::get<string>(m_Variant) == std::get<string>(rhs.m_Variant);
+        case ValueType::Function:       return std::get<const AST::FunctionDefinition*>(m_Variant) == std::get<const AST::FunctionDefinition*>(rhs.m_Variant);
+        case ValueType::SystemFunction: return std::get<SystemFunction>(m_Variant) == std::get<SystemFunction>(rhs.m_Variant);
+        case ValueType::Object:         return std::get<shared_ptr<Object>>(m_Variant).get() == std::get<shared_ptr<Object>>(rhs.m_Variant).get();
+        case ValueType::Array:          return std::get<shared_ptr<Array>>(m_Variant).get() == std::get<shared_ptr<Array>>(rhs.m_Variant).get();
+        case ValueType::Type:           return std::get<ValueType>(m_Variant) == std::get<ValueType>(rhs.m_Variant);
         default: assert(0); return false;
         }
     }
@@ -502,31 +542,31 @@ public:
         switch(m_Type)
         {
         case ValueType::Null:           return false;
-        case ValueType::Number:         return m_Number != 0.f;
-        case ValueType::String:         return !m_String.empty();
+        case ValueType::Number:         return std::get<double>(m_Variant) != 0.f;
+        case ValueType::String:         return !std::get<string>(m_Variant).empty();
         case ValueType::Function:       return true;
         case ValueType::SystemFunction: return true;
         case ValueType::Object:         return true;
         case ValueType::Array:          return true;
-        case ValueType::Type:           return m_TypeValue != ValueType::Null;
+        case ValueType::Type:           return std::get<ValueType>(m_Variant) != ValueType::Null;
         default: assert(0); return false;
         }
     }
 
-    void ChangeNumber(double number) { assert(m_Type == ValueType::Number); m_Number = number; }
+    void ChangeNumber(double number) { assert(m_Type == ValueType::Number); std::get<double>(m_Variant) = number; }
 
 private:
     ValueType m_Type = ValueType::Null;
-    union
-    {
-        double m_Number;
-        const AST::FunctionDefinition* m_Function;
-        SystemFunction m_SystemFunction;
-        ValueType m_TypeValue;
-    };
-    string m_String;
-    shared_ptr<Object> m_Object;
-    shared_ptr<Array> m_Array;
+    using VariantType = std::variant<
+        std::monostate, // ValueType::Null
+        double, // ValueType::Number
+        string, // ValueType::String
+        const AST::FunctionDefinition*, // ValueType::Function
+        SystemFunction, // ValueType::SystemFunction
+        shared_ptr<Object>, // ValueType::Object
+        shared_ptr<Array>, // ValueType::Array
+        ValueType>; // ValueType::Type
+    VariantType m_Variant;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
