@@ -1044,6 +1044,13 @@ TEST_CASE("Object")
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "T\nT\n");
     }
+    SECTION("Object definitions with trailing comma")
+    {
+        const char* code = "o1={a:123, b:124,}; o2={'a':o1.a, 'b':o1.b,}; \n"
+            "print(o1['a'], o1['b'], o2.a, o2.b);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "123\n124\n123\n124\n");
+    }
 }
 
 TEST_CASE("Types")
@@ -1197,6 +1204,12 @@ TEST_CASE("Array")
             "print(a2[0], a2[1], a2[2], a1==a2, a1==a0); \n";
         env.Execute(code, strlen(code));
         REQUIRE(env.GetOutput() == "1\n2\n3\n0\n0\n");
+    }
+    SECTION("Array definition with trailing comma")
+    {
+        const char* code = "a=[1, 2, 3,]; print(a[0], a[1], a[2]);";
+        env.Execute(code, strlen(code));
+        REQUIRE(env.GetOutput() == "1\n2\n3\n");
     }
 }
 
