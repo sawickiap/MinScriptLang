@@ -288,7 +288,7 @@ enum class Symbol
     Switch, Case, Default, Function, Return,
     Local, This, Global, Class, Count
 };
-static const char* SYMBOL_STR[] = {
+static constexpr string_view SYMBOL_STR[] = {
     // Token types
     "", "", "", "", "",
     // Symbols
@@ -985,8 +985,8 @@ void Tokenizer::GetNextToken(Token& out)
     // Multi char symbol
     for(size_t i = (size_t)firstMultiCharSymbol; i < (size_t)firstKeywordSymbol; ++i)
     {
-        const size_t symbolLen = strlen(SYMBOL_STR[i]);
-        if(currentCodeLen >= symbolLen && memcmp(SYMBOL_STR[i], currentCode, symbolLen) == 0)
+        const size_t symbolLen = SYMBOL_STR[i].length();
+        if(currentCodeLen >= symbolLen && memcmp(SYMBOL_STR[i].data(), currentCode, symbolLen) == 0)
         {
             out.Symbol = (Symbol)i;
             m_Code.MoveChars(symbolLen);
@@ -1012,8 +1012,8 @@ void Tokenizer::GetNextToken(Token& out)
         // Keyword
         for(size_t i = (size_t)firstKeywordSymbol; i < (size_t)Symbol::Count; ++i)
         {
-            const size_t keywordLen = strlen(SYMBOL_STR[i]);
-            if(keywordLen == tokenLen && memcmp(SYMBOL_STR[i], currentCode, tokenLen) == 0)
+            const size_t keywordLen = SYMBOL_STR[i].length();
+            if(keywordLen == tokenLen && memcmp(SYMBOL_STR[i].data(), currentCode, tokenLen) == 0)
             {
                 out.Symbol = (Symbol)i;
                 m_Code.MoveChars(keywordLen);
