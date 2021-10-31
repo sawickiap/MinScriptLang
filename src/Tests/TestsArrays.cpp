@@ -117,6 +117,19 @@ TEST_CASE("Arrays")
         REQUIRE(env.GetOutput() == "0\n1\n1\n2\n2\n3\n"
             "null\nnull\n");
     }
+    SECTION("For loop always sets local variable")
+    {
+        const char* code = "function f() { \n"
+            "  a=[1, 2, 3]; \n"
+            "  for(i, v : a) { print(i, v); } \n"
+            "} \n"
+            "i='A'; v='B'; \n"
+            "f(); \n"
+            "print(i, v); \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "0\n1\n1\n2\n2\n3\n"
+            "A\nB\n");
+    }
     SECTION("Array conversion to bool")
     {
         const char* code = "a0=[]; a3=[1, 2, 3]; n=null;\n"
