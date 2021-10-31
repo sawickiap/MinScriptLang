@@ -444,34 +444,37 @@ struct ThisType : public std::variant<std::monostate, shared_ptr<Object>, shared
     }
 };
 
+enum class ValueType { Null, Number, String, Function, SystemFunction, Object, Array, Type, Count };
+static constexpr string_view VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Object", "Array", "Type" };
+static_assert(_countof(VALUE_TYPE_NAMES) == (size_t)ValueType::Count);
+
+
 class Value
 {
 public:
-    enum class Type { Null, Number, String, Function, SystemFunction, Object, Array, Type, Count };
-    
     ThisType m_This;
 
     Value() { }
-    Value(double number) : m_Type(Type::Number), m_Number(number) { }
-    Value(string&& str) : m_Type(Type::String), m_String(std::move(str)) { }
-    Value(const AST::FunctionDefinition* func) : m_Type{Type::Function}, m_Function{func} { }
-    Value(SystemFunction func) : m_Type{Type::SystemFunction}, m_SystemFunction{func} { }
-    Value(ThisType&& th, SystemFunction func) : m_This{th}, m_Type{Type::SystemFunction}, m_SystemFunction{func} { }
-    Value(shared_ptr<Object> &&obj) : m_Type{Type::Object}, m_Object(obj) { }
-    Value(shared_ptr<Array> &&arr) : m_Type{Type::Array}, m_Array(arr) { }
-    Value(Type typeVal) : m_Type{Type::Type}, m_TypeValue(typeVal) { }
+    Value(double number) : m_Type(ValueType::Number), m_Number(number) { }
+    Value(string&& str) : m_Type(ValueType::String), m_String(std::move(str)) { }
+    Value(const AST::FunctionDefinition* func) : m_Type{ValueType::Function}, m_Function{func} { }
+    Value(SystemFunction func) : m_Type{ValueType::SystemFunction}, m_SystemFunction{func} { }
+    Value(ThisType&& th, SystemFunction func) : m_This{th}, m_Type{ValueType::SystemFunction}, m_SystemFunction{func} { }
+    Value(shared_ptr<Object> &&obj) : m_Type{ValueType::Object}, m_Object(obj) { }
+    Value(shared_ptr<Array> &&arr) : m_Type{ValueType::Array}, m_Array(arr) { }
+    Value(ValueType typeVal) : m_Type{ValueType::Type}, m_TypeValue(typeVal) { }
 
-    Type GetType() const { return m_Type; }
-    double GetNumber() const { assert(m_Type == Type::Number); return m_Number; }
-    string& GetString() { assert(m_Type == Type::String); return m_String; }
-    const string& GetString() const { assert(m_Type == Type::String); return m_String; }
-    const AST::FunctionDefinition* GetFunction() const { assert(m_Type == Type::Function && m_Function); return m_Function; }
-    SystemFunction GetSystemFunction() const { assert(m_Type == Type::SystemFunction); return m_SystemFunction; }
-    Object* GetObject() const { assert(m_Type == Type::Object && m_Object); return m_Object.get(); }
-    shared_ptr<Object> GetObjectPtr() const { assert(m_Type == Type::Object && m_Object); return m_Object; }
-    Array* GetArray() const { assert(m_Type == Type::Array && m_Array); return m_Array.get(); }
-    shared_ptr<Array> GetArrayPtr() const { assert(m_Type == Type::Array && m_Array); return m_Array; }
-    Type GetTypeValue() const { assert(m_Type == Type::Type); return m_TypeValue; }
+    ValueType GetType() const { return m_Type; }
+    double GetNumber() const { assert(m_Type == ValueType::Number); return m_Number; }
+    string& GetString() { assert(m_Type == ValueType::String); return m_String; }
+    const string& GetString() const { assert(m_Type == ValueType::String); return m_String; }
+    const AST::FunctionDefinition* GetFunction() const { assert(m_Type == ValueType::Function && m_Function); return m_Function; }
+    SystemFunction GetSystemFunction() const { assert(m_Type == ValueType::SystemFunction); return m_SystemFunction; }
+    Object* GetObject() const { assert(m_Type == ValueType::Object && m_Object); return m_Object.get(); }
+    shared_ptr<Object> GetObjectPtr() const { assert(m_Type == ValueType::Object && m_Object); return m_Object; }
+    Array* GetArray() const { assert(m_Type == ValueType::Array && m_Array); return m_Array.get(); }
+    shared_ptr<Array> GetArrayPtr() const { assert(m_Type == ValueType::Array && m_Array); return m_Array; }
+    ValueType GetTypeValue() const { assert(m_Type == ValueType::Type); return m_TypeValue; }
 
     bool IsEqual(const Value& rhs) const
     {
@@ -479,14 +482,14 @@ public:
             return false;
         switch(m_Type)
         {
-        case Type::Null:           return true;
-        case Type::Number:         return m_Number == rhs.m_Number;
-        case Type::String:         return m_String == rhs.m_String;
-        case Type::Function:       return m_Function == rhs.m_Function;
-        case Type::SystemFunction: return m_SystemFunction == rhs.m_SystemFunction;
-        case Type::Object:         return m_Object.get() == rhs.m_Object.get();
-        case Type::Array:          return m_Array.get() == rhs.m_Array.get();
-        case Type::Type:           return m_TypeValue == rhs.m_TypeValue;
+        case ValueType::Null:           return true;
+        case ValueType::Number:         return m_Number == rhs.m_Number;
+        case ValueType::String:         return m_String == rhs.m_String;
+        case ValueType::Function:       return m_Function == rhs.m_Function;
+        case ValueType::SystemFunction: return m_SystemFunction == rhs.m_SystemFunction;
+        case ValueType::Object:         return m_Object.get() == rhs.m_Object.get();
+        case ValueType::Array:          return m_Array.get() == rhs.m_Array.get();
+        case ValueType::Type:           return m_TypeValue == rhs.m_TypeValue;
         default: assert(0); return false;
         }
     }
@@ -494,36 +497,33 @@ public:
     {
         switch(m_Type)
         {
-        case Type::Null:           return false;
-        case Type::Number:         return m_Number != 0.f;
-        case Type::String:         return !m_String.empty();
-        case Type::Function:       return true;
-        case Type::SystemFunction: return true;
-        case Type::Object:         return true;
-        case Type::Array:          return true;
-        case Type::Type:           return m_TypeValue != Type::Null;
+        case ValueType::Null:           return false;
+        case ValueType::Number:         return m_Number != 0.f;
+        case ValueType::String:         return !m_String.empty();
+        case ValueType::Function:       return true;
+        case ValueType::SystemFunction: return true;
+        case ValueType::Object:         return true;
+        case ValueType::Array:          return true;
+        case ValueType::Type:           return m_TypeValue != ValueType::Null;
         default: assert(0); return false;
         }
     }
 
-    void ChangeNumber(double number) { assert(m_Type == Type::Number); m_Number = number; }
+    void ChangeNumber(double number) { assert(m_Type == ValueType::Number); m_Number = number; }
 
 private:
-    Type m_Type = Type::Null;
+    ValueType m_Type = ValueType::Null;
     union
     {
         double m_Number;
         const AST::FunctionDefinition* m_Function;
         SystemFunction m_SystemFunction;
-        Type m_TypeValue;
+        ValueType m_TypeValue;
     };
     string m_String;
     shared_ptr<Object> m_Object;
     shared_ptr<Array> m_Array;
 };
-
-static constexpr string_view VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Object", "Array", "Type" };
-static_assert(_countof(VALUE_TYPE_NAMES) == (size_t)Value::Type::Count);
 
 ////////////////////////////////////////////////////////////////////////////////
 // class Object definition
@@ -746,7 +746,7 @@ struct ConstantValue : ConstantExpression
     Value Val;
     ConstantValue(const PlaceInCode& place, Value&& val) : ConstantExpression{place}, Val{std::move(val)}
     {
-        assert(Val.GetType() == Value::Type::Null || Val.GetType() == Value::Type::Number || Val.GetType() == Value::Type::String);
+        assert(Val.GetType() == ValueType::Null || Val.GetType() == ValueType::Number || Val.GetType() == ValueType::String);
     }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
     virtual Value Evaluate(ExecuteContext& ctx) const { return Value{Val}; }
@@ -877,7 +877,7 @@ struct ArrayExpression : public Expression
 
 static inline void CheckNumberOperand(const AST::Expression* operand, const Value& value)
 {
-    EXECUTION_CHECK_PLACE( value.GetType() == Value::Type::Number, operand->GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
+    EXECUTION_CHECK_PLACE( value.GetType() == ValueType::Number, operand->GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1347,44 +1347,44 @@ static shared_ptr<Array> CopyArray(const Array& src)
 }
 static Value BuiltInTypeCtor_Null(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
-    EXECUTION_CHECK_PLACE(args.empty() || args.size() == 1 && args[0].GetType() == Value::Type::Null, place, "Null can be constructed only from no arguments or from another null value.");
+    EXECUTION_CHECK_PLACE(args.empty() || args.size() == 1 && args[0].GetType() == ValueType::Null, place, "Null can be constructed only from no arguments or from another null value.");
     return Value{};
 }
 static Value BuiltInTypeCtor_Number(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
-    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::Number, place, "Number can be constructed only from another number.");
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == ValueType::Number, place, "Number can be constructed only from another number.");
     return Value{args[0].GetNumber()};
 }
 static Value BuiltInTypeCtor_String(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     if(args.empty())
         return Value{string{}};
-    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::String, place, "String can be constructed only from no arguments or from another string value.");
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == ValueType::String, place, "String can be constructed only from no arguments or from another string value.");
     return Value{string{args[0].GetString()}};
 }
 static Value BuiltInTypeCtor_Object(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     if(args.empty())
         return Value{std::make_shared<Object>()};
-    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::Object, place, "Object can be constructed only from no arguments or from another object value.");
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == ValueType::Object, place, "Object can be constructed only from no arguments or from another object value.");
     return Value{CopyObject(*args[0].GetObject())};
 }
 static Value BuiltInTypeCtor_Array(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     if(args.empty())
         return Value{std::make_shared<Array>()};
-    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::Array, place, "Array can be constructed only from no arguments or from another array value.");
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == ValueType::Array, place, "Array can be constructed only from no arguments or from another array value.");
     return Value{CopyArray(*args[0].GetArray())};
 }
 static Value BuiltInTypeCtor_Function(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
-    EXECUTION_CHECK_PLACE(args.size() == 1 && (args[0].GetType() == Value::Type::Function || args[0].GetType() == Value::Type::SystemFunction),
+    EXECUTION_CHECK_PLACE(args.size() == 1 && (args[0].GetType() == ValueType::Function || args[0].GetType() == ValueType::SystemFunction),
         place, "Function can be constructed only from another function value.");
     return Value{args[0]};
 }
 static Value BuiltInTypeCtor_Type(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
-    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == Value::Type::Type, place, "Type can be constructed only from another type value.");
+    EXECUTION_CHECK_PLACE(args.size() == 1 && args[0].GetType() == ValueType::Type, place, "Type can be constructed only from another type value.");
     return Value{args[0]};
 }
 
@@ -1401,29 +1401,29 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
     {
         switch(val.GetType())
         {
-        case Value::Type::Null:
+        case ValueType::Null:
             ctx.Env.Print("null\n");
             break;
-        case Value::Type::Number:
+        case ValueType::Number:
             Format(s, "%g\n", val.GetNumber());
             ctx.Env.Print(s);
             break;
-        case Value::Type::String:
+        case ValueType::String:
             if(!val.GetString().empty())
                 ctx.Env.Print(val.GetString());
             ctx.Env.Print("\n");
             break;
-        case Value::Type::Function:
-        case Value::Type::SystemFunction:
+        case ValueType::Function:
+        case ValueType::SystemFunction:
             ctx.Env.Print("function\n");
             break;
-        case Value::Type::Object:
+        case ValueType::Object:
             ctx.Env.Print("object\n");
             break;
-        case Value::Type::Array:
+        case ValueType::Array:
             ctx.Env.Print("array\n");
             break;
-        case Value::Type::Type:
+        case ValueType::Type:
         {
             const size_t typeIndex = (size_t)val.GetTypeValue();
             const string_view& typeName = VALUE_TYPE_NAMES[typeIndex];
@@ -1439,17 +1439,17 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
 
 static Value BuiltInMember_Object_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
-    EXECUTION_CHECK_PLACE(objVal.GetType() == Value::Type::Object && objVal.GetObject(), place, ERROR_MESSAGE_EXPECTED_OBJECT);
+    EXECUTION_CHECK_PLACE(objVal.GetType() == ValueType::Object && objVal.GetObject(), place, ERROR_MESSAGE_EXPECTED_OBJECT);
     return Value{(double)objVal.GetObject()->GetCount()};
 }
 static Value BuiltInMember_Array_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
-    EXECUTION_CHECK_PLACE(objVal.GetType() == Value::Type::Array && objVal.GetArray(), place, ERROR_MESSAGE_EXPECTED_ARRAY);
+    EXECUTION_CHECK_PLACE(objVal.GetType() == ValueType::Array && objVal.GetArray(), place, ERROR_MESSAGE_EXPECTED_ARRAY);
     return Value{(double)objVal.GetArray()->Items.size()};
 }
 static Value BuiltInMember_String_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
-    EXECUTION_CHECK_PLACE(objVal.GetType() == Value::Type::String, place, ERROR_MESSAGE_EXPECTED_STRING);
+    EXECUTION_CHECK_PLACE(objVal.GetType() == ValueType::String, place, ERROR_MESSAGE_EXPECTED_STRING);
     return Value{(double)objVal.GetString().length()};
 }
 
@@ -1467,7 +1467,7 @@ static Value BuiltInFunction_Array_Insert(AST::ExecuteContext& ctx, const PlaceI
     EXECUTION_CHECK_PLACE(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
     EXECUTION_CHECK_PLACE(args.size() == 2, place, ERROR_MESSAGE_EXPECTED_2_ARGUMENTS);
     size_t index = 0;
-    EXECUTION_CHECK_PLACE(args[0].GetType() == Value::Type::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
+    EXECUTION_CHECK_PLACE(args[0].GetType() == ValueType::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
     arr->Items.insert(arr->Items.begin() + index, std::move(args[1]));
     return Value{};
 }
@@ -1477,7 +1477,7 @@ static Value BuiltInFunction_Array_Remove(AST::ExecuteContext& ctx, const PlaceI
     EXECUTION_CHECK_PLACE(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
     EXECUTION_CHECK_PLACE(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
     size_t index = 0;
-    EXECUTION_CHECK_PLACE(args[0].GetType() == Value::Type::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
+    EXECUTION_CHECK_PLACE(args[0].GetType() == ValueType::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
     arr->Items.erase(arr->Items.begin() + index);
     return Value{};
 }
@@ -1494,7 +1494,7 @@ void Statement::Assign(const LValue& lhs, Value&& rhs) const
 {
     if(const ObjectMemberLValue* objMemberLhs = std::get_if<ObjectMemberLValue>(&lhs))
     {
-        if(rhs.GetType() == Value::Type::Null)
+        if(rhs.GetType() == ValueType::Null)
             objMemberLhs->Obj->Remove(objMemberLhs->Key);
         else
             objMemberLhs->Obj->GetOrCreateValue(objMemberLhs->Key) = std::move(rhs);
@@ -1507,7 +1507,7 @@ void Statement::Assign(const LValue& lhs, Value&& rhs) const
     else if(const StringCharacterLValue* strCharLhs = std::get_if<StringCharacterLValue>(&lhs))
     {
         EXECUTION_CHECK( strCharLhs->Index < strCharLhs->Str->length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
-        EXECUTION_CHECK( rhs.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
+        EXECUTION_CHECK( rhs.GetType() == ValueType::String, ERROR_MESSAGE_EXPECTED_STRING );
         EXECUTION_CHECK( rhs.GetString().length() == 1, ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING );
         (*strCharLhs->Str)[strCharLhs->Index] = rhs.GetString()[0];
     }
@@ -1654,7 +1654,7 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
     Object& innermostCtxObj = ctx.GetInnermostScope();
     const bool useKey = !KeyVarName.empty();
 
-    if(rangeVal.GetType() == Value::Type::String)
+    if(rangeVal.GetType() == ValueType::String)
     {
         const string& rangeStr = rangeVal.GetString();
         const size_t count = rangeStr.length();
@@ -1667,7 +1667,7 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
             Body->Execute(ctx);
         }
     }
-    else if(rangeVal.GetType() == Value::Type::Object)
+    else if(rangeVal.GetType() == ValueType::Object)
     {
         for(const auto& [key, value]: rangeVal.GetObject()->m_Items)
         {
@@ -1677,7 +1677,7 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
             Body->Execute(ctx);
         }
     }
-    else if(rangeVal.GetType() == Value::Type::Array)
+    else if(rangeVal.GetType() == ValueType::Array)
     {
         const Array* const arr = rangeVal.GetArray();
         for(size_t i = 0, count = arr->Items.size(); i < count; ++i)
@@ -1816,9 +1816,9 @@ void ConstantValue::DebugPrint(uint32_t indentLevel, const string_view& prefix) 
 {
     switch(Val.GetType())
     {
-    case Value::Type::Null: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant null\n", DEBUG_PRINT_ARGS_BEG); break;
-    case Value::Type::Number: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant number: %g\n", DEBUG_PRINT_ARGS_BEG, Val.GetNumber()); break;
-    case Value::Type::String: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant string: %s\n", DEBUG_PRINT_ARGS_BEG, Val.GetString().c_str()); break;
+    case ValueType::Null: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant null\n", DEBUG_PRINT_ARGS_BEG); break;
+    case ValueType::Number: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant number: %g\n", DEBUG_PRINT_ARGS_BEG, Val.GetNumber()); break;
+    case ValueType::String: printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant string: %s\n", DEBUG_PRINT_ARGS_BEG, Val.GetString().c_str()); break;
     default: assert(0 && "ConstantValue should not be used with this type.");
     }
 }
@@ -1862,9 +1862,9 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
         if(val)
             return *val;
         // Type
-        for(size_t i = 0, count = (size_t)Value::Type::Count; i < count; ++i)
+        for(size_t i = 0, count = (size_t)ValueType::Count; i < count; ++i)
             if(S == VALUE_TYPE_NAMES[i])
-                return Value{(Value::Type)i};
+                return Value{(ValueType)i};
         // System function
         for(size_t i = 0, count = (size_t)SystemFunction::Count; i < count; ++i)
             if(S == SYSTEM_FUNCTION_NAMES[i])
@@ -1934,7 +1934,7 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         Type == UnaryOperatorType::Postdecrementation)
     {
         Value* val = Operand->GetLValue(ctx).GetValueRef(GetPlace());
-        EXECUTION_CHECK( val->GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+        EXECUTION_CHECK( val->GetType() == ValueType::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
         {
         case UnaryOperatorType::Preincrementation: val->ChangeNumber(val->GetNumber() + 1.0); return *val;
@@ -1961,7 +1961,7 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         Type == UnaryOperatorType::BitwiseNot)
     {
         Value val = Operand->Evaluate(ctx);
-        EXECUTION_CHECK( val.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+        EXECUTION_CHECK( val.GetType() == ValueType::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
         {
         case UnaryOperatorType::Plus: return val;
@@ -1983,7 +1983,7 @@ LValue UnaryOperator::GetLValue(ExecuteContext& ctx) const
         EXECUTION_CHECK( objMemberLval, ERROR_MESSAGE_INVALID_LVALUE );
         Value* val = objMemberLval->Obj->TryGetValue(objMemberLval->Key);
         EXECUTION_CHECK( val != nullptr, ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
-        EXECUTION_CHECK( val->GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+        EXECUTION_CHECK( val->GetType() == ValueType::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
         {
         case UnaryOperatorType::Preincrementation: val->ChangeNumber(val->GetNumber() + 1.0); return lval;
@@ -2003,7 +2003,7 @@ void MemberAccessOperator::DebugPrint(uint32_t indentLevel, const string_view& p
 Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
 {
     Value objVal = Operand->Evaluate(ctx);
-    if(objVal.GetType() == Value::Type::Object)
+    if(objVal.GetType() == ValueType::Object)
     {
         const Value* memberVal = objVal.GetObject()->TryGetValue(MemberName);
         if(memberVal)
@@ -2016,13 +2016,13 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
             return BuiltInMember_Object_Count(ctx, GetPlace(), std::move(objVal));
         return Value{};
     }
-    if(objVal.GetType() == Value::Type::String)
+    if(objVal.GetType() == ValueType::String)
     {
         if(MemberName == "Count")
             return BuiltInMember_String_Count(ctx, GetPlace(), std::move(objVal));
         EXECUTION_CHECK( false, ERROR_MESSAGE_INVALID_MEMBER );
     }
-    if(objVal.GetType() == Value::Type::Array)
+    if(objVal.GetType() == ValueType::Array)
     {
         auto arrayThis = ThisType{objVal.GetArrayPtr()};
         if(MemberName == "Count") return BuiltInMember_Array_Count(ctx, GetPlace(), std::move(objVal));
@@ -2037,7 +2037,7 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
 LValue MemberAccessOperator::GetLValue(ExecuteContext& ctx) const
 {
     Value objVal = Operand->Evaluate(ctx);
-    EXECUTION_CHECK(objVal.GetType() == Value::Type::Object, ERROR_MESSAGE_EXPECTED_OBJECT);
+    EXECUTION_CHECK(objVal.GetType() == ValueType::Object, ERROR_MESSAGE_EXPECTED_OBJECT);
     return LValue{ObjectMemberLValue{objVal.GetObject(), MemberName}};
 }
 
@@ -2110,15 +2110,15 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     // Remaining operators use both operands as r-values.
     Value rhs = Operands[1]->Evaluate(ctx);
 
-    const Value::Type lhsType = lhs.GetType();
-    const Value::Type rhsType = rhs.GetType();
+    const ValueType lhsType = lhs.GetType();
+    const ValueType rhsType = rhs.GetType();
 
     // These ones support various types.
     if(Type == BinaryOperatorType::Add)
     {
-        if(lhsType == Value::Type::Number && rhsType == Value::Type::Number)
+        if(lhsType == ValueType::Number && rhsType == ValueType::Number)
             return Value{lhs.GetNumber() + rhs.GetNumber()};
-        if(lhsType == Value::Type::String && rhsType == Value::Type::String)
+        if(lhsType == ValueType::String && rhsType == ValueType::String)
             return Value{lhs.GetString() + rhs.GetString()};
         
         EXECUTION_CHECK( false, ERROR_MESSAGE_INCOMPATIBLE_TYPES );
@@ -2136,7 +2136,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     {
         bool result = false;
         EXECUTION_CHECK( lhsType == rhsType, ERROR_MESSAGE_INCOMPATIBLE_TYPES );
-        if(lhsType == Value::Type::Number)
+        if(lhsType == ValueType::Number)
         {
             switch(Type)
             {
@@ -2147,7 +2147,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
             default: assert(0);
             }
         }
-        else if(lhsType == Value::Type::String)
+        else if(lhsType == ValueType::String)
         {
             switch(Type)
             {
@@ -2164,17 +2164,17 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     }
     if(Type == BinaryOperatorType::Indexing)
     {
-        if(lhsType == Value::Type::String)
+        if(lhsType == ValueType::String)
         {
-            EXECUTION_CHECK( rhsType == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+            EXECUTION_CHECK( rhsType == ValueType::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
             size_t index = 0;
             EXECUTION_CHECK( NumberToIndex(index, rhs.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
             EXECUTION_CHECK( index < lhs.GetString().length(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
             return Value{string(1, lhs.GetString()[index])};
         }
-        if(lhsType == Value::Type::Object)
+        if(lhsType == ValueType::Object)
         {
-            EXECUTION_CHECK( rhsType == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
+            EXECUTION_CHECK( rhsType == ValueType::String, ERROR_MESSAGE_EXPECTED_STRING );
             if(Value* val = lhs.GetObject()->TryGetValue(rhs.GetString()))
             {
                 Value resultVal = *val;
@@ -2183,9 +2183,9 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
             }
             return Value{};
         }
-        if(lhsType == Value::Type::Array)
+        if(lhsType == ValueType::Array)
         {
-            EXECUTION_CHECK( rhsType == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+            EXECUTION_CHECK( rhsType == ValueType::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
             size_t index;
             EXECUTION_CHECK( NumberToIndex(index, rhs.GetNumber()) && index < lhs.GetArray()->Items.size(), ERROR_MESSAGE_INVALID_INDEX );
             return lhs.GetArray()->Items[index];
@@ -2219,21 +2219,21 @@ LValue BinaryOperator::GetLValue(ExecuteContext& ctx) const
     {
         Value* leftValRef = Operands[0]->GetLValue(ctx).GetValueRef(GetPlace());
         const Value indexVal = Operands[1]->Evaluate(ctx);
-        if(leftValRef->GetType() == Value::Type::String)
+        if(leftValRef->GetType() == ValueType::String)
         {
-            EXECUTION_CHECK( indexVal.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+            EXECUTION_CHECK( indexVal.GetType() == ValueType::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
             size_t charIndex;
             EXECUTION_CHECK( NumberToIndex(charIndex, indexVal.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
             return LValue{StringCharacterLValue{&leftValRef->GetString(), charIndex}};
         }
-        if(leftValRef->GetType() == Value::Type::Object)
+        if(leftValRef->GetType() == ValueType::Object)
         {
-            EXECUTION_CHECK( indexVal.GetType() == Value::Type::String, ERROR_MESSAGE_EXPECTED_STRING );
+            EXECUTION_CHECK( indexVal.GetType() == ValueType::String, ERROR_MESSAGE_EXPECTED_STRING );
             return LValue{ObjectMemberLValue{leftValRef->GetObject(), indexVal.GetString()}};
         }
-        if(leftValRef->GetType() == Value::Type::Array)
+        if(leftValRef->GetType() == ValueType::Array)
         {
-            EXECUTION_CHECK( indexVal.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+            EXECUTION_CHECK( indexVal.GetType() == ValueType::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
             size_t itemIndex;
             EXECUTION_CHECK( NumberToIndex(itemIndex, indexVal.GetNumber()), ERROR_MESSAGE_INVALID_INDEX );
             return LValue{ArrayItemLValue{leftValRef->GetArray(), itemIndex}};
@@ -2272,9 +2272,9 @@ Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
 
     if(Type == BinaryOperatorType::AssignmentAdd)
     {
-        if(lhsValPtr->GetType() == Value::Type::Number && rhs.GetType() == Value::Type::Number)
+        if(lhsValPtr->GetType() == ValueType::Number && rhs.GetType() == ValueType::Number)
             lhsValPtr->ChangeNumber(lhsValPtr->GetNumber() + rhs.GetNumber());
-        else if(lhsValPtr->GetType() == Value::Type::String && rhs.GetType() == Value::Type::String)
+        else if(lhsValPtr->GetType() == ValueType::String && rhs.GetType() == ValueType::String)
             lhsValPtr->GetString() += rhs.GetString();
         else
             EXECUTION_CHECK( false, ERROR_MESSAGE_INCOMPATIBLE_TYPES );
@@ -2282,8 +2282,8 @@ Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
     }
 
     // Remaining ones work on numbers only.
-    EXECUTION_CHECK( lhsValPtr->GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
-    EXECUTION_CHECK( rhs.GetType() == Value::Type::Number, ERROR_MESSAGE_EXPECTED_NUMBER);
+    EXECUTION_CHECK( lhsValPtr->GetType() == ValueType::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
+    EXECUTION_CHECK( rhs.GetType() == ValueType::Number, ERROR_MESSAGE_EXPECTED_NUMBER);
     switch(Type)
     {
     case BinaryOperatorType::AssignmentSub: lhsValPtr->ChangeNumber(lhsValPtr->GetNumber() - rhs.GetNumber()); break;
@@ -2362,7 +2362,7 @@ Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
     if(BaseExpression)
     {
         Value baseObj = BaseExpression->Evaluate(ctx);
-        if(baseObj.GetType() != Value::Type::Object)
+        if(baseObj.GetType() != ValueType::Object)
             throw ExecutionError{GetPlace(), ERROR_MESSAGE_BASE_MUST_BE_OBJECT};
         obj = CopyObject(*baseObj.GetObject());
     }
@@ -2371,7 +2371,7 @@ Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
     for(const auto& [name, valueExpr] : Items)
     {
         Value val = valueExpr->Evaluate(ctx);
-        if(val.GetType() != Value::Type::Null)
+        if(val.GetType() != ValueType::Null)
             obj->GetOrCreateValue(name) = std::move(val);
         else if(BaseExpression)
             obj->Remove(name);
@@ -2408,17 +2408,17 @@ Value CallOperator::Evaluate(ExecuteContext& ctx) const
         arguments[i] = Operands[i + 1]->Evaluate(ctx);
 
     // Calling an object: Call its function under '' key.
-    if(callee.GetType() == Value::Type::Object)
+    if(callee.GetType() == ValueType::Object)
     {
         shared_ptr<Object> calleeObj = callee.GetObjectPtr();
-        if(Value* defaultVal = calleeObj->TryGetValue(string{}); defaultVal && defaultVal->GetType() == Value::Type::Function)
+        if(Value* defaultVal = calleeObj->TryGetValue(string{}); defaultVal && defaultVal->GetType() == ValueType::Function)
         {
             callee = *defaultVal;
             callee.m_This = ThisType{std::move(calleeObj)};
         }
     }
 
-    if(callee.GetType() == Value::Type::Function)
+    if(callee.GetType() == ValueType::Function)
     {
         const AST::FunctionDefinition* const funcDef = callee.GetFunction();
         EXECUTION_CHECK( argCount == funcDef->Parameters.size(), ERROR_MESSAGE_INVALID_NUMBER_OF_ARGUMENTS );
@@ -2445,7 +2445,7 @@ Value CallOperator::Evaluate(ExecuteContext& ctx) const
         }
         return Value{};
     }
-    if(callee.GetType() == Value::Type::SystemFunction)
+    if(callee.GetType() == ValueType::SystemFunction)
     {
         switch(callee.GetSystemFunction())
         {
@@ -2457,18 +2457,18 @@ Value CallOperator::Evaluate(ExecuteContext& ctx) const
         default: assert(0); return Value{};
         }
     }
-    if(callee.GetType() == Value::Type::Type)
+    if(callee.GetType() == ValueType::Type)
     {
         switch(callee.GetTypeValue())
         {
-        case Value::Type::Null: return BuiltInTypeCtor_Null(ctx, GetPlace(), std::move(arguments));
-        case Value::Type::Number: return BuiltInTypeCtor_Number(ctx, GetPlace(), std::move(arguments));
-        case Value::Type::String: return BuiltInTypeCtor_String(ctx, GetPlace(), std::move(arguments));
-        case Value::Type::Object: return BuiltInTypeCtor_Object(ctx, GetPlace(), std::move(arguments));
-        case Value::Type::Array: return BuiltInTypeCtor_Array(ctx, GetPlace(), std::move(arguments));
-        case Value::Type::Type: return BuiltInTypeCtor_Type(ctx, GetPlace(), std::move(arguments));
-        case Value::Type::Function:
-        case Value::Type::SystemFunction:
+        case ValueType::Null: return BuiltInTypeCtor_Null(ctx, GetPlace(), std::move(arguments));
+        case ValueType::Number: return BuiltInTypeCtor_Number(ctx, GetPlace(), std::move(arguments));
+        case ValueType::String: return BuiltInTypeCtor_String(ctx, GetPlace(), std::move(arguments));
+        case ValueType::Object: return BuiltInTypeCtor_Object(ctx, GetPlace(), std::move(arguments));
+        case ValueType::Array: return BuiltInTypeCtor_Array(ctx, GetPlace(), std::move(arguments));
+        case ValueType::Type: return BuiltInTypeCtor_Type(ctx, GetPlace(), std::move(arguments));
+        case ValueType::Function:
+        case ValueType::SystemFunction:
             return BuiltInTypeCtor_Function(ctx, GetPlace(), std::move(arguments));
         default: assert(0); return Value{};
         }
