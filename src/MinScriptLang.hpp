@@ -217,33 +217,52 @@ public:
 // Convenience macros for loading function arguments
 // They require to have following available: env, place, args.
 #define MINSL_LOAD_ARG_BEGIN(functionNameStr) \
-    constexpr std::string_view minsl_functionName = (functionNameStr); \
+    const char* minsl_functionName = (functionNameStr); \
     size_t minsl_argIndex = 0; \
     size_t minsl_argCount = (args).size(); \
     ValueType minsl_argType;
 #define MINSL_LOAD_ARG_NUMBER(dstVarName) \
     MINSL_EXECUTION_CHECK(minsl_argIndex < minsl_argCount, place, \
-        Format("Function %.*s received too few arguments. Number expected as argument %zu.", \
-            (int)minsl_functionName.length(), minsl_functionName.data(), minsl_argIndex)); \
+        Format("Function %s received too few arguments. Number expected as argument %zu.", \
+            minsl_functionName, minsl_argIndex)); \
     minsl_argType = args[minsl_argIndex].GetType(); \
     MINSL_EXECUTION_CHECK(minsl_argType == ValueType::Number, place, \
-        Format("Function %.*s received incorrect argument %zu. Expected: Number, actual: %.*s.", \
-            (int)minsl_functionName.length(), minsl_functionName.data(), minsl_argIndex, \
+        Format("Function %s received incorrect argument %zu. Expected: Number, actual: %.*s.", \
+            minsl_functionName, minsl_argIndex, \
             (int)env.GetTypeName(minsl_argType).length(), env.GetTypeName(minsl_argType).data())); \
     double dstVarName = args[minsl_argIndex++].GetNumber();
 #define MINSL_LOAD_ARG_STRING(dstVarName) \
     MINSL_EXECUTION_CHECK(minsl_argIndex < minsl_argCount, place, \
-        Format("Function %.*s received too few arguments. String expected as argument %zu.", \
-            (int)minsl_functionName.length(), minsl_functionName.data(), minsl_argIndex)); \
+        Format("Function %s received too few arguments. String expected as argument %zu.", \
+            minsl_functionName, minsl_argIndex)); \
     minsl_argType = args[minsl_argIndex].GetType(); \
     MINSL_EXECUTION_CHECK(minsl_argType == ValueType::String, place, \
-        Format("Function %.*s received incorrect argument %zu. Expected: String, actual: %.*s.", \
-            (int)minsl_functionName.length(), minsl_functionName.data(), minsl_argIndex, \
+        Format("Function %s received incorrect argument %zu. Expected: String, actual: %.*s.", \
+            minsl_functionName, minsl_argIndex, \
             (int)env.GetTypeName(minsl_argType).length(), env.GetTypeName(minsl_argType).data())); \
     std::string dstVarName = std::move(args[minsl_argIndex++].GetString());
 #define MINSL_LOAD_ARG_END() \
-    MINSL_EXECUTION_CHECK(minsl_argIndex == minsl_argCount, place, Format("Function %.*s requires %zu arguments, %zu provided.", (int)minsl_functionName.length(), minsl_functionName.data(), minsl_argIndex, minsl_argCount));
-    
+    MINSL_EXECUTION_CHECK(minsl_argIndex == minsl_argCount, place, \
+        Format("Function %s requires %zu arguments, %zu provided.", \
+            minsl_functionName, minsl_argIndex, minsl_argCount));
+
+#define MINSL_LOAD_ARGS_0(functionNameStr) \
+    MINSL_LOAD_ARG_BEGIN(functionNameStr); \
+    MINSL_LOAD_ARG_END();
+#define MINSL_LOAD_ARGS_1_NUMBER(functionNameStr, dstVarName) \
+    MINSL_LOAD_ARG_BEGIN(functionNameStr); \
+    MINSL_LOAD_ARG_NUMBER(dstVarName); \
+    MINSL_LOAD_ARG_END();
+#define MINSL_LOAD_ARGS_1_STRING(functionNameStr, dstVarName) \
+    MINSL_LOAD_ARG_BEGIN(functionNameStr); \
+    MINSL_LOAD_ARG_STRING(dstVarName); \
+    MINSL_LOAD_ARG_END();
+#define MINSL_LOAD_ARGS_2_NUMBERS(functionNameStr, dstVarName1, dstVarName2) \
+    MINSL_LOAD_ARG_BEGIN(functionNameStr); \
+    MINSL_LOAD_ARG_NUMBER(dstVarName1); \
+    MINSL_LOAD_ARG_NUMBER(dstVarName2); \
+    MINSL_LOAD_ARG_END();
+
 std::string VFormat(const char* format, va_list argList);
 std::string Format(const char* format, ...);
 
@@ -1461,15 +1480,17 @@ static Value BuiltInTypeCtor_Null(AST::ExecuteContext& ctx, const PlaceInCode& p
 }
 static Value BuiltInTypeCtor_Number(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
-    MINSL_EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::Number, place, "Number can be constructed only from another number.");
-    return Value{args[0].GetNumber()};
+    Environment& env = ctx.Env.GetOwner();
+    MINSL_LOAD_ARGS_1_NUMBER("Number", val);
+    return Value{val};
 }
 static Value BuiltInTypeCtor_String(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     if(args.empty())
         return Value{string{}};
-    MINSL_EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::String, place, "String can be constructed only from no arguments or from another string value.");
-    return Value{string{args[0].GetString()}};
+    Environment& env = ctx.Env.GetOwner();
+    MINSL_LOAD_ARGS_1_STRING("String", str);
+    return Value{std::move(str)};
 }
 static Value BuiltInTypeCtor_Object(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {

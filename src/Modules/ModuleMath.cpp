@@ -41,10 +41,8 @@ using namespace MinScriptLang;
 
 static Value Func_abs(Environment& env, const PlaceInCode& place, std::vector<Value>&& args)
 {
-    MINSL_LOAD_ARG_BEGIN("math.abs");
-    MINSL_LOAD_ARG_NUMBER(a);
-    MINSL_LOAD_ARG_END();
-    return Value{abs(a)};
+    MINSL_LOAD_ARGS_1_NUMBER("math.abs", arg);
+    return Value{abs(arg)};
 }
 
 void Setup(MinScriptLang::Environment& targetEnv)
