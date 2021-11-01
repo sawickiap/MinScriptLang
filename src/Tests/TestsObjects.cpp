@@ -205,15 +205,43 @@ TEST_CASE("Objects")
         env.Execute(code);
         REQUIRE(env.GetOutput() == "3\n");
     }
+    // It used to pass this together with value before the rules was changed in the language. Now it should fail.
     SECTION("Passing function together with this")
     {
         const char* code =
             "obj={ 'x': 2, 'f': function() { this.x += 1; print(this.x); } }; \n"
             "function call(a) { a(); } \n"
             "call(obj.f); call(obj.f); \n";
+        REQUIRE_THROWS_AS( env.Execute(code), ExecutionError );
+    }
+    SECTION("This in member access and indexing operator")
+    {
+        const char* code =
+            "obj={ 'x': 2, function f() { print(++this.x); } }; \n"
+            "obj.f(); obj['f'](); \n";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "3\n4\n");
     }
+    SECTION("This in grouping and comma operator")
+    {
+        const char* code =
+            "obj={ 'x': 2, function f() { print(++this.x); } }; \n"
+            "((obj)).f(); (111, 'AAA', obj.f)(); \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "3\n4\n");
+    }
+    SECTION("This in ternary operator")
+    {
+        const char* code =
+            "obj1={ x: 2, f: function() { print(++this.x); } }; \n"
+            "obj2={ f: function() { print('obj2f'); } }; \n"
+            "function call_f(cond) { (cond ? obj1 : obj2).f(); } \n"
+            "call_f(true); call_f(false); \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "3\nobj2f\n");
+    }
+
+
     SECTION("Calling a method from another method")
     {
         const char* code =

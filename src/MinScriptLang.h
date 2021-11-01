@@ -91,34 +91,15 @@ class Object;
 class Array;
 enum class SystemFunction;
     
-struct ThisType : public std::variant<std::monostate, std::shared_ptr<Object>, std::shared_ptr<Array>>
-{
-    bool IsEmpty() const { return std::get_if<std::monostate>(this) != nullptr; }
-    Object* GetObject_() const
-    {
-        const std::shared_ptr<Object>* objectPtr = std::get_if<std::shared_ptr<Object>>(this);
-        return objectPtr ? objectPtr->get() : nullptr;
-    }
-    Array* GetArray() const
-    {
-        const std::shared_ptr<Array>* arrayPtr = std::get_if<std::shared_ptr<Array>>(this);
-        return arrayPtr ? arrayPtr->get() : nullptr;
-    }
-};
-
 enum class ValueType { Null, Number, String, Function, SystemFunction, Object, Array, Type, Count };
-
 class Value
 {
 public:
-    ThisType m_This;
-
     Value() { }
     Value(double number) : m_Type(ValueType::Number), m_Variant(number) { }
     Value(std::string&& str) : m_Type(ValueType::String), m_Variant(std::move(str)) { }
     Value(const AST::FunctionDefinition* func) : m_Type{ValueType::Function}, m_Variant{func} { }
     Value(SystemFunction func) : m_Type{ValueType::SystemFunction}, m_Variant{func} { }
-    Value(ThisType&& th, SystemFunction func) : m_This{th}, m_Type{ValueType::SystemFunction}, m_Variant{func} { }
     Value(std::shared_ptr<Object> &&obj) : m_Type{ValueType::Object}, m_Variant(obj) { }
     Value(std::shared_ptr<Array> &&arr) : m_Type{ValueType::Array}, m_Variant(arr) { }
     Value(ValueType typeVal) : m_Type{ValueType::Type}, m_Variant(typeVal) { }
@@ -149,7 +130,7 @@ public:
         assert(m_Type == ValueType::SystemFunction);
         return std::get<SystemFunction>(m_Variant);
     }
-    Object* GetObject_() const
+    Object* GetObject_() const // Using underscore because the %^#& WinAPI defines GetObject as a macro.
     {
         assert(m_Type == ValueType::Object && std::get<std::shared_ptr<Object>>(m_Variant));
         return std::get<std::shared_ptr<Object>>(m_Variant).get();
@@ -224,10 +205,7 @@ private:
     VariantType m_Variant;
 };
 
-struct ValueException
-{
-    Value m_Value;
-};
+struct ValueException { Value m_Value; };
 
 #define EXECUTION_CHECK(condition, errorMessage) \
     do { if(!(condition)) throw ExecutionError(GetPlace(), (errorMessage)); } while(false)
@@ -239,7 +217,6 @@ struct ValueException
     do { throw ExecutionError((place), (errorMessage)); } while(false)
 
 class EnvironmentPimpl;
-
 class Environment
 {
 public:
@@ -631,6 +608,25 @@ struct ReturnException
 namespace AST
 {
 
+struct ThisType : public std::variant<
+    std::monostate,
+    shared_ptr<Object>,
+    shared_ptr<Array>>
+{
+    bool IsEmpty() const { return std::get_if<std::monostate>(this) != nullptr; }
+    Object* GetObject_() const
+    {
+        const shared_ptr<Object>* objectPtr = std::get_if<shared_ptr<Object>>(this);
+        return objectPtr ? objectPtr->get() : nullptr;
+    }
+    Array* GetArray() const
+    {
+        const shared_ptr<Array>* arrayPtr = std::get_if<shared_ptr<Array>>(this);
+        return arrayPtr ? arrayPtr->get() : nullptr;
+    }
+    void Clear() { *this = ThisType{}; }
+};
+
 struct ExecuteContext
 {
 public:
@@ -797,9 +793,9 @@ struct Script : Block
 struct Expression : Statement
 {
     explicit Expression(const PlaceInCode& place) : Statement{place} { }
-    virtual Value Evaluate(ExecuteContext& ctx) const { return GetLValue(ctx).GetValue(GetPlace()); }
+    virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const { return GetLValue(ctx).GetValue(GetPlace()); }
     virtual LValue GetLValue(ExecuteContext& ctx) const { EXECUTION_CHECK( false, ERROR_MESSAGE_EXPECTED_LVALUE ); }
-    virtual void Execute(ExecuteContext& ctx) const { Evaluate(ctx); }
+    virtual void Execute(ExecuteContext& ctx) const { Evaluate(ctx, nullptr); }
 };
 
 struct ConstantExpression : Expression
@@ -816,7 +812,7 @@ struct ConstantValue : ConstantExpression
         assert(Val.GetType() == ValueType::Null || Val.GetType() == ValueType::Number || Val.GetType() == ValueType::String);
     }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{Val}; }
+    virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const { return Value{Val}; }
 };
 
 enum class IdentifierScope { None, Local, Global, Count };
@@ -826,7 +822,7 @@ struct Identifier : ConstantExpression
     string S;
     Identifier(const PlaceInCode& place, IdentifierScope scope, string&& s) : ConstantExpression{place}, Scope(scope), S(std::move(s)) { }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
 };
 
@@ -834,7 +830,7 @@ struct ThisExpression : ConstantExpression
 {
     ThisExpression(const PlaceInCode& place) : ConstantExpression{place} { }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const;
 };
 
 struct Operator : Expression
@@ -847,14 +843,13 @@ enum class UnaryOperatorType
     Preincrementation, Predecrementation, Postincrementation, Postdecrementation,
     Plus, Minus, LogicalNot, BitwiseNot, Count,
 };
-
 struct UnaryOperator : Operator
 {
     UnaryOperatorType Type;
     unique_ptr<Expression> Operand;
     UnaryOperator(const PlaceInCode& place, UnaryOperatorType type) : Operator{place}, Type(type) { }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
 
 private:
@@ -867,7 +862,7 @@ struct MemberAccessOperator : Operator
     string MemberName;
     MemberAccessOperator(const PlaceInCode& place) : Operator{place} { }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
 };
 
@@ -880,14 +875,13 @@ enum class BinaryOperatorType
     BitwiseAnd, BitwiseXor, BitwiseOr, LogicalAnd, LogicalOr,
     Comma, Indexing, Count
 };
-
 struct BinaryOperator : Operator
 {
     BinaryOperatorType Type;
     unique_ptr<Expression> Operands[2];
     BinaryOperator(const PlaceInCode& place, BinaryOperatorType type) : Operator{place}, Type(type) { }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const;
     virtual LValue GetLValue(ExecuteContext& ctx) const;
 
 private:
@@ -901,7 +895,7 @@ struct TernaryOperator : Operator
     unique_ptr<Expression> Operands[3];
     explicit TernaryOperator(const PlaceInCode& place) : Operator{place} { }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const;
 };
 
 struct CallOperator : Operator
@@ -909,7 +903,7 @@ struct CallOperator : Operator
     vector<unique_ptr<Expression>> Operands;
     CallOperator(const PlaceInCode& place) : Operator{place} { }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const;
 };
 
 struct FunctionDefinition : public Expression
@@ -918,7 +912,7 @@ struct FunctionDefinition : public Expression
     Block Body;
     FunctionDefinition(const PlaceInCode& place) : Expression{place}, Body{place} { }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const { return Value{this}; }
+    virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const { return Value{this}; }
     bool AreParameterNamesUnique() const;
 };
 
@@ -929,7 +923,7 @@ struct ObjectExpression : public Expression
     ItemMap Items;
     ObjectExpression(const PlaceInCode& place) : Expression{place} { }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const;
 };
 
 struct ArrayExpression : public Expression
@@ -937,7 +931,7 @@ struct ArrayExpression : public Expression
     vector<unique_ptr<Expression>> Items;
     ArrayExpression(const PlaceInCode& place) : Expression{ place } { }
     virtual void DebugPrint(uint32_t indentLevel, const string_view& prefix) const;
-    virtual Value Evaluate(ExecuteContext& ctx) const;
+    virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const;
 };
 
 } // namespace AST
@@ -1529,7 +1523,7 @@ static Value BuiltInMember_String_Count(AST::ExecuteContext& ctx, const PlaceInC
     return Value{(double)objVal.GetString().length()};
 }
 
-static Value BuiltInFunction_Array_Add(AST::ExecuteContext& ctx, const PlaceInCode& place, const ThisType& th, std::vector<Value>&& args)
+static Value BuiltInFunction_Array_Add(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
 {
     Array* arr = th.GetArray();
     EXECUTION_CHECK_PLACE(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
@@ -1537,7 +1531,7 @@ static Value BuiltInFunction_Array_Add(AST::ExecuteContext& ctx, const PlaceInCo
     arr->Items.push_back(std::move(args[0]));
     return Value{};
 }
-static Value BuiltInFunction_Array_Insert(AST::ExecuteContext& ctx, const PlaceInCode& place, const ThisType& th, std::vector<Value>&& args)
+static Value BuiltInFunction_Array_Insert(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
 {
     Array* arr = th.GetArray();
     EXECUTION_CHECK_PLACE(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
@@ -1547,7 +1541,7 @@ static Value BuiltInFunction_Array_Insert(AST::ExecuteContext& ctx, const PlaceI
     arr->Items.insert(arr->Items.begin() + index, std::move(args[1]));
     return Value{};
 }
-static Value BuiltInFunction_Array_Remove(AST::ExecuteContext& ctx, const PlaceInCode& place, const ThisType& th, std::vector<Value>&& args)
+static Value BuiltInFunction_Array_Remove(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
 {
     Array* arr = th.GetArray();
     EXECUTION_CHECK_PLACE(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
@@ -1608,7 +1602,7 @@ void Condition::DebugPrint(uint32_t indentLevel, const string_view& prefix) cons
 
 void Condition::Execute(ExecuteContext& ctx) const
 {
-    if(ConditionExpression->Evaluate(ctx).IsTrue())
+    if(ConditionExpression->Evaluate(ctx, nullptr).IsTrue())
         Statements[0]->Execute(ctx);
     else if(Statements[1])
         Statements[1]->Execute(ctx);
@@ -1634,7 +1628,7 @@ void WhileLoop::Execute(ExecuteContext& ctx) const
     switch(Type)
     {
     case WhileLoopType::While:
-        while(ConditionExpression->Evaluate(ctx).IsTrue())
+        while(ConditionExpression->Evaluate(ctx, nullptr).IsTrue())
         {
             try
             {
@@ -1666,7 +1660,7 @@ void WhileLoop::Execute(ExecuteContext& ctx) const
                 continue;
             }
         }
-        while(ConditionExpression->Evaluate(ctx).IsTrue());
+        while(ConditionExpression->Evaluate(ctx, nullptr).IsTrue());
         break;
     default: assert(0);
     }
@@ -1695,7 +1689,7 @@ void ForLoop::Execute(ExecuteContext& ctx) const
 {
     if(InitExpression)
         InitExpression->Execute(ctx);
-    while(ConditionExpression ? ConditionExpression->Evaluate(ctx).IsTrue() : true)
+    while(ConditionExpression ? ConditionExpression->Evaluate(ctx, nullptr).IsTrue() : true)
     {
         try
         {
@@ -1726,7 +1720,7 @@ void RangeBasedForLoop::DebugPrint(uint32_t indentLevel, const string_view& pref
 
 void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
 {
-    const Value rangeVal = RangeExpression->Evaluate(ctx);
+    const Value rangeVal = RangeExpression->Evaluate(ctx, nullptr);
     Object& innermostCtxObj = ctx.GetInnermostScope();
     const bool useKey = !KeyVarName.empty();
 
@@ -1832,7 +1826,7 @@ void ReturnStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix
 void ReturnStatement::Execute(ExecuteContext& ctx) const
 {
     if(ReturnedValue)
-        throw ReturnException{GetPlace(), ReturnedValue->Evaluate(ctx)};
+        throw ReturnException{GetPlace(), ReturnedValue->Evaluate(ctx, nullptr)};
     else
         throw ReturnException{GetPlace(), Value{}};
 }
@@ -1871,7 +1865,7 @@ void SwitchStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix
 
 void SwitchStatement::Execute(ExecuteContext& ctx) const
 {
-    const Value condVal = Condition->Evaluate(ctx);
+    const Value condVal = Condition->Evaluate(ctx, nullptr);
     size_t itemIndex, defaultItemIndex = SIZE_MAX;
     const size_t itemCount = ItemValues.size();
     for(itemIndex = 0; itemIndex < itemCount; ++itemIndex)
@@ -1910,7 +1904,7 @@ void ThrowStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix)
 
 void ThrowStatement::Execute(ExecuteContext& ctx) const
 {
-    throw ValueException{ThrownExpression->Evaluate(ctx)};
+    throw ValueException{ThrownExpression->Evaluate(ctx, nullptr)};
 }
 
 void TryStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
@@ -2036,7 +2030,7 @@ void Identifier::DebugPrint(uint32_t indentLevel, const string_view& prefix) con
     printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier: %s%s\n", DEBUG_PRINT_ARGS_BEG, PREFIX[(size_t)Scope], S.c_str());
 }
 
-Value Identifier::Evaluate(ExecuteContext& ctx) const
+Value Identifier::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
 {
     EXECUTION_CHECK(Scope != IdentifierScope::Local || ctx.IsLocal(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
 
@@ -2053,9 +2047,9 @@ Value Identifier::Evaluate(ExecuteContext& ctx) const
             {
                 if(Value* val = (*thisObj)->TryGetValue(S); val)
                 {
-                    Value valWithThis = *val;
-                    valWithThis.m_This = ThisType{*thisObj};
-                    return valWithThis;
+                    if(outThis)
+                        *outThis = ThisType{*thisObj};
+                    return *val;
                 }
             }
         }
@@ -2114,7 +2108,7 @@ void ThisExpression::DebugPrint(uint32_t indentLevel, const string_view& prefix)
     printf(DEBUG_PRINT_FORMAT_STR_BEG "This\n", DEBUG_PRINT_ARGS_BEG);
 }
 
-Value ThisExpression::Evaluate(ExecuteContext& ctx) const
+Value ThisExpression::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
 {
     EXECUTION_CHECK(ctx.IsLocal() && std::get_if<shared_ptr<Object>>(&ctx.GetThis()), ERROR_MESSAGE_NO_THIS);
     return Value{shared_ptr<Object>{*std::get_if<shared_ptr<Object>>(&ctx.GetThis())}};
@@ -2131,7 +2125,7 @@ void UnaryOperator::DebugPrint(uint32_t indentLevel, const string_view& prefix) 
     Operand->DebugPrint(indentLevel, "Operand: ");
 }
 
-Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
+Value UnaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
 {
     // Those require l-value.
     if(Type == UnaryOperatorType::Preincrementation ||
@@ -2166,7 +2160,7 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx) const
         Type == UnaryOperatorType::LogicalNot ||
         Type == UnaryOperatorType::BitwiseNot)
     {
-        Value val = Operand->Evaluate(ctx);
+        Value val = Operand->Evaluate(ctx, nullptr);
         EXECUTION_CHECK( val.GetType() == ValueType::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
         {
@@ -2206,17 +2200,17 @@ void MemberAccessOperator::DebugPrint(uint32_t indentLevel, const string_view& p
     Operand->DebugPrint(indentLevel + 1, "Operand: ");
 }
 
-Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
+Value MemberAccessOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
 {
-    Value objVal = Operand->Evaluate(ctx);
+    Value objVal = Operand->Evaluate(ctx, nullptr);
     if(objVal.GetType() == ValueType::Object)
     {
         const Value* memberVal = objVal.GetObject_()->TryGetValue(MemberName);
         if(memberVal)
         {
-            Value resultVal = *memberVal;
-            resultVal.m_This = ThisType{objVal.GetObjectPtr()};
-            return resultVal;
+            if(outThis)
+                *outThis = ThisType{objVal.GetObjectPtr()};
+            return *memberVal;
         }
         if(MemberName == "Count")
             return BuiltInMember_Object_Count(ctx, GetPlace(), std::move(objVal));
@@ -2230,11 +2224,12 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
     }
     if(objVal.GetType() == ValueType::Array)
     {
-        auto arrayThis = ThisType{objVal.GetArrayPtr()};
+        if(outThis)
+            *outThis = ThisType{objVal.GetArrayPtr()};
         if(MemberName == "Count") return BuiltInMember_Array_Count(ctx, GetPlace(), std::move(objVal));
-        else if(MemberName == "Add") return Value{std::move(arrayThis), SystemFunction::Array_Add};
-        else if(MemberName == "Insert") return Value{std::move(arrayThis), SystemFunction::Array_Insert};
-        else if(MemberName == "Remove") return Value{std::move(arrayThis), SystemFunction::Array_Remove};
+        else if(MemberName == "Add") return Value{SystemFunction::Array_Add};
+        else if(MemberName == "Insert") return Value{SystemFunction::Array_Insert};
+        else if(MemberName == "Remove") return Value{SystemFunction::Array_Remove};
         EXECUTION_FAIL(ERROR_MESSAGE_INVALID_MEMBER);
     }
     EXECUTION_FAIL(ERROR_MESSAGE_INVALID_TYPE);
@@ -2242,7 +2237,7 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx) const
 
 LValue MemberAccessOperator::GetLValue(ExecuteContext& ctx) const
 {
-    Value objVal = Operand->Evaluate(ctx);
+    Value objVal = Operand->Evaluate(ctx, nullptr);
     EXECUTION_CHECK(objVal.GetType() == ValueType::Object, ERROR_MESSAGE_EXPECTED_OBJECT);
     return LValue{ObjectMemberLValue{objVal.GetObject_(), MemberName}};
 }
@@ -2270,13 +2265,13 @@ void BinaryOperator::DebugPrint(uint32_t indentLevel, const string_view& prefix)
     Operands[1]->DebugPrint(indentLevel, "RightOperand: ");
 }
 
-Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
+Value BinaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
 {
     // This operator is special, discards result of left operand.
     if(Type == BinaryOperatorType::Comma)
     {
         Operands[0]->Execute(ctx);
-        return Operands[1]->Evaluate(ctx);
+        return Operands[1]->Evaluate(ctx, outThis);
     }
     
     // Operators that require l-value.
@@ -2293,28 +2288,28 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
     case BinaryOperatorType::AssignmentBitwiseAnd:
     case BinaryOperatorType::AssignmentBitwiseXor:
     case BinaryOperatorType::AssignmentBitwiseOr:
-        return Assignment(Operands[0]->GetLValue(ctx), Operands[1]->Evaluate(ctx));
+        return Assignment(Operands[0]->GetLValue(ctx), Operands[1]->Evaluate(ctx, nullptr));
     }
     
     // Remaining operators use r-values.
-    Value lhs = Operands[0]->Evaluate(ctx);
+    Value lhs = Operands[0]->Evaluate(ctx, nullptr);
 
     // Logical operators with short circuit for right hand side operand.
     if(Type == BinaryOperatorType::LogicalAnd)
     {
         if(!lhs.IsTrue())
             return lhs;
-        return Operands[1]->Evaluate(ctx);
+        return Operands[1]->Evaluate(ctx, nullptr);
     }
     if(Type == BinaryOperatorType::LogicalOr)
     {
         if(lhs.IsTrue())
             return lhs;
-        return Operands[1]->Evaluate(ctx);
+        return Operands[1]->Evaluate(ctx, nullptr);
     }
 
     // Remaining operators use both operands as r-values.
-    Value rhs = Operands[1]->Evaluate(ctx);
+    Value rhs = Operands[1]->Evaluate(ctx, nullptr);
 
     const ValueType lhsType = lhs.GetType();
     const ValueType rhsType = rhs.GetType();
@@ -2382,9 +2377,9 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx) const
             EXECUTION_CHECK( rhsType == ValueType::String, ERROR_MESSAGE_EXPECTED_STRING );
             if(Value* val = lhs.GetObject_()->TryGetValue(rhs.GetString()))
             {
-                Value resultVal = *val;
-                resultVal.m_This = ThisType{lhs.GetObjectPtr()};
-                return resultVal;
+                if(outThis)
+                    *outThis = ThisType{lhs.GetObjectPtr()};
+                return *val;
             }
             return Value{};
         }
@@ -2423,7 +2418,7 @@ LValue BinaryOperator::GetLValue(ExecuteContext& ctx) const
     if(Type == BinaryOperatorType::Indexing)
     {
         Value* leftValRef = Operands[0]->GetLValue(ctx).GetValueRef(GetPlace());
-        const Value indexVal = Operands[1]->Evaluate(ctx);
+        const Value indexVal = Operands[1]->Evaluate(ctx, nullptr);
         if(leftValRef->GetType() == ValueType::String)
         {
             EXECUTION_CHECK( indexVal.GetType() == ValueType::Number, ERROR_MESSAGE_EXPECTED_NUMBER );
@@ -2516,9 +2511,9 @@ void TernaryOperator::DebugPrint(uint32_t indentLevel, const string_view& prefix
     Operands[2]->DebugPrint(indentLevel, "FalseExpression: ");
 }
 
-Value TernaryOperator::Evaluate(ExecuteContext& ctx) const
+Value TernaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
 {
-    return Operands[0]->Evaluate(ctx).IsTrue() ? Operands[1]->Evaluate(ctx) : Operands[2]->Evaluate(ctx);
+    return Operands[0]->Evaluate(ctx, nullptr).IsTrue() ? Operands[1]->Evaluate(ctx, outThis) : Operands[2]->Evaluate(ctx, outThis);
 }
 
 void CallOperator::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
@@ -2528,6 +2523,85 @@ void CallOperator::DebugPrint(uint32_t indentLevel, const string_view& prefix) c
     Operands[0]->DebugPrint(indentLevel, "Callee: ");
     for(size_t i = 1, count = Operands.size(); i < count; ++i)
         Operands[i]->DebugPrint(indentLevel, "Argument: ");
+}
+
+Value CallOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
+{
+    ThisType th = ThisType{};
+    Value callee = Operands[0]->Evaluate(ctx, &th);
+    const size_t argCount = Operands.size() - 1;
+    vector<Value> arguments(argCount);
+    for(size_t i = 0; i < argCount; ++i)
+        arguments[i] = Operands[i + 1]->Evaluate(ctx, nullptr);
+
+    // Calling an object: Call its function under '' key.
+    if(callee.GetType() == ValueType::Object)
+    {
+        shared_ptr<Object> calleeObj = callee.GetObjectPtr();
+        if(Value* defaultVal = calleeObj->TryGetValue(string{}); defaultVal && defaultVal->GetType() == ValueType::Function)
+        {
+            callee = *defaultVal;
+            th = ThisType{std::move(calleeObj)};
+        }
+    }
+
+    if(callee.GetType() == ValueType::Function)
+    {
+        const AST::FunctionDefinition* const funcDef = callee.GetFunction();
+        EXECUTION_CHECK( argCount == funcDef->Parameters.size(), ERROR_MESSAGE_INVALID_NUMBER_OF_ARGUMENTS );
+        Object localScope;
+        // Setup parameters
+        for(size_t argIndex = 0; argIndex != argCount; ++argIndex)
+            localScope.GetOrCreateValue(funcDef->Parameters[argIndex]) = std::move(arguments[argIndex]);
+        ExecuteContext::LocalScopePush localContextPush{ctx, &localScope, std::move(th), GetPlace()};
+        try
+        {
+            callee.GetFunction()->Body.Execute(ctx);
+        }
+        catch(ReturnException& returnEx)
+        {
+            return std::move(returnEx.ThrownValue);
+        }
+        catch(BreakException)
+        {
+            EXECUTION_FAIL(ERROR_MESSAGE_BREAK_WITHOUT_LOOP);
+        }
+        catch(ContinueException)
+        {
+            EXECUTION_FAIL(ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP);
+        }
+        return Value{};
+    }
+    if(callee.GetType() == ValueType::SystemFunction)
+    {
+        switch(callee.GetSystemFunction())
+        {
+        case SystemFunction::TypeOf: return BuiltInFunction_TypeOf(ctx, GetPlace(), std::move(arguments));
+        case SystemFunction::Print: return BuiltInFunction_Print(ctx, GetPlace(), std::move(arguments));
+        case SystemFunction::Array_Add: return BuiltInFunction_Array_Add(ctx, GetPlace(), th, std::move(arguments));
+        case SystemFunction::Array_Insert: return BuiltInFunction_Array_Insert(ctx, GetPlace(), th, std::move(arguments));
+        case SystemFunction::Array_Remove: return BuiltInFunction_Array_Remove(ctx, GetPlace(), th, std::move(arguments));
+        default: assert(0); return Value{};
+        }
+    }
+    if(callee.GetType() == ValueType::Type)
+    {
+        switch(callee.GetTypeValue())
+        {
+        case ValueType::Null: return BuiltInTypeCtor_Null(ctx, GetPlace(), std::move(arguments));
+        case ValueType::Number: return BuiltInTypeCtor_Number(ctx, GetPlace(), std::move(arguments));
+        case ValueType::String: return BuiltInTypeCtor_String(ctx, GetPlace(), std::move(arguments));
+        case ValueType::Object: return BuiltInTypeCtor_Object(ctx, GetPlace(), std::move(arguments));
+        case ValueType::Array: return BuiltInTypeCtor_Array(ctx, GetPlace(), std::move(arguments));
+        case ValueType::Type: return BuiltInTypeCtor_Type(ctx, GetPlace(), std::move(arguments));
+        case ValueType::Function:
+        case ValueType::SystemFunction:
+            return BuiltInTypeCtor_Function(ctx, GetPlace(), std::move(arguments));
+        default: assert(0); return Value{};
+        }
+    }
+
+    EXECUTION_FAIL(ERROR_MESSAGE_INVALID_FUNCTION);
 }
 
 void FunctionDefinition::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
@@ -2561,12 +2635,12 @@ void ObjectExpression::DebugPrint(uint32_t indentLevel, const string_view& prefi
         value->DebugPrint(indentLevel, name);
 }
 
-Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
+Value ObjectExpression::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
 {
     shared_ptr<Object> obj;
     if(BaseExpression)
     {
-        Value baseObj = BaseExpression->Evaluate(ctx);
+        Value baseObj = BaseExpression->Evaluate(ctx, nullptr);
         if(baseObj.GetType() != ValueType::Object)
             throw ExecutionError{GetPlace(), ERROR_MESSAGE_BASE_MUST_BE_OBJECT};
         obj = CopyObject(*baseObj.GetObject_());
@@ -2575,7 +2649,7 @@ Value ObjectExpression::Evaluate(ExecuteContext& ctx) const
         obj = make_shared<Object>();
     for(const auto& [name, valueExpr] : Items)
     {
-        Value val = valueExpr->Evaluate(ctx);
+        Value val = valueExpr->Evaluate(ctx, nullptr);
         if(val.GetType() != ValueType::Null)
             obj->GetOrCreateValue(name) = std::move(val);
         else if(BaseExpression)
@@ -2596,90 +2670,12 @@ void ArrayExpression::DebugPrint(uint32_t indentLevel, const string_view& prefix
     }
 }
 
-Value ArrayExpression::Evaluate(ExecuteContext& ctx) const
+Value ArrayExpression::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
 {
     auto result = std::make_shared<Array>();
     for (const auto& item : Items)
-        result->Items.push_back(item->Evaluate(ctx));
+        result->Items.push_back(item->Evaluate(ctx, nullptr));
     return Value{std::move(result)};
-}
-
-Value CallOperator::Evaluate(ExecuteContext& ctx) const
-{
-    Value callee = Operands[0]->Evaluate(ctx);
-    const size_t argCount = Operands.size() - 1;
-    vector<Value> arguments(argCount);
-    for(size_t i = 0; i < argCount; ++i)
-        arguments[i] = Operands[i + 1]->Evaluate(ctx);
-
-    // Calling an object: Call its function under '' key.
-    if(callee.GetType() == ValueType::Object)
-    {
-        shared_ptr<Object> calleeObj = callee.GetObjectPtr();
-        if(Value* defaultVal = calleeObj->TryGetValue(string{}); defaultVal && defaultVal->GetType() == ValueType::Function)
-        {
-            callee = *defaultVal;
-            callee.m_This = ThisType{std::move(calleeObj)};
-        }
-    }
-
-    if(callee.GetType() == ValueType::Function)
-    {
-        const AST::FunctionDefinition* const funcDef = callee.GetFunction();
-        EXECUTION_CHECK( argCount == funcDef->Parameters.size(), ERROR_MESSAGE_INVALID_NUMBER_OF_ARGUMENTS );
-        Object localScope;
-        // Setup parameters
-        for(size_t argIndex = 0; argIndex != argCount; ++argIndex)
-            localScope.GetOrCreateValue(funcDef->Parameters[argIndex]) = std::move(arguments[argIndex]);
-        ExecuteContext::LocalScopePush localContextPush{ctx, &localScope, ThisType{callee.m_This}, GetPlace()};
-        try
-        {
-            callee.GetFunction()->Body.Execute(ctx);
-        }
-        catch(ReturnException& returnEx)
-        {
-            return std::move(returnEx.ThrownValue);
-        }
-        catch(BreakException)
-        {
-            EXECUTION_FAIL(ERROR_MESSAGE_BREAK_WITHOUT_LOOP);
-        }
-        catch(ContinueException)
-        {
-            EXECUTION_FAIL(ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP);
-        }
-        return Value{};
-    }
-    if(callee.GetType() == ValueType::SystemFunction)
-    {
-        switch(callee.GetSystemFunction())
-        {
-        case SystemFunction::TypeOf: return BuiltInFunction_TypeOf(ctx, GetPlace(), std::move(arguments));
-        case SystemFunction::Print: return BuiltInFunction_Print(ctx, GetPlace(), std::move(arguments));
-        case SystemFunction::Array_Add: return BuiltInFunction_Array_Add(ctx, GetPlace(), callee.m_This, std::move(arguments));
-        case SystemFunction::Array_Insert: return BuiltInFunction_Array_Insert(ctx, GetPlace(), callee.m_This, std::move(arguments));
-        case SystemFunction::Array_Remove: return BuiltInFunction_Array_Remove(ctx, GetPlace(), callee.m_This, std::move(arguments));
-        default: assert(0); return Value{};
-        }
-    }
-    if(callee.GetType() == ValueType::Type)
-    {
-        switch(callee.GetTypeValue())
-        {
-        case ValueType::Null: return BuiltInTypeCtor_Null(ctx, GetPlace(), std::move(arguments));
-        case ValueType::Number: return BuiltInTypeCtor_Number(ctx, GetPlace(), std::move(arguments));
-        case ValueType::String: return BuiltInTypeCtor_String(ctx, GetPlace(), std::move(arguments));
-        case ValueType::Object: return BuiltInTypeCtor_Object(ctx, GetPlace(), std::move(arguments));
-        case ValueType::Array: return BuiltInTypeCtor_Array(ctx, GetPlace(), std::move(arguments));
-        case ValueType::Type: return BuiltInTypeCtor_Type(ctx, GetPlace(), std::move(arguments));
-        case ValueType::Function:
-        case ValueType::SystemFunction:
-            return BuiltInTypeCtor_Function(ctx, GetPlace(), std::move(arguments));
-        default: assert(0); return Value{};
-        }
-    }
-
-    EXECUTION_FAIL(ERROR_MESSAGE_INVALID_FUNCTION);
 }
 
 } // namespace AST
