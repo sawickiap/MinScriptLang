@@ -63,4 +63,22 @@ TEST_CASE("Module math")
         env.Execute(code);
         REQUIRE(env.GetOutput() == "1\n1\n");
     }
+    SECTION("abs called incorrectly no arguments inspect error")
+    {
+        const char* code = "try print(math.abs()); catch(ex) print(ex.message);\n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "Function math.abs received too few arguments. Number expected as argument 0.\n");
+    }
+    SECTION("abs called incorrectly too many arguments inspect error")
+    {
+        const char* code = "try print(math.abs(1, 2, 3)); catch(ex) print(ex.message);\n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "Function math.abs requires 1 arguments, 3 provided.\n");
+    }
+    SECTION("abs called incorrectly array inspect error")
+    {
+        const char* code = "try print(math.abs([1, 2, 3])); catch(ex) print(ex.message);\n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "Function math.abs received incorrect argument 0. Expected: Number, actual: Array.\n");
+    }
 }

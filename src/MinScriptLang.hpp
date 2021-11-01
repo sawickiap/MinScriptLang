@@ -214,6 +214,36 @@ public:
 #define MINSL_EXECUTION_FAIL(place, errorMessage) \
     do { throw ExecutionError((place), (errorMessage)); } while(false)
 
+// Convenience macros for loading function arguments
+// They require to have following available: env, place, args.
+#define MINSL_LOAD_ARG_BEGIN(functionNameStr) \
+    constexpr std::string_view minsl_functionName = (functionNameStr); \
+    size_t minsl_argIndex = 0; \
+    size_t minsl_argCount = (args).size(); \
+    ValueType minsl_argType;
+#define MINSL_LOAD_ARG_NUMBER(dstVarName) \
+    MINSL_EXECUTION_CHECK(minsl_argIndex < minsl_argCount, place, \
+        Format("Function %.*s received too few arguments. Number expected as argument %zu.", \
+            (int)minsl_functionName.length(), minsl_functionName.data(), minsl_argIndex)); \
+    minsl_argType = args[minsl_argIndex].GetType(); \
+    MINSL_EXECUTION_CHECK(minsl_argType == ValueType::Number, place, \
+        Format("Function %.*s received incorrect argument %zu. Expected: Number, actual: %.*s.", \
+            (int)minsl_functionName.length(), minsl_functionName.data(), minsl_argIndex, \
+            (int)env.GetTypeName(minsl_argType).length(), env.GetTypeName(minsl_argType).data())); \
+    double dstVarName = args[minsl_argIndex++].GetNumber();
+#define MINSL_LOAD_ARG_STRING(dstVarName) \
+    MINSL_EXECUTION_CHECK(minsl_argIndex < minsl_argCount, place, \
+        Format("Function %.*s received too few arguments. String expected as argument %zu.", \
+            (int)minsl_functionName.length(), minsl_functionName.data(), minsl_argIndex)); \
+    minsl_argType = args[minsl_argIndex].GetType(); \
+    MINSL_EXECUTION_CHECK(minsl_argType == ValueType::String, place, \
+        Format("Function %.*s received incorrect argument %zu. Expected: String, actual: %.*s.", \
+            (int)minsl_functionName.length(), minsl_functionName.data(), minsl_argIndex, \
+            (int)env.GetTypeName(minsl_argType).length(), env.GetTypeName(minsl_argType).data())); \
+    std::string dstVarName = std::move(args[minsl_argIndex++].GetString());
+#define MINSL_LOAD_ARG_END() \
+    MINSL_EXECUTION_CHECK(minsl_argIndex == minsl_argCount, place, Format("Function %.*s requires %zu arguments, %zu provided.", (int)minsl_functionName.length(), minsl_functionName.data(), minsl_argIndex, minsl_argCount));
+    
 std::string VFormat(const char* format, va_list argList);
 std::string Format(const char* format, ...);
 
@@ -228,6 +258,7 @@ public:
     ~Environment();
     Value Execute(const std::string_view& code);
     const std::string& GetOutput() const;
+    std::string_view GetTypeName(ValueType type) const;
 private:
     EnvironmentPimpl* pimpl;
 };
@@ -998,6 +1029,7 @@ public:
     Environment& GetOwner() { return m_Owner; }
     Value Execute(const string_view& code);
     const string& GetOutput() const { return m_Output; }
+    string_view GetTypeName(ValueType type) const;
     void Print(const string_view& s) { m_Output.append(s); }
 
 private:
@@ -1415,11 +1447,11 @@ static shared_ptr<Array> CopyArray(const Array& src)
 static shared_ptr<Object> ConvertExecutionErrorToObject(const ExecutionError& err)
 {
     auto obj = std::make_shared<Object>();
-    obj->GetOrCreateValue("Type") = Value{"ExecutionError"};
-    obj->GetOrCreateValue("Index") = Value{(double)err.GetPlace().Index};
-    obj->GetOrCreateValue("Row") = Value{(double)err.GetPlace().Row};
-    obj->GetOrCreateValue("Column") = Value{(double)err.GetPlace().Column};
-    obj->GetOrCreateValue("Message") = Value{string{err.GetMessage_()}};
+    obj->GetOrCreateValue("type") = Value{"ExecutionError"};
+    obj->GetOrCreateValue("index") = Value{(double)err.GetPlace().Index};
+    obj->GetOrCreateValue("row") = Value{(double)err.GetPlace().Row};
+    obj->GetOrCreateValue("column") = Value{(double)err.GetPlace().Column};
+    obj->GetOrCreateValue("message") = Value{string{err.GetMessage_()}};
     return obj;
 }
 static Value BuiltInTypeCtor_Null(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
@@ -3604,6 +3636,12 @@ Value EnvironmentPimpl::Execute(const string_view& code)
     return {};
 }
 
+string_view EnvironmentPimpl::GetTypeName(ValueType type) const
+{
+    return VALUE_TYPE_NAMES[(size_t)type];
+    // TODO support custom types
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // class Environment
 
@@ -3611,6 +3649,7 @@ Environment::Environment() : pimpl{new EnvironmentPimpl{*this, GlobalScope}} { }
 Environment::~Environment() { delete pimpl; }
 Value Environment::Execute(const string_view& code) { return pimpl->Execute(code); }
 const std::string& Environment::GetOutput() const { return pimpl->GetOutput(); }
+std::string_view Environment::GetTypeName(ValueType type) const { return pimpl->GetTypeName(type); }
 
 } // namespace MinScriptLang
 

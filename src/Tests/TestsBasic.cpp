@@ -748,11 +748,11 @@ TEST_CASE("Basic")
     {
         const char* code = "try { a='AAA' + 5 + null; } \n"
             "catch(ex) { \n"
-            "  print(ex.Type); \n"
-            "  print(ex.Index < 1000); \n"
-            "  print(ex.Row); \n"
-            "  print(ex.Column < 1000); \n"
-            "  print(typeOf(ex.Message)); \n"
+            "  print(ex.type); \n"
+            "  print(ex.index < 1000); \n"
+            "  print(ex.row); \n"
+            "  print(ex.column < 1000); \n"
+            "  print(typeOf(ex.message)); \n"
             "} \n";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "ExecutionError\n1\n1\n1\nString\n");
