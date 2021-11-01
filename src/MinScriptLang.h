@@ -210,6 +210,9 @@ private:
 #define EXECUTION_FAIL(place, errorMessage) \
     do { throw ExecutionError((place), (errorMessage)); } while(false)
 
+std::string VFormat(const char* format, va_list argList);
+std::string Format(const char* format, ...);
+
 class EnvironmentPimpl;
 class Environment
 {
@@ -422,25 +425,26 @@ static const char* GetDebugPrintIndent(uint32_t indentLevel)
         + (256 - std::min<uint32_t>(indentLevel, 128) * 2);
 }
 
-static void VFormat(string& str, const char* format, va_list argList)
+std::string VFormat(const char* format, va_list argList)
 {
     size_t dstLen = (size_t)_vscprintf(format, argList);
     if(dstLen)
     {
         std::vector<char> buf(dstLen + 1);
         vsprintf_s(&buf[0], dstLen + 1, format, argList);
-        str.assign(&buf[0], &buf[dstLen]);
+        return string{&buf[0], &buf[dstLen]};
     }
     else
-        str.clear();
+        return {};
 }
 
-static void Format(string& str, const char* format, ...)
+std::string Format(const char* format, ...)
 {
     va_list argList;
     va_start(argList, format);
-    VFormat(str, format, argList);
+    auto result = VFormat(format, argList);
     va_end(argList);
+    return result;
 }
 
 static bool NumberToIndex(size_t& outIndex, double number)
@@ -989,7 +993,7 @@ private:
 const char* Error::what() const
 {
     if(m_What.empty())
-        Format(m_What, "(%u,%u): %.*s", m_Place.Row, m_Place.Column, (int)GetMessage_().length(), GetMessage_().data());
+        m_What = Format("(%u,%u): %.*s", m_Place.Row, m_Place.Column, (int)GetMessage_().length(), GetMessage_().data());
     return m_What.c_str();
 }
 
@@ -1452,7 +1456,7 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
             ctx.Env.Print("null\n");
             break;
         case ValueType::Number:
-            Format(s, "%g\n", val.GetNumber());
+            s = Format("%g\n", val.GetNumber());
             ctx.Env.Print(s);
             break;
         case ValueType::String:
@@ -1474,7 +1478,7 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
         {
             const size_t typeIndex = (size_t)val.GetTypeValue();
             const string_view& typeName = VALUE_TYPE_NAMES[typeIndex];
-            Format(s, "%.*s\n", (int)typeName.length(), typeName.data());
+            s = Format("%.*s\n", (int)typeName.length(), typeName.data());
             ctx.Env.Print(s);
         }
             break;
@@ -2642,7 +2646,7 @@ void ArrayExpression::DebugPrint(uint32_t indentLevel, const string_view& prefix
     string itemPrefix;
     for(size_t i = 0, count = Items.size(); i < count; ++i)
     {
-        Format(itemPrefix, "%zu: ", i);
+        itemPrefix = Format("%zu: ", i);
         Items[i]->DebugPrint(indentLevel, itemPrefix);
     }
 }
