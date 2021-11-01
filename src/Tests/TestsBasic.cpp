@@ -724,7 +724,7 @@ TEST_CASE("Basic")
     SECTION("Throw statement")
     {
         const char* code = "throw 1; \n";
-        REQUIRE_THROWS_AS( env.Execute(code), ValueException );
+        REQUIRE_THROWS_AS( env.Execute(code), Value );
     }
     SECTION("Try catch")
     {

@@ -205,8 +205,6 @@ private:
     VariantType m_Variant;
 };
 
-struct ValueException { Value m_Value; };
-
 #define EXECUTION_CHECK(condition, errorMessage) \
     do { if(!(condition)) throw ExecutionError(GetPlace(), (errorMessage)); } while(false)
 #define EXECUTION_CHECK_PLACE(condition, place, errorMessage) \
@@ -1904,7 +1902,7 @@ void ThrowStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix)
 
 void ThrowStatement::Execute(ExecuteContext& ctx) const
 {
-    throw ValueException{ThrownExpression->Evaluate(ctx, nullptr)};
+    throw ThrownExpression->Evaluate(ctx, nullptr);
 }
 
 void TryStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
@@ -1923,12 +1921,12 @@ void TryStatement::Execute(ExecuteContext& ctx) const
     // Careful with this function! It contains logic that was difficult to get right.
     try
         { TryBlock->Execute(ctx); }
-    catch(ValueException &ex)
+    catch(Value &val)
     {
         if(CatchBlock)
         {
             Object& innermostCtxObj = ctx.GetInnermostScope();
-            Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, std::move(ex.m_Value));
+            Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, std::move(val));
             CatchBlock->Execute(ctx);
             Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, Value{});
             if(FinallyBlock)
@@ -1940,11 +1938,11 @@ void TryStatement::Execute(ExecuteContext& ctx) const
             // One exception is on the fly - new one is ignored, old one is thrown again.
             try
                 { FinallyBlock->Execute(ctx); }
-            catch(const ValueException&)
-                { throw ex; }
+            catch(const Value&)
+                { throw val; }
             catch(const ExecutionError&)
-                { throw ex; }
-            throw ex;
+                { throw val; }
+            throw val;
         }
         return;
     }
@@ -1964,7 +1962,7 @@ void TryStatement::Execute(ExecuteContext& ctx) const
             assert(FinallyBlock);
             // One exception is on the fly - new one is ignored, old one is thrown again.
             try { FinallyBlock->Execute(ctx); }
-            catch(const ValueException&)
+            catch(const Value&)
                 { throw err; }
             catch(const ExecutionError&)
                 { throw err; }
