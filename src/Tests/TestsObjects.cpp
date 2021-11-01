@@ -250,6 +250,15 @@ TEST_CASE("Objects")
         env.Execute(code);
         REQUIRE(env.GetOutput() == "101\n3\n102\n4\n");
     }
+    SECTION("Nested this")
+    {
+        const char* code =
+            "objInner = { x: 2, f: function() { print(++x); } }; \n"
+            "objOuter = { o: objInner }; \n"
+            "objOuter.o.f(); \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "3\n");
+    }
     SECTION("Calling a method from another method")
     {
         const char* code =
