@@ -240,8 +240,16 @@ TEST_CASE("Objects")
         env.Execute(code);
         REQUIRE(env.GetOutput() == "3\nobj2f\n");
     }
-
-
+    SECTION("This not preserved when assigned")
+    {
+        const char* code =
+            "x=100; \n"
+            "obj={ x: 2, f: function() { print(++x); } }; \n"
+            "fn = obj.f; \n"
+            "fn(); obj.f(); fn(); obj.f(); \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "101\n3\n102\n4\n");
+    }
     SECTION("Calling a method from another method")
     {
         const char* code =
