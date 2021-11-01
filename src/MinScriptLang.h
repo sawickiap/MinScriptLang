@@ -49,6 +49,7 @@ SOFTWARE.
 #include <unordered_map>
 #include <variant>
 #include <cstdint>
+#include <cassert>
 
 namespace MinScriptLang {
 
@@ -243,7 +244,6 @@ private:
 #include <initializer_list>
 
 #include <cstdlib>
-#include <cassert>
 #include <cstring>
 #include <cmath>
 #include <ctype.h>
@@ -977,14 +977,13 @@ private:
 class EnvironmentPimpl
 {
 public:
-    EnvironmentPimpl() : m_Script{PlaceInCode{0, 1, 1}} { }
+    EnvironmentPimpl() { }
     ~EnvironmentPimpl() = default;
     Value Execute(const string_view& code);
     const string& GetOutput() const { return m_Output; }
     void Print(const string_view& s) { m_Output.append(s); }
 
 private:
-    AST::Script m_Script;
     Object m_GlobalScope;
     string m_Output;
 };
@@ -3535,18 +3534,17 @@ string Parser::TryParseIdentifier()
 
 Value EnvironmentPimpl::Execute(const string_view& code)
 {
-    m_Script.Statements.clear();
-
+    AST::Script script{PlaceInCode{0, 1, 1}};
     {
         Tokenizer tokenizer{code};
         Parser parser{tokenizer};
-        parser.ParseScript(m_Script);
+        parser.ParseScript(script);
     }
 
     try
     {
         AST::ExecuteContext executeContext{*this, m_GlobalScope};
-        m_Script.Execute(executeContext);
+        script.Execute(executeContext);
     }
     catch(ReturnException& returnEx)
     {

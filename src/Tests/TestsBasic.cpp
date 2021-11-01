@@ -903,4 +903,12 @@ TEST_CASE("Basic")
         REQUIRE(obj->TryGetValue("b")->GetType() == ValueType::String);
         REQUIRE(obj->TryGetValue("b")->GetString() == "2");
     }
+    SECTION("Two executions in same environment")
+    {
+        const char* code = "print('A');";
+        env.Execute(code);
+        code = "print('B');";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "A\nB\n");
+    }
 }
