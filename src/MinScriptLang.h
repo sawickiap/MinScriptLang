@@ -1383,7 +1383,7 @@ Value LValue::GetValue(const PlaceInCode& place) const
         return Value{arrItemLval->Arr->Items[arrItemLval->Index]};
     }
     assert(0);
-    return Value{};
+    return {};
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1418,7 +1418,7 @@ static shared_ptr<Object> ConvertExecutionErrorToObject(const ExecutionError& er
 static Value BuiltInTypeCtor_Null(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     EXECUTION_CHECK_PLACE(args.empty() || args.size() == 1 && args[0].GetType() == ValueType::Null, place, "Null can be constructed only from no arguments or from another null value.");
-    return Value{};
+    return {};
 }
 static Value BuiltInTypeCtor_Number(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
@@ -1504,7 +1504,7 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
         default: assert(0);
         }
     }
-    return Value{};
+    return {};
 }
 
 static Value BuiltInMember_Object_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
@@ -1529,7 +1529,7 @@ static Value BuiltInFunction_Array_Add(AST::ExecuteContext& ctx, const PlaceInCo
     EXECUTION_CHECK_PLACE(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
     EXECUTION_CHECK_PLACE(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
     arr->Items.push_back(std::move(args[0]));
-    return Value{};
+    return {};
 }
 static Value BuiltInFunction_Array_Insert(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
 {
@@ -1539,7 +1539,7 @@ static Value BuiltInFunction_Array_Insert(AST::ExecuteContext& ctx, const PlaceI
     size_t index = 0;
     EXECUTION_CHECK_PLACE(args[0].GetType() == ValueType::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
     arr->Items.insert(arr->Items.begin() + index, std::move(args[1]));
-    return Value{};
+    return {};
 }
 static Value BuiltInFunction_Array_Remove(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
 {
@@ -1549,7 +1549,7 @@ static Value BuiltInFunction_Array_Remove(AST::ExecuteContext& ctx, const PlaceI
     size_t index = 0;
     EXECUTION_CHECK_PLACE(args[0].GetType() == ValueType::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
     arr->Items.erase(arr->Items.begin() + index);
-    return Value{};
+    return {};
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2072,7 +2072,7 @@ Value Identifier::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
     }
 
     // Not found - null
-    return Value{};
+    return {};
 }
 
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
@@ -2151,7 +2151,7 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
             val->ChangeNumber(val->GetNumber() - 1.0);
             return std::move(result);
         }
-        default: assert(0); return Value{};
+        default: assert(0); return {};
         }
     }
     // Those use r-value.
@@ -2168,10 +2168,10 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
         case UnaryOperatorType::Minus: return Value{-val.GetNumber()};
         case UnaryOperatorType::LogicalNot: return Value{val.IsTrue() ? 0.0 : 1.0};
         case UnaryOperatorType::BitwiseNot: return BitwiseNot(std::move(val));
-        default: assert(0); return Value{};
+        default: assert(0); return {};
         }
     }
-    assert(0); return Value{};
+    assert(0); return {};
 }
 
 LValue UnaryOperator::GetLValue(ExecuteContext& ctx) const
@@ -2214,7 +2214,7 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) con
         }
         if(MemberName == "Count")
             return BuiltInMember_Object_Count(ctx, GetPlace(), std::move(objVal));
-        return Value{};
+        return {};
     }
     if(objVal.GetType() == ValueType::String)
     {
@@ -2381,7 +2381,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
                     *outThis = ThisType{lhs.GetObjectPtr()};
                 return *val;
             }
-            return Value{};
+            return {};
         }
         if(lhsType == ValueType::Array)
         {
@@ -2410,7 +2410,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
     case BinaryOperatorType::BitwiseOr:    return Value{ (double)( (int64_t)lhs.GetNumber() | (int64_t)rhs.GetNumber() ) };
     }
 
-    assert(0); return Value{};
+    assert(0); return {};
 }
 
 LValue BinaryOperator::GetLValue(ExecuteContext& ctx) const
@@ -2570,7 +2570,7 @@ Value CallOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
         {
             EXECUTION_FAIL(ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP);
         }
-        return Value{};
+        return {};
     }
     if(callee.GetType() == ValueType::SystemFunction)
     {
@@ -2581,7 +2581,7 @@ Value CallOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
         case SystemFunction::Array_Add: return BuiltInFunction_Array_Add(ctx, GetPlace(), th, std::move(arguments));
         case SystemFunction::Array_Insert: return BuiltInFunction_Array_Insert(ctx, GetPlace(), th, std::move(arguments));
         case SystemFunction::Array_Remove: return BuiltInFunction_Array_Remove(ctx, GetPlace(), th, std::move(arguments));
-        default: assert(0); return Value{};
+        default: assert(0); return {};
         }
     }
     if(callee.GetType() == ValueType::Type)
@@ -2597,7 +2597,7 @@ Value CallOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
         case ValueType::Function:
         case ValueType::SystemFunction:
             return BuiltInTypeCtor_Function(ctx, GetPlace(), std::move(arguments));
-        default: assert(0); return Value{};
+        default: assert(0); return {};
         }
     }
 
@@ -2977,7 +2977,7 @@ unique_ptr<AST::Statement> Parser::TryParseStatement()
     if(auto cls = TryParseClassSyntacticSugar(); cls)
         return cls;
     
-    return unique_ptr<AST::Statement>{};
+    return {};
 }
 
 unique_ptr<AST::ConstantValue> Parser::TryParseConstantValue()
@@ -3001,7 +3001,7 @@ unique_ptr<AST::ConstantValue> Parser::TryParseConstantValue()
         ++m_TokenIndex;
         return make_unique<AST::ConstantValue>(t.Place, Value{1.0});
     }
-    return unique_ptr<AST::ConstantValue>{};
+    return {};
 }
 
 unique_ptr<AST::Identifier> Parser::TryParseIdentifierValue()
@@ -3027,7 +3027,7 @@ unique_ptr<AST::Identifier> Parser::TryParseIdentifierValue()
         ++m_TokenIndex;
         return make_unique<AST::Identifier>(t.Place, AST::IdentifierScope::None, string(t.String));
     }
-    return unique_ptr<AST::Identifier>{};
+    return {};
 }
 
 unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
@@ -3039,7 +3039,7 @@ unique_ptr<AST::ConstantExpression> Parser::TryParseConstantExpr()
     const PlaceInCode place = m_Tokens[m_TokenIndex].Place;
     if(TryParseSymbol(Symbol::This))
         return make_unique<AST::ThisExpression>(place);
-    return unique_ptr<AST::ConstantExpression>{};
+    return {};
 }
 
 std::pair<string, unique_ptr<AST::FunctionDefinition>> Parser::TryParseFunctionSyntacticSugar()
@@ -3065,12 +3065,7 @@ unique_ptr<AST::Expression> Parser::TryParseObjectMember(string& outMemberName)
         m_TokenIndex += 2;
         return TryParseExpr16();
     }
-    if(auto fnSyntacticSugar = TryParseFunctionSyntacticSugar(); fnSyntacticSugar.second)
-    {
-        outMemberName = std::move(fnSyntacticSugar.first);
-        return std::move(fnSyntacticSugar.second);
-    }
-    return unique_ptr<AST::Expression>{};
+    return {};
 }
 
 unique_ptr<AST::Expression> Parser::TryParseClassSyntacticSugar()
@@ -3125,7 +3120,7 @@ unique_ptr<AST::ObjectExpression> Parser::TryParseObject()
         }
         return objExpr;
     }
-    return unique_ptr<AST::ObjectExpression>{};
+    return {};
 }
 
 unique_ptr<AST::ArrayExpression> Parser::TryParseArray()
@@ -3152,7 +3147,7 @@ unique_ptr<AST::ArrayExpression> Parser::TryParseArray()
         }
         return arrExpr;
     }
-    return unique_ptr<AST::ArrayExpression>{};
+    return {};
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr0()
@@ -3187,14 +3182,14 @@ unique_ptr<AST::Expression> Parser::TryParseExpr0()
     if(constant)
         return constant;
 
-    return unique_ptr<AST::Expression>{};
+    return {};
 }
 
 unique_ptr<AST::Expression> Parser::TryParseExpr2()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr0();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
     for(;;)
     {
         const PlaceInCode place = GetCurrentTokenPlace();
@@ -3291,7 +3286,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr5()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr3();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
  
     for(;;)
     {
@@ -3312,7 +3307,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr6()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr5();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
 
     for(;;)
     {
@@ -3331,7 +3326,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr7()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr6();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
 
     for(;;)
     {
@@ -3350,7 +3345,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr9()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr7();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
 
     for(;;)
     {
@@ -3373,7 +3368,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr10()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr9();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
 
     for(;;)
     {
@@ -3392,7 +3387,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr11()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr10();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
 
     for(;;)
     {
@@ -3409,7 +3404,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr12()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr11();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
 
     for(;;)
     {
@@ -3426,7 +3421,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr13()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr12();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
 
     for(;;)
     {
@@ -3443,7 +3438,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr14()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr13();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
     for(;;)
     {
         const PlaceInCode place = GetCurrentTokenPlace();
@@ -3459,7 +3454,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr15()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr14();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
     for(;;)
     {
         const PlaceInCode place = GetCurrentTokenPlace();
@@ -3475,7 +3470,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr16()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr15();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
 
     // Ternary operator: Expr15 '?' Expr16 ':' Expr16
     if(TryParseSymbol(Symbol::QuestionMark))
@@ -3516,7 +3511,7 @@ unique_ptr<AST::Expression> Parser::TryParseExpr17()
 {
     unique_ptr<AST::Expression> expr = TryParseExpr16();
     if(!expr)
-        return unique_ptr<AST::Expression>{};
+        return {};
     for(;;)
     {
         const PlaceInCode place = GetCurrentTokenPlace();
@@ -3542,7 +3537,7 @@ string Parser::TryParseIdentifier()
 {
     if(m_TokenIndex < m_Tokens.size() && m_Tokens[m_TokenIndex].Symbol == Symbol::Identifier)
         return m_Tokens[m_TokenIndex++].String;
-    return string{};
+    return {};
 }
 
 ////////////////////////////////////////////////////////////////////////////////

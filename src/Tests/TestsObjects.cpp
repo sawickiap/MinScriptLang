@@ -217,7 +217,7 @@ TEST_CASE("Objects")
     SECTION("This in member access and indexing operator")
     {
         const char* code =
-            "obj={ 'x': 2, function f() { print(++this.x); } }; \n"
+            "obj={ 'x': 2, f: function() { print(++this.x); } }; \n"
             "obj.f(); obj['f'](); \n";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "3\n4\n");
@@ -225,7 +225,7 @@ TEST_CASE("Objects")
     SECTION("This in grouping and comma operator")
     {
         const char* code =
-            "obj={ 'x': 2, function f() { print(++this.x); } }; \n"
+            "obj={ 'x': 2, f: function() { print(++this.x); } }; \n"
             "((obj)).f(); (111, 'AAA', obj.f)(); \n";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "3\n4\n");
@@ -280,14 +280,14 @@ TEST_CASE("Objects")
     }
     SECTION("Function syntactic sugar in object definition")
     {
-        const char* code = "obj={ var: 2, function fn() { print(var); } }; \n"
+        const char* code = "obj={ var: 2, fn: function() { print(var); } }; \n"
             "obj.fn(); \n";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "2\n");
     }
     SECTION("Calling object default function")
     {
-        const char* code = "obj={ var: 2, function fn() { print('fn'); }, '':function(a) { print('Default', a); } }; \n"
+        const char* code = "obj={ var: 2, fn: function() { print('fn'); }, '':function(a) { print('Default', a); } }; \n"
             "obj(3); \n";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "Default\n3\n");
@@ -297,7 +297,7 @@ TEST_CASE("Objects")
         const char* code = "class C { \n"
             "   var: 1, \n"
             "   '': function(x) { var=x; }, \n"
-            "   function print() { global.print(this.var); } \n"
+            "   print: function() { global.print(this.var); } \n"
             "} \n"
             "C(2); C.print(); \n";
         env.Execute(code);
@@ -308,7 +308,7 @@ TEST_CASE("Objects")
         const char* code = "class A { \n"
             "   var: 1, \n"
             "   '': function(x) { var=x; }, \n"
-            "   function print() { global.print(this.var); } \n"
+            "   print: function() { global.print(this.var); } \n"
             "} \n"
             "class B : A { \n"
             "   '': function(x) { var=x+1; } \n"
