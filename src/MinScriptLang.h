@@ -526,8 +526,8 @@ enum class SystemFunction {
     Count
 };
 static constexpr string_view SYSTEM_FUNCTION_NAMES[] = {
-    "TypeOf", "print",
-    "Add", "Insert", "Remove",
+    "typeOf", "print",
+    "add", "insert", "remove",
 };
 static_assert(_countof(SYSTEM_FUNCTION_NAMES) == (size_t)SystemFunction::Count);
 
@@ -2193,13 +2193,13 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) con
                 *outThis = ThisType{objVal.GetObjectPtr()};
             return *memberVal;
         }
-        if(MemberName == "Count")
+        if(MemberName == "count")
             return BuiltInMember_Object_Count(ctx, GetPlace(), std::move(objVal));
         return {};
     }
     if(objVal.GetType() == ValueType::String)
     {
-        if(MemberName == "Count")
+        if(MemberName == "count")
             return BuiltInMember_String_Count(ctx, GetPlace(), std::move(objVal));
         EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_MEMBER);
     }
@@ -2207,10 +2207,10 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) con
     {
         if(outThis)
             *outThis = ThisType{objVal.GetArrayPtr()};
-        if(MemberName == "Count") return BuiltInMember_Array_Count(ctx, GetPlace(), std::move(objVal));
-        else if(MemberName == "Add") return Value{SystemFunction::Array_Add};
-        else if(MemberName == "Insert") return Value{SystemFunction::Array_Insert};
-        else if(MemberName == "Remove") return Value{SystemFunction::Array_Remove};
+        if(MemberName == "count") return BuiltInMember_Array_Count(ctx, GetPlace(), std::move(objVal));
+        else if(MemberName == "add") return Value{SystemFunction::Array_Add};
+        else if(MemberName == "insert") return Value{SystemFunction::Array_Insert};
+        else if(MemberName == "remove") return Value{SystemFunction::Array_Remove};
         EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_MEMBER);
     }
     EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);

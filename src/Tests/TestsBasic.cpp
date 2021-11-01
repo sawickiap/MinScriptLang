@@ -450,10 +450,10 @@ TEST_CASE("Basic")
         env.Execute(code);
         REQUIRE(env.GetOutput() == "B\nCC\n");
     }
-    SECTION("String Count")
+    SECTION("String count")
     {
         const char* code = "s='ABCD'; \n"
-            "for(i=0; i<s.Count; ++i) { print(i, s[i]); }";
+            "for(i=0; i<s.count; ++i) { print(i, s[i]); }";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "0\nA\n1\nB\n2\nC\n3\nD\n");
     }
@@ -752,7 +752,7 @@ TEST_CASE("Basic")
             "  print(ex.Index < 1000); \n"
             "  print(ex.Row); \n"
             "  print(ex.Column < 1000); \n"
-            "  print(TypeOf(ex.Message)); \n"
+            "  print(typeOf(ex.Message)); \n"
             "} \n";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "ExecutionError\n1\n1\n1\nString\n");

@@ -159,7 +159,7 @@ TEST_CASE("Objects")
     {
         const char* code =
             "obj={'a':1, 'b':2, 'd':null}; obj.c=3; obj.b=null; \n"
-            "print(obj.Count); \n";
+            "print(obj.count); \n";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "2\n");
     }
@@ -173,7 +173,7 @@ TEST_CASE("Objects")
         const char* code =
             "obj={'a':1, 'bbbb':4, 'cc':10}; \n"
             "sum = 0; for(val: obj) sum += val; print(sum);\n"
-            "sumKeyLen = 0; sumVal = 0; for(key, val: obj) { sumKeyLen += key.Count; sumVal += val; } print(sumKeyLen, sumVal); \n"
+            "sumKeyLen = 0; sumVal = 0; for(key, val: obj) { sumKeyLen += key.count; sumVal += val; } print(sumKeyLen, sumVal); \n"
             "print(key, val); \n";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "15\n7\n15\n"

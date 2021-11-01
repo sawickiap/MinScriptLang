@@ -46,9 +46,9 @@ TEST_CASE("Types")
         env.Execute(code);
         REQUIRE(env.GetOutput() == "Null\nNumber\nString\nObject\n");
     }
-    SECTION("TypeOf and comparisons")
+    SECTION("typeOf and comparisons")
     {
-        const char* code = "tn1=Number; n2=123; tn2=TypeOf(n2); tnull=TypeOf(nonExistent); \n"
+        const char* code = "tn1=Number; n2=123; tn2=typeOf(n2); tnull=typeOf(nonExistent); \n"
             "print(tn1, tn2, tnull); \n"
             "print(tn1==tn2, tn1!=tn2, tn2==tnull, tn2!=tnull); \n";
         env.Execute(code);
@@ -57,7 +57,7 @@ TEST_CASE("Types")
     }
     SECTION("Type conversion to bool")
     {
-        const char* code = "tobj=TypeOf({a:1, b:2}); tnull=TypeOf(nonExistent); \n"
+        const char* code = "tobj=typeOf({a:1, b:2}); tnull=typeOf(nonExistent); \n"
             "print(tobj?1:0, tnull?1:0); \n";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "1\n0\n");
@@ -126,7 +126,7 @@ TEST_CASE("Types")
     }
     SECTION("Type construction")
     {
-        const char* code = "v1=TypeOf(125); v2=Type(v1); v3=v2(123);\n"
+        const char* code = "v1=typeOf(125); v2=Type(v1); v3=v2(123);\n"
             "print(v1==v2, v3); \n";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "1\n123\n");
