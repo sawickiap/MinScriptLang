@@ -47,6 +47,16 @@ TEST_CASE("Module math")
         env.Execute(code);
         REQUIRE(env.GetOutput() == "-10\n10\n");
     }
+    SECTION("abs called incorrectly string")
+    {
+        const char* code = "print(math.abs('A')); \n";
+        REQUIRE_THROWS_AS(env.Execute(code), ExecutionError);
+    }
+    SECTION("abs called incorrectly no arguments")
+    {
+        const char* code = "print(math.abs()); \n";
+        REQUIRE_THROWS_AS(env.Execute(code), ExecutionError);
+    }
     SECTION("Constants")
     {
         const char* code = "print(math.abs(math.E - 2.71828182) < 1e-6, math.abs(math.PI - 3.14159265) < 1e-6); \n";
