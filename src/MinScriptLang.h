@@ -328,23 +328,6 @@ static constexpr string_view ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT = "Repeating 
 static constexpr string_view ERROR_MESSAGE_STACK_OVERFLOW = "Stack overflow.";
 static constexpr string_view ERROR_MESSAGE_BASE_MUST_BE_OBJECT = "Base must be object.";
 
-struct Constant
-{
-public:
-    enum class Type { Number, String };
-    explicit Constant(double number) : m_Type{Type::Number}, m_Number(number) { }
-    explicit Constant(string&& s) : m_Type{Type::String}, m_String{std::move(s)} { }
-    Type GetType() const { return m_Type; }
-    double GetNumber() const { assert(m_Type == Type::Number); return m_Number; }
-    const string& GetString() const { assert(m_Type == Type::String); return m_String; }
-    void SetNumber(double v) { m_Type = Type::Number; m_Number = v; m_String.clear(); }
-    void SetString(string&& s) { m_Type = Type::String; m_String = std::move(s); }
-private:
-    Type m_Type;
-    double m_Number = 0.0;
-    string m_String;
-};
-
 static constexpr string_view VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Object", "Array", "Type" };
 static_assert(_countof(VALUE_TYPE_NAMES) == (size_t)ValueType::Count);
 
