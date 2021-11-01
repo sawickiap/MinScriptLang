@@ -15,8 +15,8 @@
     <ClCompile Include="TestsModuleMath.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="PCH.h" />
-    <ClInclude Include="..\MinScriptLang.h">
+    <ClInclude Include="PCH.hpp" />
+    <ClInclude Include="..\MinScriptLang.hpp">
       <Filter>MinScriptLang</Filter>
     </ClInclude>
     <ClInclude Include="..\3rdParty\Catch2\catch.hpp">
