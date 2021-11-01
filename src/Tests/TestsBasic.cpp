@@ -827,4 +827,46 @@ TEST_CASE("Basic")
         env.Execute(code);
         REQUIRE(env.GetOutput() == "CATCH\n666\n");
     }
+    SECTION("Throwing from finally with no exception")
+    {
+        const char* code =
+            "function f() { \n"
+            "  try { \n"
+            "    print('AAA'); \n"
+            "  } \n"
+            "  finally { throw 123; } \n"
+            "} \n"
+            "try { f(); } catch(ex) { print(ex); } \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "AAA\n123\n");
+    }
+    SECTION("Try with finally and exception")
+    {
+        const char* code =
+            "function f() { \n"
+            "  try { \n"
+            "    print('try before throw'); \n"
+            "    throw 1; \n"
+            "    print('try after throw'); \n"
+            "  } \n"
+            "  finally { print('try finally'); } \n"
+            "} \n"
+            "try { f(); } catch(ex) { print('catch', ex); } \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "try before throw\ntry finally\ncatch\n1\n");
+    }
+    SECTION("Throwing from finally with exception - exception precedence")
+    {
+        const char* code =
+            "function f() { \n"
+            "  try { \n"
+            "    throw 1; \n"
+            "    print('AAA'); \n"
+            "  } \n"
+            "  finally { throw 123; } \n"
+            "} \n"
+            "try { f(); } catch(ex) { print(ex); } \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "1\n");
+    }
 }

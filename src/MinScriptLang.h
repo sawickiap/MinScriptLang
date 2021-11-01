@@ -1916,10 +1916,9 @@ void TryStatement::DebugPrint(uint32_t indentLevel, const string_view& prefix) c
 
 void TryStatement::Execute(ExecuteContext& ctx) const
 {
+    // Careful with this function! It contains logic that was difficult to get right.
     try
-    {
-        TryBlock->Execute(ctx);
-    }
+        { TryBlock->Execute(ctx); }
     catch(ValueException &ex)
     {
         if(CatchBlock)
@@ -1928,7 +1927,22 @@ void TryStatement::Execute(ExecuteContext& ctx) const
             Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, std::move(ex.m_Value));
             CatchBlock->Execute(ctx);
             Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, Value{});
+            if(FinallyBlock)
+                FinallyBlock->Execute(ctx);
         }
+        else
+        {
+            assert(FinallyBlock);
+            // One exception is on the fly - new one is ignored, old one is thrown again.
+            try
+                { FinallyBlock->Execute(ctx); }
+            catch(const ValueException&)
+                { throw ex; }
+            catch(const ExecutionError&)
+                { throw ex; }
+            throw ex;
+        }
+        return;
     }
     catch(const ExecutionError& err)
     {
@@ -1944,7 +1958,21 @@ void TryStatement::Execute(ExecuteContext& ctx) const
             Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, Value{std::move(exObj)});
             CatchBlock->Execute(ctx);
             Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, Value{});
+            if(FinallyBlock)
+                FinallyBlock->Execute(ctx);
         }
+        else
+        {
+            assert(FinallyBlock);
+            // One exception is on the fly - new one is ignored, old one is thrown again.
+            try { FinallyBlock->Execute(ctx); }
+            catch(const ValueException&)
+                { throw err; }
+            catch(const ExecutionError&)
+                { throw err; }
+            throw err;
+        }
+        return;
     }
     catch(const BreakException&)
     {
@@ -1965,10 +1993,7 @@ void TryStatement::Execute(ExecuteContext& ctx) const
         throw;
     }
     catch(const ParsingError&)
-    {
-        assert(0 && "ParsingError not expected during execution.");
-    }
-
+        { assert(0 && "ParsingError not expected during execution."); }
     if(FinallyBlock)
         FinallyBlock->Execute(ctx);
 }
