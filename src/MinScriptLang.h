@@ -1411,6 +1411,16 @@ static shared_ptr<Array> CopyArray(const Array& src)
         dst->Items[i] = Value{src.Items[i]};
     return dst;
 }
+static shared_ptr<Object> ConvertExecutionErrorToObject(const ExecutionError& err)
+{
+    auto obj = std::make_shared<Object>();
+    obj->GetOrCreateValue("Type") = Value{"ExecutionError"};
+    obj->GetOrCreateValue("Index") = Value{(double)err.GetPlace().Index};
+    obj->GetOrCreateValue("Row") = Value{(double)err.GetPlace().Row};
+    obj->GetOrCreateValue("Column") = Value{(double)err.GetPlace().Column};
+    obj->GetOrCreateValue("Message") = Value{string{err.GetMessage_()}};
+    return obj;
+}
 static Value BuiltInTypeCtor_Null(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     EXECUTION_CHECK_PLACE(args.empty() || args.size() == 1 && args[0].GetType() == ValueType::Null, place, "Null can be constructed only from no arguments or from another null value.");
@@ -1948,14 +1958,8 @@ void TryStatement::Execute(ExecuteContext& ctx) const
     {
         if(CatchBlock)
         {
-            auto exObj = std::make_shared<Object>();
-            exObj->GetOrCreateValue("Type") = Value{"ExecutionError"};
-            exObj->GetOrCreateValue("Index") = Value{(double)err.GetPlace().Index};
-            exObj->GetOrCreateValue("Row") = Value{(double)err.GetPlace().Row};
-            exObj->GetOrCreateValue("Column") = Value{(double)err.GetPlace().Column};
-            exObj->GetOrCreateValue("Message") = Value{string{err.GetMessage_()}};
             Object& innermostCtxObj = ctx.GetInnermostScope();
-            Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, Value{std::move(exObj)});
+            Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, Value{ConvertExecutionErrorToObject(err)});
             CatchBlock->Execute(ctx);
             Assign(LValue{ObjectMemberLValue{&innermostCtxObj, ExceptionVarName}}, Value{});
             if(FinallyBlock)
