@@ -107,6 +107,17 @@ TEST_CASE("Basic")
         env.Execute(code);
         REQUIRE(env.GetOutput() == "14\n20\n");
     }
+    SECTION("Unary operators")
+    {
+        const char* code = "a=4; print(a, +a, -a);";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "4\n4\n-4\n");
+    }
+    SECTION("Unary plus on non-number") // To make sure it doesn't just pass-through any value.
+    {
+        const char* code = "a='AAA'; print(+a);";
+        REQUIRE_THROWS_AS( env.Execute(code), ExecutionError );
+    }
     SECTION("Curly brackets block")
     {
         const char* code = "print(1); { print(2); print(3); } print(4); { }";
