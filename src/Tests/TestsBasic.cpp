@@ -880,4 +880,27 @@ TEST_CASE("Basic")
         env.Execute(code);
         REQUIRE(env.GetOutput() == "1\n");
     }
+    SECTION("Return from global")
+    {
+        const char* code = "s='A'; print(s); return s;";
+        Value val = env.Execute(code);
+        REQUIRE(env.GetOutput() == "A\n");
+        REQUIRE(val.GetType() == ValueType::String);
+        REQUIRE(val.GetString() == "A");
+    }
+    // To make sure the memory is correct even after code finished executing.
+    SECTION("Return object from global")
+    {
+        const char* code = "s={a: 1, b: '2'}; print(s.a, s.b); return s;";
+        Value val = env.Execute(code);
+        REQUIRE(env.GetOutput() == "1\n2\n");
+        REQUIRE(val.GetType() == ValueType::Object);
+        const Object* obj = val.GetObject_();
+        REQUIRE(obj->TryGetValue("a") != nullptr);
+        REQUIRE(obj->TryGetValue("a")->GetType() == ValueType::Number);
+        REQUIRE(obj->TryGetValue("a")->GetNumber() == 1.0);
+        REQUIRE(obj->TryGetValue("b") != nullptr);
+        REQUIRE(obj->TryGetValue("b")->GetType() == ValueType::String);
+        REQUIRE(obj->TryGetValue("b")->GetString() == "2");
+    }
 }

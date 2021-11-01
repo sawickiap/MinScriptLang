@@ -75,11 +75,6 @@ TEST_CASE("Functions")
         env.Execute(code);
         REQUIRE(env.GetOutput() == "functionNotReturning\nnull\nfunctionReturningNull\nnull\nfunctionReturningSomething\n123\n");
     }
-    SECTION("Return without function")
-    {
-        const char* code = "return 2;";
-        REQUIRE_THROWS_AS( env.Execute(code), ExecutionError );
-    }
     SECTION("Syntactic sugar")
     {
         const char* code = "function add(a, b){ return a+b; }\n"

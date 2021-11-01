@@ -45,8 +45,10 @@ SOFTWARE.
 #include <string_view>
 #include <exception>
 #include <memory>
-#include <cstdint>
+#include <vector>
+#include <unordered_map>
 #include <variant>
+#include <cstdint>
 
 namespace MinScriptLang {
 
@@ -156,38 +158,8 @@ public:
         return std::get<ValueType>(m_Variant);
     }
 
-    bool IsEqual(const Value& rhs) const
-    {
-        if(m_Type != rhs.m_Type)
-            return false;
-        switch(m_Type)
-        {
-        case ValueType::Null:           return true;
-        case ValueType::Number:         return std::get<double>(m_Variant) == std::get<double>(rhs.m_Variant);
-        case ValueType::String:         return std::get<std::string>(m_Variant) == std::get<std::string>(rhs.m_Variant);
-        case ValueType::Function:       return std::get<const AST::FunctionDefinition*>(m_Variant) == std::get<const AST::FunctionDefinition*>(rhs.m_Variant);
-        case ValueType::SystemFunction: return std::get<SystemFunction>(m_Variant) == std::get<SystemFunction>(rhs.m_Variant);
-        case ValueType::Object:         return std::get<std::shared_ptr<Object>>(m_Variant).get() == std::get<std::shared_ptr<Object>>(rhs.m_Variant).get();
-        case ValueType::Array:          return std::get<std::shared_ptr<Array>>(m_Variant).get() == std::get<std::shared_ptr<Array>>(rhs.m_Variant).get();
-        case ValueType::Type:           return std::get<ValueType>(m_Variant) == std::get<ValueType>(rhs.m_Variant);
-        default: assert(0); return false;
-        }
-    }
-    bool IsTrue() const
-    {
-        switch(m_Type)
-        {
-        case ValueType::Null:           return false;
-        case ValueType::Number:         return std::get<double>(m_Variant) != 0.f;
-        case ValueType::String:         return !std::get<std::string>(m_Variant).empty();
-        case ValueType::Function:       return true;
-        case ValueType::SystemFunction: return true;
-        case ValueType::Object:         return true;
-        case ValueType::Array:          return true;
-        case ValueType::Type:           return std::get<ValueType>(m_Variant) != ValueType::Null;
-        default: assert(0); return false;
-        }
-    }
+    bool IsEqual(const Value& rhs) const;
+    bool IsTrue() const;
 
     void ChangeNumber(double number) { assert(m_Type == ValueType::Number); std::get<double>(m_Variant) = number; }
 
@@ -205,6 +177,26 @@ private:
     VariantType m_Variant;
 };
 
+class Object
+{
+public:
+    using MapType = std::unordered_map<std::string, Value>;
+    MapType m_Items;
+
+    size_t GetCount() const { return m_Items.size(); }
+    bool HasKey(const std::string& key) const { return m_Items.find(key) != m_Items.end(); }
+    Value& GetOrCreateValue(const std::string& key) { return m_Items[key]; }; // Creates new null value if doesn't exist.
+    Value* TryGetValue(const std::string& key); // Returns null if doesn't exist.
+    const Value* TryGetValue(const std::string& key) const; // Returns null if doesn't exist.
+    bool Remove(const std::string& key); // Returns true if has been found and removed.
+};
+
+class Array
+{
+public:
+    std::vector<Value> Items;
+};
+
 #define EXECUTION_CHECK(condition, place, errorMessage) \
     do { if(!(condition)) throw ExecutionError((place), (errorMessage)); } while(false)
 #define EXECUTION_FAIL(place, errorMessage) \
@@ -219,7 +211,7 @@ class Environment
 public:
     Environment();
     ~Environment();
-    void Execute(const std::string_view& code);
+    Value Execute(const std::string_view& code);
     const std::string& GetOutput() const;
 private:
     EnvironmentPimpl* pimpl;
@@ -246,9 +238,7 @@ private:
 /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
 
-#include <vector>
 #include <map>
-#include <unordered_map>
 #include <algorithm>
 #include <initializer_list>
 
@@ -321,7 +311,6 @@ static constexpr string_view ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST = "Object 
 static constexpr string_view ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
 static constexpr string_view ERROR_MESSAGE_BREAK_WITHOUT_LOOP = "Break without a loop.";
 static constexpr string_view ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP = "Continue without a loop.";
-static constexpr string_view ERROR_MESSAGE_RETURN_WITHOUT_FUNCTION = "Return without a function.";
 static constexpr string_view ERROR_MESSAGE_INCOMPATIBLE_TYPES = "Incompatible types.";
 static constexpr string_view ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS = "Index out of bounds.";
 static constexpr string_view ERROR_MESSAGE_PARAMETER_NAMES_MUST_BE_UNIQUE = "Parameter naems must be unique.";
@@ -458,6 +447,44 @@ static bool NumberToIndex(size_t& outIndex, double number)
 struct BreakException { };
 struct ContinueException { };
 
+
+////////////////////////////////////////////////////////////////////////////////
+// class Value definition
+
+bool Value::IsEqual(const Value& rhs) const
+{
+    if(m_Type != rhs.m_Type)
+        return false;
+    switch(m_Type)
+    {
+    case ValueType::Null:           return true;
+    case ValueType::Number:         return std::get<double>(m_Variant) == std::get<double>(rhs.m_Variant);
+    case ValueType::String:         return std::get<std::string>(m_Variant) == std::get<std::string>(rhs.m_Variant);
+    case ValueType::Function:       return std::get<const AST::FunctionDefinition*>(m_Variant) == std::get<const AST::FunctionDefinition*>(rhs.m_Variant);
+    case ValueType::SystemFunction: return std::get<SystemFunction>(m_Variant) == std::get<SystemFunction>(rhs.m_Variant);
+    case ValueType::Object:         return std::get<std::shared_ptr<Object>>(m_Variant).get() == std::get<std::shared_ptr<Object>>(rhs.m_Variant).get();
+    case ValueType::Array:          return std::get<std::shared_ptr<Array>>(m_Variant).get() == std::get<std::shared_ptr<Array>>(rhs.m_Variant).get();
+    case ValueType::Type:           return std::get<ValueType>(m_Variant) == std::get<ValueType>(rhs.m_Variant);
+    default: assert(0); return false;
+    }
+}
+
+bool Value::IsTrue() const
+{
+    switch(m_Type)
+    {
+    case ValueType::Null:           return false;
+    case ValueType::Number:         return std::get<double>(m_Variant) != 0.f;
+    case ValueType::String:         return !std::get<std::string>(m_Variant).empty();
+    case ValueType::Function:       return true;
+    case ValueType::SystemFunction: return true;
+    case ValueType::Object:         return true;
+    case ValueType::Array:          return true;
+    case ValueType::Type:           return std::get<ValueType>(m_Variant) != ValueType::Null;
+    default: assert(0); return false;
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // class CodeReader definition
 
@@ -531,28 +558,6 @@ static constexpr string_view SYSTEM_FUNCTION_NAMES[] = {
 };
 static_assert(_countof(SYSTEM_FUNCTION_NAMES) == (size_t)SystemFunction::Count);
 
-////////////////////////////////////////////////////////////////////////////////
-// class Object definition
-
-class Object
-{
-public:
-    using MapType = std::unordered_map<string, Value>;
-    MapType m_Items;
-
-    size_t GetCount() const { return m_Items.size(); }
-    bool HasKey(const string& key) const { return m_Items.find(key) != m_Items.end(); }
-    Value& GetOrCreateValue(const string& key) { return m_Items[key]; }; // Creates new null value if doesn't exist.
-    Value* TryGetValue(const string& key); // Returns null if doesn't exist.
-    bool Remove(const string& key); // Returns true if has been found and removed.
-};
-
-class Array
-{
-public:
-    vector<Value> Items;
-};
-
 struct ObjectMemberLValue
 {
     Object* Obj;
@@ -574,9 +579,6 @@ struct LValue : public std::variant<ObjectMemberLValue, StringCharacterLValue, A
     Value GetValue(const PlaceInCode& place) const;
 };
 
-////////////////////////////////////////////////////////////////////////////////
-// struct ReturnException definition
-
 struct ReturnException
 {
     const PlaceInCode Place;
@@ -584,7 +586,7 @@ struct ReturnException
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// Abstract Syntax Tree definitions
+// namespace AST
 
 namespace AST
 {
@@ -977,7 +979,7 @@ class EnvironmentPimpl
 public:
     EnvironmentPimpl() : m_Script{PlaceInCode{0, 1, 1}} { }
     ~EnvironmentPimpl() = default;
-    void Execute(const string_view& code);
+    Value Execute(const string_view& code);
     const string& GetOutput() const { return m_Output; }
     void Print(const string_view& s) { m_Output.append(s); }
 
@@ -1307,6 +1309,13 @@ bool Tokenizer::ParseString(Token& out)
 // class Object implementation
 
 Value* Object::TryGetValue(const string& key)
+{
+    auto it = m_Items.find(key);
+    if(it != m_Items.end())
+        return &it->second;
+    return nullptr;
+}
+const Value* Object::TryGetValue(const string& key) const
 {
     auto it = m_Items.find(key);
     if(it != m_Items.end())
@@ -3524,7 +3533,7 @@ string Parser::TryParseIdentifier()
 ////////////////////////////////////////////////////////////////////////////////
 // class EnvironmentPimpl implementation
 
-void EnvironmentPimpl::Execute(const string_view& code)
+Value EnvironmentPimpl::Execute(const string_view& code)
 {
     m_Script.Statements.clear();
 
@@ -3534,15 +3543,16 @@ void EnvironmentPimpl::Execute(const string_view& code)
         parser.ParseScript(m_Script);
     }
 
-    AST::ExecuteContext executeContext{*this, m_GlobalScope};
     try
     {
+        AST::ExecuteContext executeContext{*this, m_GlobalScope};
         m_Script.Execute(executeContext);
     }
-    catch(const ReturnException& returnEx)
+    catch(ReturnException& returnEx)
     {
-        throw ExecutionError(returnEx.Place, ERROR_MESSAGE_RETURN_WITHOUT_FUNCTION);
+        return std::move(returnEx.ThrownValue);
     }
+    return {};
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3550,7 +3560,7 @@ void EnvironmentPimpl::Execute(const string_view& code)
 
 Environment::Environment() : pimpl{new EnvironmentPimpl{}} { }
 Environment::~Environment() { delete pimpl; }
-void Environment::Execute(const string_view& code) { pimpl->Execute(code); }
+Value Environment::Execute(const string_view& code) { return pimpl->Execute(code); }
 const std::string& Environment::GetOutput() const { return pimpl->GetOutput(); }
 
 } // namespace MinScriptLang
