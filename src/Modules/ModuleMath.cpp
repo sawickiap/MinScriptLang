@@ -39,12 +39,23 @@ namespace ModuleMath
 
 using namespace MinScriptLang;
 
+static Value Func_abs(Environment&, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::Number,
+        place, "Function math.abs requires 1 number argument.");
+    return Value{abs(args[0].GetNumber())};
+}
+
 void Setup(MinScriptLang::Environment& targetEnv)
 {
     auto mathObj = std::make_shared<Object>();
     
-    mathObj->GetOrCreateValue("PI") = Value{3.14159265358979323846264338327950288419716939937510582};
-    mathObj->GetOrCreateValue("E") = Value{2.71828182845904523536};
+    // # Constants
+    mathObj->GetOrCreateValue("PI") = Value{PI};
+    mathObj->GetOrCreateValue("E") = Value{E};
+
+    // # Functions
+    mathObj->GetOrCreateValue("abs") = Value{Func_abs};
 
     targetEnv.GlobalScope.GetOrCreateValue("math") = Value{std::move(mathObj)};
 }

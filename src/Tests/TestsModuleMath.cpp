@@ -41,10 +41,16 @@ TEST_CASE("Module math")
 {
     Environment env;
     ModuleMath::Setup(env);
-    /*SECTION("Constants")
+    SECTION("abs")
     {
-        const char* code = "print(math.E, math.PI); \n";
+        const char* code = "a=-10; print(a, math.abs(a)); \n";
         env.Execute(code);
-        REQUIRE(env.GetOutput() == "\n");
-    }*/
+        REQUIRE(env.GetOutput() == "-10\n10\n");
+    }
+    SECTION("Constants")
+    {
+        const char* code = "print(math.abs(math.E - 2.71828182) < 1e-6, math.abs(math.PI - 3.14159265) < 1e-6); \n";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "1\n1\n");
+    }
 }

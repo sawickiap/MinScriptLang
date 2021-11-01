@@ -39,5 +39,10 @@ namespace MinScriptLang
 
 namespace ModuleMath
 {
-    void Setup(MinScriptLang::Environment& targetEnv);
+
+constexpr double PI = 3.14159265358979323846264338327950288419716939937510582;
+constexpr double E = 2.71828182845904523536;
+
+void Setup(MinScriptLang::Environment& targetEnv);
+
 } // namespace ModuleMath

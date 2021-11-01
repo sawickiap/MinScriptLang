@@ -90,11 +90,15 @@ private:
 };
 
 namespace AST { struct FunctionDefinition; }
+class Value;
 class Object;
 class Array;
+class Environment;
 enum class SystemFunction;
+
+using HostFunction = Value(Environment& env, const PlaceInCode& place, std::vector<Value>&& args);
     
-enum class ValueType { Null, Number, String, Function, SystemFunction, Object, Array, Type, Count };
+enum class ValueType { Null, Number, String, Function, SystemFunction, HostFunction, Object, Array, Type, Count };
 class Value
 {
 public:
@@ -103,6 +107,7 @@ public:
     Value(std::string&& str) : m_Type(ValueType::String), m_Variant(std::move(str)) { }
     Value(const AST::FunctionDefinition* func) : m_Type{ValueType::Function}, m_Variant{func} { }
     Value(SystemFunction func) : m_Type{ValueType::SystemFunction}, m_Variant{func} { }
+    Value(HostFunction func) : m_Type{ValueType::HostFunction}, m_Variant{func} { assert(func); }
     Value(std::shared_ptr<Object> &&obj) : m_Type{ValueType::Object}, m_Variant(obj) { }
     Value(std::shared_ptr<Array> &&arr) : m_Type{ValueType::Array}, m_Variant(arr) { }
     Value(ValueType typeVal) : m_Type{ValueType::Type}, m_Variant(typeVal) { }
@@ -132,6 +137,11 @@ public:
     {
         assert(m_Type == ValueType::SystemFunction);
         return std::get<SystemFunction>(m_Variant);
+    }
+    HostFunction* GetHostFunction() const
+    {
+        assert(m_Type == ValueType::HostFunction);
+        return std::get<HostFunction*>(m_Variant);
     }
     Object* GetObject_() const // Using underscore because the %^#& WinAPI defines GetObject as a macro.
     {
@@ -172,6 +182,7 @@ private:
         std::string, // ValueType::String
         const AST::FunctionDefinition*, // ValueType::Function
         SystemFunction, // ValueType::SystemFunction
+        HostFunction*, // ValueType::HostFunction
         std::shared_ptr<Object>, // ValueType::Object
         std::shared_ptr<Array>, // ValueType::Array
         ValueType>; // ValueType::Type
@@ -211,6 +222,7 @@ class Environment
 {
 public:
     Object GlobalScope;
+    void* UserData = nullptr;
 
     Environment();
     ~Environment();
@@ -322,7 +334,7 @@ static constexpr string_view ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT = "Repeating 
 static constexpr string_view ERROR_MESSAGE_STACK_OVERFLOW = "Stack overflow.";
 static constexpr string_view ERROR_MESSAGE_BASE_MUST_BE_OBJECT = "Base must be object.";
 
-static constexpr string_view VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Object", "Array", "Type" };
+static constexpr string_view VALUE_TYPE_NAMES[] = { "Null", "Number", "String", "Function", "Function", "Function", "Object", "Array", "Type" };
 static_assert(_countof(VALUE_TYPE_NAMES) == (size_t)ValueType::Count);
 
 enum class Symbol
@@ -464,6 +476,7 @@ bool Value::IsEqual(const Value& rhs) const
     case ValueType::String:         return std::get<std::string>(m_Variant) == std::get<std::string>(rhs.m_Variant);
     case ValueType::Function:       return std::get<const AST::FunctionDefinition*>(m_Variant) == std::get<const AST::FunctionDefinition*>(rhs.m_Variant);
     case ValueType::SystemFunction: return std::get<SystemFunction>(m_Variant) == std::get<SystemFunction>(rhs.m_Variant);
+    case ValueType::HostFunction:   return std::get<HostFunction*>(m_Variant) == std::get<HostFunction*>(rhs.m_Variant);
     case ValueType::Object:         return std::get<std::shared_ptr<Object>>(m_Variant).get() == std::get<std::shared_ptr<Object>>(rhs.m_Variant).get();
     case ValueType::Array:          return std::get<std::shared_ptr<Array>>(m_Variant).get() == std::get<std::shared_ptr<Array>>(rhs.m_Variant).get();
     case ValueType::Type:           return std::get<ValueType>(m_Variant) == std::get<ValueType>(rhs.m_Variant);
@@ -480,6 +493,7 @@ bool Value::IsTrue() const
     case ValueType::String:         return !std::get<std::string>(m_Variant).empty();
     case ValueType::Function:       return true;
     case ValueType::SystemFunction: return true;
+    case ValueType::HostFunction:   return true;
     case ValueType::Object:         return true;
     case ValueType::Array:          return true;
     case ValueType::Type:           return std::get<ValueType>(m_Variant) != ValueType::Null;
@@ -979,13 +993,15 @@ private:
 class EnvironmentPimpl
 {
 public:
-    EnvironmentPimpl(Object& globalScope) : m_GlobalScope{globalScope} { }
+    EnvironmentPimpl(Environment& owner, Object& globalScope) : m_Owner(owner), m_GlobalScope{globalScope} { }
     ~EnvironmentPimpl() = default;
+    Environment& GetOwner() { return m_Owner; }
     Value Execute(const string_view& code);
     const string& GetOutput() const { return m_Output; }
     void Print(const string_view& s) { m_Output.append(s); }
 
 private:
+    Environment& m_Owner;
     Object& m_GlobalScope;
     string m_Output;
 };
@@ -1476,6 +1492,7 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
             break;
         case ValueType::Function:
         case ValueType::SystemFunction:
+        case ValueType::HostFunction:
             ctx.Env.Print("function\n");
             break;
         case ValueType::Object:
@@ -2563,6 +2580,8 @@ Value CallOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
         }
         return {};
     }
+    if(callee.GetType() == ValueType::HostFunction)
+        return callee.GetHostFunction()(ctx.Env.GetOwner(), GetPlace(), std::move(arguments));
     if(callee.GetType() == ValueType::SystemFunction)
     {
         switch(callee.GetSystemFunction())
@@ -3558,7 +3577,7 @@ Value EnvironmentPimpl::Execute(const string_view& code)
 ////////////////////////////////////////////////////////////////////////////////
 // class Environment
 
-Environment::Environment() : pimpl{new EnvironmentPimpl{GlobalScope}} { }
+Environment::Environment() : pimpl{new EnvironmentPimpl{*this, GlobalScope}} { }
 Environment::~Environment() { delete pimpl; }
 Value Environment::Execute(const string_view& code) { return pimpl->Execute(code); }
 const std::string& Environment::GetOutput() const { return pimpl->GetOutput(); }
