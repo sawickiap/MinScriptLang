@@ -103,14 +103,14 @@ class Value
 {
 public:
     Value() { }
-    Value(double number) : m_Type(ValueType::Number), m_Variant(number) { }
-    Value(std::string&& str) : m_Type(ValueType::String), m_Variant(std::move(str)) { }
-    Value(const AST::FunctionDefinition* func) : m_Type{ValueType::Function}, m_Variant{func} { }
-    Value(SystemFunction func) : m_Type{ValueType::SystemFunction}, m_Variant{func} { }
-    Value(HostFunction func) : m_Type{ValueType::HostFunction}, m_Variant{func} { assert(func); }
-    Value(std::shared_ptr<Object> &&obj) : m_Type{ValueType::Object}, m_Variant(obj) { }
-    Value(std::shared_ptr<Array> &&arr) : m_Type{ValueType::Array}, m_Variant(arr) { }
-    Value(ValueType typeVal) : m_Type{ValueType::Type}, m_Variant(typeVal) { }
+    explicit Value(double number) : m_Type(ValueType::Number), m_Variant(number) { }
+    explicit Value(std::string&& str) : m_Type(ValueType::String), m_Variant(std::move(str)) { }
+    explicit Value(const AST::FunctionDefinition* func) : m_Type{ValueType::Function}, m_Variant{func} { }
+    explicit Value(SystemFunction func) : m_Type{ValueType::SystemFunction}, m_Variant{func} { }
+    explicit Value(HostFunction func) : m_Type{ValueType::HostFunction}, m_Variant{func} { assert(func); }
+    explicit Value(std::shared_ptr<Object> &&obj) : m_Type{ValueType::Object}, m_Variant(obj) { }
+    explicit Value(std::shared_ptr<Array> &&arr) : m_Type{ValueType::Array}, m_Variant(arr) { }
+    explicit Value(ValueType typeVal) : m_Type{ValueType::Type}, m_Variant(typeVal) { }
 
     ValueType GetType() const { return m_Type; }
     double GetNumber() const
@@ -564,12 +564,12 @@ private:
 // class Value definition
 
 enum class SystemFunction {
-    TypeOf, Print,
+    TypeOf, Print, Min, Max,
     Array_Add, Array_Insert, Array_Remove,
     Count
 };
 static constexpr string_view SYSTEM_FUNCTION_NAMES[] = {
-    "typeOf", "print",
+    "typeOf", "print", "min", "max",
     "add", "insert", "remove",
 };
 static_assert(_countof(SYSTEM_FUNCTION_NAMES) == (size_t)SystemFunction::Count);
@@ -1465,13 +1465,13 @@ static Value BuiltInTypeCtor_Type(AST::ExecuteContext& ctx, const PlaceInCode& p
     return Value{args[0]};
 }
 
-static Value BuiltInFunction_TypeOf(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+static Value BuiltInFunction_typeOf(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     MINSL_EXECUTION_CHECK(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
     return Value{args[0].GetType()};
 }
 
-static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+static Value BuiltInFunction_print(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     string s;
     for(const auto& val : args)
@@ -1514,6 +1514,34 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
     }
     return {};
 }
+static Value BuiltInFunction_min(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    const size_t argCount = args.size();
+    MINSL_EXECUTION_CHECK(argCount > 0, place, "Built-in function min requires at least 1 argument.");
+    double result = 0.0;
+    for(size_t i = 0; i < argCount; ++i)
+    {
+        MINSL_EXECUTION_CHECK(args[i].GetType() == ValueType::Number, place, "Built-in function min requires number arguments.");
+        const double argNum = args[i].GetNumber();
+        if(i == 0 || argNum < result)
+            result = argNum;
+    }
+    return Value{result};
+}
+static Value BuiltInFunction_max(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+{
+    const size_t argCount = args.size();
+    MINSL_EXECUTION_CHECK(argCount > 0, place, "Built-in function min requires at least 1 argument.");
+    double result = 0.0;
+    for(size_t i = 0; i < argCount; ++i)
+    {
+        MINSL_EXECUTION_CHECK(args[i].GetType() == ValueType::Number, place, "Built-in function min requires number arguments.");
+        const double argNum = args[i].GetNumber();
+        if(i == 0 || argNum > result)
+            result = argNum;
+    }
+    return Value{result};
+}
 
 static Value BuiltInMember_Object_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
@@ -1531,7 +1559,7 @@ static Value BuiltInMember_String_Count(AST::ExecuteContext& ctx, const PlaceInC
     return Value{(double)objVal.GetString().length()};
 }
 
-static Value BuiltInFunction_Array_Add(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
+static Value BuiltInFunction_Array_add(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
 {
     Array* arr = th.GetArray();
     MINSL_EXECUTION_CHECK(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
@@ -1539,7 +1567,7 @@ static Value BuiltInFunction_Array_Add(AST::ExecuteContext& ctx, const PlaceInCo
     arr->Items.push_back(std::move(args[0]));
     return {};
 }
-static Value BuiltInFunction_Array_Insert(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
+static Value BuiltInFunction_Array_insert(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
 {
     Array* arr = th.GetArray();
     MINSL_EXECUTION_CHECK(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
@@ -1549,7 +1577,7 @@ static Value BuiltInFunction_Array_Insert(AST::ExecuteContext& ctx, const PlaceI
     arr->Items.insert(arr->Items.begin() + index, std::move(args[1]));
     return {};
 }
-static Value BuiltInFunction_Array_Remove(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
+static Value BuiltInFunction_Array_remove(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
 {
     Array* arr = th.GetArray();
     MINSL_EXECUTION_CHECK(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
@@ -2586,11 +2614,13 @@ Value CallOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
     {
         switch(callee.GetSystemFunction())
         {
-        case SystemFunction::TypeOf: return BuiltInFunction_TypeOf(ctx, GetPlace(), std::move(arguments));
-        case SystemFunction::Print: return BuiltInFunction_Print(ctx, GetPlace(), std::move(arguments));
-        case SystemFunction::Array_Add: return BuiltInFunction_Array_Add(ctx, GetPlace(), th, std::move(arguments));
-        case SystemFunction::Array_Insert: return BuiltInFunction_Array_Insert(ctx, GetPlace(), th, std::move(arguments));
-        case SystemFunction::Array_Remove: return BuiltInFunction_Array_Remove(ctx, GetPlace(), th, std::move(arguments));
+        case SystemFunction::TypeOf: return BuiltInFunction_typeOf(ctx, GetPlace(), std::move(arguments));
+        case SystemFunction::Print: return BuiltInFunction_print(ctx, GetPlace(), std::move(arguments));
+        case SystemFunction::Min: return BuiltInFunction_min(ctx, GetPlace(), std::move(arguments));
+        case SystemFunction::Max: return BuiltInFunction_max(ctx, GetPlace(), std::move(arguments));
+        case SystemFunction::Array_Add: return BuiltInFunction_Array_add(ctx, GetPlace(), th, std::move(arguments));
+        case SystemFunction::Array_Insert: return BuiltInFunction_Array_insert(ctx, GetPlace(), th, std::move(arguments));
+        case SystemFunction::Array_Remove: return BuiltInFunction_Array_remove(ctx, GetPlace(), th, std::move(arguments));
         default: assert(0); return {};
         }
     }
@@ -3000,7 +3030,7 @@ unique_ptr<AST::ConstantValue> Parser::TryParseConstantValue()
         return make_unique<AST::ConstantValue>(t.Place, Value{t.Number});
     case Symbol::String:
         ++m_TokenIndex;
-        return make_unique<AST::ConstantValue>(t.Place, string(t.String));
+        return make_unique<AST::ConstantValue>(t.Place, Value{string(t.String)});
     case Symbol::Null:
         ++m_TokenIndex;
         return make_unique<AST::ConstantValue>(t.Place, Value{});

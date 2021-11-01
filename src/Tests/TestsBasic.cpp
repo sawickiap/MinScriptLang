@@ -924,4 +924,10 @@ TEST_CASE("Basic")
         REQUIRE(v->GetType() == ValueType::Number);
         REQUIRE(v->GetNumber() == 2.0);
     }
+    SECTION("Function min max")
+    {
+        const char* code = "a=[1, 2, 3]; print(min(a[0], a[1], a[2])); print(max(a[0], a[1], a[2]));";
+        env.Execute(code);
+        REQUIRE(env.GetOutput() == "1\n3\n");
+    }
 }
