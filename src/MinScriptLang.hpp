@@ -30,8 +30,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-#ifndef MIN_SCRIPT_LANG_H
-#define MIN_SCRIPT_LANG_H
+#ifndef MINLS_H
+#define MINLS_H
 
 /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
@@ -209,9 +209,9 @@ public:
     std::vector<Value> Items;
 };
 
-#define EXECUTION_CHECK(condition, place, errorMessage) \
+#define MINSL_EXECUTION_CHECK(condition, place, errorMessage) \
     do { if(!(condition)) throw ExecutionError((place), (errorMessage)); } while(false)
-#define EXECUTION_FAIL(place, errorMessage) \
+#define MINSL_EXECUTION_FAIL(place, errorMessage) \
     do { throw ExecutionError((place), (errorMessage)); } while(false)
 
 std::string VFormat(const char* format, va_list argList);
@@ -234,16 +234,16 @@ private:
 
 } // namespace MinScriptLang
 
-#endif // #ifndef MIN_SCRIPT_LANG_H
+#endif // #ifndef MINLS_H
 
 
 
 // For Visual Studio IntelliSense.
 #ifdef __INTELLISENSE__
-#define MIN_SCRIPT_LANG_IMPLEMENTATION
+#define MINSL_IMPLEMENTATION
 #endif
 
-#ifdef MIN_SCRIPT_LANG_IMPLEMENTATION
+#ifdef MINSL_IMPLEMENTATION
 
 /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
@@ -793,7 +793,7 @@ struct Expression : Statement
 {
     explicit Expression(const PlaceInCode& place) : Statement{place} { }
     virtual Value Evaluate(ExecuteContext& ctx, ThisType* outThis) const { return GetLValue(ctx).GetValue(GetPlace()); }
-    virtual LValue GetLValue(ExecuteContext& ctx) const { EXECUTION_CHECK( false, GetPlace(), ERROR_MESSAGE_EXPECTED_LVALUE ); }
+    virtual LValue GetLValue(ExecuteContext& ctx) const { MINSL_EXECUTION_CHECK( false, GetPlace(), ERROR_MESSAGE_EXPECTED_LVALUE ); }
     virtual void Execute(ExecuteContext& ctx) const { Evaluate(ctx, nullptr); }
 };
 
@@ -937,7 +937,7 @@ struct ArrayExpression : public Expression
 
 static inline void CheckNumberOperand(const AST::Expression* operand, const Value& value)
 {
-    EXECUTION_CHECK( value.GetType() == ValueType::Number, operand->GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
+    MINSL_EXECUTION_CHECK( value.GetType() == ValueType::Number, operand->GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1360,14 +1360,14 @@ Value* LValue::GetValueRef(const PlaceInCode& place) const
     {
         if(Value* val = objMemberLval->Obj->TryGetValue(objMemberLval->Key))
             return val;
-        EXECUTION_FAIL(place, ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST);
+        MINSL_EXECUTION_FAIL(place, ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST);
     }
     if(const ArrayItemLValue* arrItemLval = std::get_if<ArrayItemLValue>(this))
     {
-        EXECUTION_CHECK(arrItemLval->Index < arrItemLval->Arr->Items.size(), place, ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
+        MINSL_EXECUTION_CHECK(arrItemLval->Index < arrItemLval->Arr->Items.size(), place, ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
         return &arrItemLval->Arr->Items[arrItemLval->Index];
     }
-    EXECUTION_FAIL(place, ERROR_MESSAGE_INVALID_LVALUE);
+    MINSL_EXECUTION_FAIL(place, ERROR_MESSAGE_INVALID_LVALUE);
 }
 
 Value LValue::GetValue(const PlaceInCode& place) const
@@ -1376,17 +1376,17 @@ Value LValue::GetValue(const PlaceInCode& place) const
     {
         if(const Value* val = objMemberLval->Obj->TryGetValue(objMemberLval->Key))
             return *val;
-        EXECUTION_FAIL(place, ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST);
+        MINSL_EXECUTION_FAIL(place, ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST);
     }
     if(const StringCharacterLValue* strCharLval = std::get_if<StringCharacterLValue>(this))
     {
-        EXECUTION_CHECK(strCharLval->Index < strCharLval->Str->length(), place, ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
+        MINSL_EXECUTION_CHECK(strCharLval->Index < strCharLval->Str->length(), place, ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
         const char ch = (*strCharLval->Str)[strCharLval->Index];
         return Value{string{&ch, &ch + 1}};
     }
     if(const ArrayItemLValue* arrItemLval = std::get_if<ArrayItemLValue>(this))
     {
-        EXECUTION_CHECK(arrItemLval->Index < arrItemLval->Arr->Items.size(), place, ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
+        MINSL_EXECUTION_CHECK(arrItemLval->Index < arrItemLval->Arr->Items.size(), place, ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS);
         return Value{arrItemLval->Arr->Items[arrItemLval->Index]};
     }
     assert(0);
@@ -1424,50 +1424,50 @@ static shared_ptr<Object> ConvertExecutionErrorToObject(const ExecutionError& er
 }
 static Value BuiltInTypeCtor_Null(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
-    EXECUTION_CHECK(args.empty() || args.size() == 1 && args[0].GetType() == ValueType::Null, place, "Null can be constructed only from no arguments or from another null value.");
+    MINSL_EXECUTION_CHECK(args.empty() || args.size() == 1 && args[0].GetType() == ValueType::Null, place, "Null can be constructed only from no arguments or from another null value.");
     return {};
 }
 static Value BuiltInTypeCtor_Number(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
-    EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::Number, place, "Number can be constructed only from another number.");
+    MINSL_EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::Number, place, "Number can be constructed only from another number.");
     return Value{args[0].GetNumber()};
 }
 static Value BuiltInTypeCtor_String(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     if(args.empty())
         return Value{string{}};
-    EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::String, place, "String can be constructed only from no arguments or from another string value.");
+    MINSL_EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::String, place, "String can be constructed only from no arguments or from another string value.");
     return Value{string{args[0].GetString()}};
 }
 static Value BuiltInTypeCtor_Object(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     if(args.empty())
         return Value{std::make_shared<Object>()};
-    EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::Object, place, "Object can be constructed only from no arguments or from another object value.");
+    MINSL_EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::Object, place, "Object can be constructed only from no arguments or from another object value.");
     return Value{CopyObject(*args[0].GetObject_())};
 }
 static Value BuiltInTypeCtor_Array(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
     if(args.empty())
         return Value{std::make_shared<Array>()};
-    EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::Array, place, "Array can be constructed only from no arguments or from another array value.");
+    MINSL_EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::Array, place, "Array can be constructed only from no arguments or from another array value.");
     return Value{CopyArray(*args[0].GetArray())};
 }
 static Value BuiltInTypeCtor_Function(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
-    EXECUTION_CHECK(args.size() == 1 && (args[0].GetType() == ValueType::Function || args[0].GetType() == ValueType::SystemFunction),
+    MINSL_EXECUTION_CHECK(args.size() == 1 && (args[0].GetType() == ValueType::Function || args[0].GetType() == ValueType::SystemFunction),
         place, "Function can be constructed only from another function value.");
     return Value{args[0]};
 }
 static Value BuiltInTypeCtor_Type(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
-    EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::Type, place, "Type can be constructed only from another type value.");
+    MINSL_EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::Type, place, "Type can be constructed only from another type value.");
     return Value{args[0]};
 }
 
 static Value BuiltInFunction_TypeOf(AST::ExecuteContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
 {
-    EXECUTION_CHECK(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
+    MINSL_EXECUTION_CHECK(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
     return Value{args[0].GetType()};
 }
 
@@ -1517,45 +1517,45 @@ static Value BuiltInFunction_Print(AST::ExecuteContext& ctx, const PlaceInCode& 
 
 static Value BuiltInMember_Object_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
-    EXECUTION_CHECK(objVal.GetType() == ValueType::Object && objVal.GetObject_(), place, ERROR_MESSAGE_EXPECTED_OBJECT);
+    MINSL_EXECUTION_CHECK(objVal.GetType() == ValueType::Object && objVal.GetObject_(), place, ERROR_MESSAGE_EXPECTED_OBJECT);
     return Value{(double)objVal.GetObject_()->GetCount()};
 }
 static Value BuiltInMember_Array_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
-    EXECUTION_CHECK(objVal.GetType() == ValueType::Array && objVal.GetArray(), place, ERROR_MESSAGE_EXPECTED_ARRAY);
+    MINSL_EXECUTION_CHECK(objVal.GetType() == ValueType::Array && objVal.GetArray(), place, ERROR_MESSAGE_EXPECTED_ARRAY);
     return Value{(double)objVal.GetArray()->Items.size()};
 }
 static Value BuiltInMember_String_Count(AST::ExecuteContext& ctx, const PlaceInCode& place, Value&& objVal)
 {
-    EXECUTION_CHECK(objVal.GetType() == ValueType::String, place, ERROR_MESSAGE_EXPECTED_STRING);
+    MINSL_EXECUTION_CHECK(objVal.GetType() == ValueType::String, place, ERROR_MESSAGE_EXPECTED_STRING);
     return Value{(double)objVal.GetString().length()};
 }
 
 static Value BuiltInFunction_Array_Add(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
 {
     Array* arr = th.GetArray();
-    EXECUTION_CHECK(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
-    EXECUTION_CHECK(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
+    MINSL_EXECUTION_CHECK(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
+    MINSL_EXECUTION_CHECK(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
     arr->Items.push_back(std::move(args[0]));
     return {};
 }
 static Value BuiltInFunction_Array_Insert(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
 {
     Array* arr = th.GetArray();
-    EXECUTION_CHECK(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
-    EXECUTION_CHECK(args.size() == 2, place, ERROR_MESSAGE_EXPECTED_2_ARGUMENTS);
+    MINSL_EXECUTION_CHECK(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
+    MINSL_EXECUTION_CHECK(args.size() == 2, place, ERROR_MESSAGE_EXPECTED_2_ARGUMENTS);
     size_t index = 0;
-    EXECUTION_CHECK(args[0].GetType() == ValueType::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
+    MINSL_EXECUTION_CHECK(args[0].GetType() == ValueType::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
     arr->Items.insert(arr->Items.begin() + index, std::move(args[1]));
     return {};
 }
 static Value BuiltInFunction_Array_Remove(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
 {
     Array* arr = th.GetArray();
-    EXECUTION_CHECK(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
-    EXECUTION_CHECK(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
+    MINSL_EXECUTION_CHECK(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
+    MINSL_EXECUTION_CHECK(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
     size_t index = 0;
-    EXECUTION_CHECK(args[0].GetType() == ValueType::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
+    MINSL_EXECUTION_CHECK(args[0].GetType() == ValueType::Number && NumberToIndex(index, args[0].GetNumber()), place, ERROR_MESSAGE_INVALID_INDEX);
     arr->Items.erase(arr->Items.begin() + index);
     return {};
 }
@@ -1579,14 +1579,14 @@ void Statement::Assign(const LValue& lhs, Value&& rhs) const
     }
     else if(const ArrayItemLValue* arrItemLhs = std::get_if<ArrayItemLValue>(&lhs))
     {
-        EXECUTION_CHECK( arrItemLhs->Index < arrItemLhs->Arr->Items.size(), GetPlace(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
+        MINSL_EXECUTION_CHECK( arrItemLhs->Index < arrItemLhs->Arr->Items.size(), GetPlace(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
         arrItemLhs->Arr->Items[arrItemLhs->Index] = std::move(rhs);
     }
     else if(const StringCharacterLValue* strCharLhs = std::get_if<StringCharacterLValue>(&lhs))
     {
-        EXECUTION_CHECK( strCharLhs->Index < strCharLhs->Str->length(), GetPlace(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
-        EXECUTION_CHECK( rhs.GetType() == ValueType::String, GetPlace(), ERROR_MESSAGE_EXPECTED_STRING );
-        EXECUTION_CHECK( rhs.GetString().length() == 1, GetPlace(), ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING );
+        MINSL_EXECUTION_CHECK( strCharLhs->Index < strCharLhs->Str->length(), GetPlace(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
+        MINSL_EXECUTION_CHECK( rhs.GetType() == ValueType::String, GetPlace(), ERROR_MESSAGE_EXPECTED_STRING );
+        MINSL_EXECUTION_CHECK( rhs.GetString().length() == 1, GetPlace(), ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING );
         (*strCharLhs->Str)[strCharLhs->Index] = rhs.GetString()[0];
     }
     else
@@ -1797,7 +1797,7 @@ void RangeBasedForLoop::Execute(ExecuteContext& ctx) const
         }
     }
     else
-        EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
+        MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
 
     if(useKey)
         Assign(LValue{ObjectMemberLValue{&innermostCtxObj, KeyVarName}}, Value{});
@@ -2040,7 +2040,7 @@ void Identifier::DebugPrint(uint32_t indentLevel, const string_view& prefix) con
 
 Value Identifier::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
 {
-    EXECUTION_CHECK(Scope != IdentifierScope::Local || ctx.IsLocal(), GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
+    MINSL_EXECUTION_CHECK(Scope != IdentifierScope::Local || ctx.IsLocal(), GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
 
     if(ctx.IsLocal())
     {
@@ -2086,7 +2086,7 @@ Value Identifier::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
 LValue Identifier::GetLValue(ExecuteContext& ctx) const
 {
     const bool isLocal = ctx.IsLocal();
-    EXECUTION_CHECK(Scope != IdentifierScope::Local || isLocal, GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
+    MINSL_EXECUTION_CHECK(Scope != IdentifierScope::Local || isLocal, GetPlace(), ERROR_MESSAGE_NO_LOCAL_SCOPE);
 
     if(isLocal)
     {
@@ -2118,7 +2118,7 @@ void ThisExpression::DebugPrint(uint32_t indentLevel, const string_view& prefix)
 
 Value ThisExpression::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
 {
-    EXECUTION_CHECK(ctx.IsLocal() && std::get_if<shared_ptr<Object>>(&ctx.GetThis()), GetPlace(), ERROR_MESSAGE_NO_THIS);
+    MINSL_EXECUTION_CHECK(ctx.IsLocal() && std::get_if<shared_ptr<Object>>(&ctx.GetThis()), GetPlace(), ERROR_MESSAGE_NO_THIS);
     return Value{shared_ptr<Object>{*std::get_if<shared_ptr<Object>>(&ctx.GetThis())}};
 }
 
@@ -2142,7 +2142,7 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
         Type == UnaryOperatorType::Postdecrementation)
     {
         Value* val = Operand->GetLValue(ctx).GetValueRef(GetPlace());
-        EXECUTION_CHECK( val->GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
+        MINSL_EXECUTION_CHECK( val->GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
         {
         case UnaryOperatorType::Preincrementation: val->ChangeNumber(val->GetNumber() + 1.0); return *val;
@@ -2169,7 +2169,7 @@ Value UnaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
         Type == UnaryOperatorType::BitwiseNot)
     {
         Value val = Operand->Evaluate(ctx, nullptr);
-        EXECUTION_CHECK( val.GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
+        MINSL_EXECUTION_CHECK( val.GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
         {
         case UnaryOperatorType::Plus: return val;
@@ -2188,10 +2188,10 @@ LValue UnaryOperator::GetLValue(ExecuteContext& ctx) const
     {
         LValue lval = Operand->GetLValue(ctx);
         const ObjectMemberLValue* objMemberLval = std::get_if<ObjectMemberLValue>(&lval);
-        EXECUTION_CHECK( objMemberLval, GetPlace(), ERROR_MESSAGE_INVALID_LVALUE );
+        MINSL_EXECUTION_CHECK( objMemberLval, GetPlace(), ERROR_MESSAGE_INVALID_LVALUE );
         Value* val = objMemberLval->Obj->TryGetValue(objMemberLval->Key);
-        EXECUTION_CHECK( val != nullptr, GetPlace(), ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
-        EXECUTION_CHECK( val->GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
+        MINSL_EXECUTION_CHECK( val != nullptr, GetPlace(), ERROR_MESSAGE_VARIABLE_DOESNT_EXIST );
+        MINSL_EXECUTION_CHECK( val->GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
         switch(Type)
         {
         case UnaryOperatorType::Preincrementation: val->ChangeNumber(val->GetNumber() + 1.0); return lval;
@@ -2199,7 +2199,7 @@ LValue UnaryOperator::GetLValue(ExecuteContext& ctx) const
         default: assert(0);
         }
     }
-    EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_LVALUE);
+    MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_LVALUE);
 }
 
 void MemberAccessOperator::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
@@ -2228,7 +2228,7 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) con
     {
         if(MemberName == "count")
             return BuiltInMember_String_Count(ctx, GetPlace(), std::move(objVal));
-        EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_MEMBER);
+        MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_MEMBER);
     }
     if(objVal.GetType() == ValueType::Array)
     {
@@ -2238,15 +2238,15 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) con
         else if(MemberName == "add") return Value{SystemFunction::Array_Add};
         else if(MemberName == "insert") return Value{SystemFunction::Array_Insert};
         else if(MemberName == "remove") return Value{SystemFunction::Array_Remove};
-        EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_MEMBER);
+        MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_MEMBER);
     }
-    EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
+    MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
 }
 
 LValue MemberAccessOperator::GetLValue(ExecuteContext& ctx) const
 {
     Value objVal = Operand->Evaluate(ctx, nullptr);
-    EXECUTION_CHECK(objVal.GetType() == ValueType::Object, GetPlace(), ERROR_MESSAGE_EXPECTED_OBJECT);
+    MINSL_EXECUTION_CHECK(objVal.GetType() == ValueType::Object, GetPlace(), ERROR_MESSAGE_EXPECTED_OBJECT);
     return LValue{ObjectMemberLValue{objVal.GetObject_(), MemberName}};
 }
 
@@ -2329,7 +2329,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
             return Value{lhs.GetNumber() + rhs.GetNumber()};
         if(lhsType == ValueType::String && rhsType == ValueType::String)
             return Value{lhs.GetString() + rhs.GetString()};
-        EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
+        MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
     }
     if(Type == BinaryOperatorType::Equal)
     {
@@ -2343,7 +2343,7 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
         Type == BinaryOperatorType::Greater || Type == BinaryOperatorType::GreaterEqual)
     {
         bool result = false;
-        EXECUTION_CHECK( lhsType == rhsType, GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES );
+        MINSL_EXECUTION_CHECK( lhsType == rhsType, GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES );
         if(lhsType == ValueType::Number)
         {
             switch(Type)
@@ -2367,22 +2367,22 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
             }
         }
         else
-            EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
+            MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
         return Value{result ? 1.0 : 0.0};
     }
     if(Type == BinaryOperatorType::Indexing)
     {
         if(lhsType == ValueType::String)
         {
-            EXECUTION_CHECK( rhsType == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
+            MINSL_EXECUTION_CHECK( rhsType == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
             size_t index = 0;
-            EXECUTION_CHECK( NumberToIndex(index, rhs.GetNumber()), GetPlace(), ERROR_MESSAGE_INVALID_INDEX );
-            EXECUTION_CHECK( index < lhs.GetString().length(), GetPlace(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
+            MINSL_EXECUTION_CHECK( NumberToIndex(index, rhs.GetNumber()), GetPlace(), ERROR_MESSAGE_INVALID_INDEX );
+            MINSL_EXECUTION_CHECK( index < lhs.GetString().length(), GetPlace(), ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS );
             return Value{string(1, lhs.GetString()[index])};
         }
         if(lhsType == ValueType::Object)
         {
-            EXECUTION_CHECK( rhsType == ValueType::String, GetPlace(), ERROR_MESSAGE_EXPECTED_STRING );
+            MINSL_EXECUTION_CHECK( rhsType == ValueType::String, GetPlace(), ERROR_MESSAGE_EXPECTED_STRING );
             if(Value* val = lhs.GetObject_()->TryGetValue(rhs.GetString()))
             {
                 if(outThis)
@@ -2393,12 +2393,12 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
         }
         if(lhsType == ValueType::Array)
         {
-            EXECUTION_CHECK( rhsType == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
+            MINSL_EXECUTION_CHECK( rhsType == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
             size_t index;
-            EXECUTION_CHECK( NumberToIndex(index, rhs.GetNumber()) && index < lhs.GetArray()->Items.size(), GetPlace(), ERROR_MESSAGE_INVALID_INDEX );
+            MINSL_EXECUTION_CHECK( NumberToIndex(index, rhs.GetNumber()) && index < lhs.GetArray()->Items.size(), GetPlace(), ERROR_MESSAGE_INVALID_INDEX );
             return lhs.GetArray()->Items[index];
         }
-        EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
+        MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
     }
 
     // Remaining operators require numbers.
@@ -2429,21 +2429,21 @@ LValue BinaryOperator::GetLValue(ExecuteContext& ctx) const
         const Value indexVal = Operands[1]->Evaluate(ctx, nullptr);
         if(leftValRef->GetType() == ValueType::String)
         {
-            EXECUTION_CHECK( indexVal.GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
+            MINSL_EXECUTION_CHECK( indexVal.GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
             size_t charIndex;
-            EXECUTION_CHECK( NumberToIndex(charIndex, indexVal.GetNumber()), GetPlace(), ERROR_MESSAGE_INVALID_INDEX );
+            MINSL_EXECUTION_CHECK( NumberToIndex(charIndex, indexVal.GetNumber()), GetPlace(), ERROR_MESSAGE_INVALID_INDEX );
             return LValue{StringCharacterLValue{&leftValRef->GetString(), charIndex}};
         }
         if(leftValRef->GetType() == ValueType::Object)
         {
-            EXECUTION_CHECK( indexVal.GetType() == ValueType::String, GetPlace(), ERROR_MESSAGE_EXPECTED_STRING );
+            MINSL_EXECUTION_CHECK( indexVal.GetType() == ValueType::String, GetPlace(), ERROR_MESSAGE_EXPECTED_STRING );
             return LValue{ObjectMemberLValue{leftValRef->GetObject_(), indexVal.GetString()}};
         }
         if(leftValRef->GetType() == ValueType::Array)
         {
-            EXECUTION_CHECK( indexVal.GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
+            MINSL_EXECUTION_CHECK( indexVal.GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
             size_t itemIndex;
-            EXECUTION_CHECK( NumberToIndex(itemIndex, indexVal.GetNumber()), GetPlace(), ERROR_MESSAGE_INVALID_INDEX );
+            MINSL_EXECUTION_CHECK( NumberToIndex(itemIndex, indexVal.GetNumber()), GetPlace(), ERROR_MESSAGE_INVALID_INDEX );
             return LValue{ArrayItemLValue{leftValRef->GetArray(), itemIndex}};
         }
     }
@@ -2485,13 +2485,13 @@ Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
         else if(lhsValPtr->GetType() == ValueType::String && rhs.GetType() == ValueType::String)
             lhsValPtr->GetString() += rhs.GetString();
         else
-            EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
+            MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INCOMPATIBLE_TYPES);
         return *lhsValPtr;
     }
 
     // Remaining ones work on numbers only.
-    EXECUTION_CHECK( lhsValPtr->GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
-    EXECUTION_CHECK( rhs.GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER);
+    MINSL_EXECUTION_CHECK( lhsValPtr->GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER );
+    MINSL_EXECUTION_CHECK( rhs.GetType() == ValueType::Number, GetPlace(), ERROR_MESSAGE_EXPECTED_NUMBER);
     switch(Type)
     {
     case BinaryOperatorType::AssignmentSub: lhsValPtr->ChangeNumber(lhsValPtr->GetNumber() - rhs.GetNumber()); break;
@@ -2556,7 +2556,7 @@ Value CallOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
     if(callee.GetType() == ValueType::Function)
     {
         const AST::FunctionDefinition* const funcDef = callee.GetFunction();
-        EXECUTION_CHECK( argCount == funcDef->Parameters.size(), GetPlace(), ERROR_MESSAGE_INVALID_NUMBER_OF_ARGUMENTS );
+        MINSL_EXECUTION_CHECK( argCount == funcDef->Parameters.size(), GetPlace(), ERROR_MESSAGE_INVALID_NUMBER_OF_ARGUMENTS );
         Object localScope;
         // Setup parameters
         for(size_t argIndex = 0; argIndex != argCount; ++argIndex)
@@ -2572,11 +2572,11 @@ Value CallOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
         }
         catch(BreakException)
         {
-            EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_BREAK_WITHOUT_LOOP);
+            MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_BREAK_WITHOUT_LOOP);
         }
         catch(ContinueException)
         {
-            EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP);
+            MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP);
         }
         return {};
     }
@@ -2611,7 +2611,7 @@ Value CallOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
         }
     }
 
-    EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_FUNCTION);
+    MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_FUNCTION);
 }
 
 void FunctionDefinition::DebugPrint(uint32_t indentLevel, const string_view& prefix) const
@@ -3584,4 +3584,4 @@ const std::string& Environment::GetOutput() const { return pimpl->GetOutput(); }
 
 } // namespace MinScriptLang
 
-#endif // MIN_SCRIPT_LANG_IMPLEMENTATION
+#endif // MINSL_IMPLEMENTATION

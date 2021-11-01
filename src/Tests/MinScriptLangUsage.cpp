@@ -32,5 +32,5 @@ SOFTWARE.
 */
 #include "PCH.hpp"
 
-#define MIN_SCRIPT_LANG_IMPLEMENTATION
+#define MINSL_IMPLEMENTATION
 #include "../MinScriptLang.hpp"

@@ -41,7 +41,7 @@ using namespace MinScriptLang;
 
 static Value Func_abs(Environment&, const PlaceInCode& place, std::vector<Value>&& args)
 {
-    EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::Number,
+    MINSL_EXECUTION_CHECK(args.size() == 1 && args[0].GetType() == ValueType::Number,
         place, "Function math.abs requires 1 number argument.");
     return Value{abs(args[0].GetNumber())};
 }
