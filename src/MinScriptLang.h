@@ -210,6 +210,8 @@ class EnvironmentPimpl;
 class Environment
 {
 public:
+    Object GlobalScope;
+
     Environment();
     ~Environment();
     Value Execute(const std::string_view& code);
@@ -977,14 +979,14 @@ private:
 class EnvironmentPimpl
 {
 public:
-    EnvironmentPimpl() { }
+    EnvironmentPimpl(Object& globalScope) : m_GlobalScope{globalScope} { }
     ~EnvironmentPimpl() = default;
     Value Execute(const string_view& code);
     const string& GetOutput() const { return m_Output; }
     void Print(const string_view& s) { m_Output.append(s); }
 
 private:
-    Object m_GlobalScope;
+    Object& m_GlobalScope;
     string m_Output;
 };
 
@@ -3556,7 +3558,7 @@ Value EnvironmentPimpl::Execute(const string_view& code)
 ////////////////////////////////////////////////////////////////////////////////
 // class Environment
 
-Environment::Environment() : pimpl{new EnvironmentPimpl{}} { }
+Environment::Environment() : pimpl{new EnvironmentPimpl{GlobalScope}} { }
 Environment::~Environment() { delete pimpl; }
 Value Environment::Execute(const string_view& code) { return pimpl->Execute(code); }
 const std::string& Environment::GetOutput() const { return pimpl->GetOutput(); }
