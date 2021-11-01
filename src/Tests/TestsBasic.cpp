@@ -911,4 +911,17 @@ TEST_CASE("Basic")
         env.Execute(code);
         REQUIRE(env.GetOutput() == "A\nB\n");
     }
+    SECTION("Retrieving global state after execution")
+    {
+        const char* code = "a=1; function f() { global.b=2; } f();";
+        env.Execute(code);
+        const Value* v = env.GlobalScope.TryGetValue("a");
+        REQUIRE(v != nullptr);
+        REQUIRE(v->GetType() == ValueType::Number);
+        REQUIRE(v->GetNumber() == 1.0);
+        v = env.GlobalScope.TryGetValue("b");
+        REQUIRE(v != nullptr);
+        REQUIRE(v->GetType() == ValueType::Number);
+        REQUIRE(v->GetNumber() == 2.0);
+    }
 }
