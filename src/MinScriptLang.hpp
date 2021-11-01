@@ -615,11 +615,13 @@ private:
 
 enum class SystemFunction {
     TypeOf, Print, Min, Max,
-    Array_Add, Array_Insert, Array_Remove,
+    String_resize,
+    Array_add, Array_insert, Array_remove,
     Count
 };
 static constexpr string_view SYSTEM_FUNCTION_NAMES[] = {
     "typeOf", "print", "min", "max",
+    "resize",
     "add", "insert", "remove",
 };
 static_assert(_countof(SYSTEM_FUNCTION_NAMES) == (size_t)SystemFunction::Count);
@@ -1611,7 +1613,11 @@ static Value BuiltInMember_String_Count(AST::ExecuteContext& ctx, const PlaceInC
     MINSL_EXECUTION_CHECK(objVal.GetType() == ValueType::String, place, ERROR_MESSAGE_EXPECTED_STRING);
     return Value{(double)objVal.GetString().length()};
 }
-
+static Value BuiltInFunction_String_resize(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
+{
+    // TODO
+    return {};
+}
 static Value BuiltInFunction_Array_add(AST::ExecuteContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
 {
     Array* arr = th.GetArray();
@@ -2307,8 +2313,8 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) con
     }
     if(objVal.GetType() == ValueType::String)
     {
-        if(MemberName == "count")
-            return BuiltInMember_String_Count(ctx, GetPlace(), std::move(objVal));
+        if(MemberName == "count") return BuiltInMember_String_Count(ctx, GetPlace(), std::move(objVal));
+        else if(MemberName == "resize") return Value{SystemFunction::String_resize};
         MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_MEMBER);
     }
     if(objVal.GetType() == ValueType::Array)
@@ -2316,9 +2322,9 @@ Value MemberAccessOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) con
         if(outThis)
             *outThis = ThisType{objVal.GetArrayPtr()};
         if(MemberName == "count") return BuiltInMember_Array_Count(ctx, GetPlace(), std::move(objVal));
-        else if(MemberName == "add") return Value{SystemFunction::Array_Add};
-        else if(MemberName == "insert") return Value{SystemFunction::Array_Insert};
-        else if(MemberName == "remove") return Value{SystemFunction::Array_Remove};
+        else if(MemberName == "add") return Value{SystemFunction::Array_add};
+        else if(MemberName == "insert") return Value{SystemFunction::Array_insert};
+        else if(MemberName == "remove") return Value{SystemFunction::Array_remove};
         MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_MEMBER);
     }
     MINSL_EXECUTION_FAIL(GetPlace(), ERROR_MESSAGE_INVALID_TYPE);
@@ -2671,9 +2677,10 @@ Value CallOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
         case SystemFunction::Print: return BuiltInFunction_print(ctx, GetPlace(), std::move(arguments));
         case SystemFunction::Min: return BuiltInFunction_min(ctx, GetPlace(), std::move(arguments));
         case SystemFunction::Max: return BuiltInFunction_max(ctx, GetPlace(), std::move(arguments));
-        case SystemFunction::Array_Add: return BuiltInFunction_Array_add(ctx, GetPlace(), th, std::move(arguments));
-        case SystemFunction::Array_Insert: return BuiltInFunction_Array_insert(ctx, GetPlace(), th, std::move(arguments));
-        case SystemFunction::Array_Remove: return BuiltInFunction_Array_remove(ctx, GetPlace(), th, std::move(arguments));
+        case SystemFunction::String_resize: return BuiltInFunction_String_resize(ctx, GetPlace(), th, std::move(arguments));
+        case SystemFunction::Array_add: return BuiltInFunction_Array_add(ctx, GetPlace(), th, std::move(arguments));
+        case SystemFunction::Array_insert: return BuiltInFunction_Array_insert(ctx, GetPlace(), th, std::move(arguments));
+        case SystemFunction::Array_remove: return BuiltInFunction_Array_remove(ctx, GetPlace(), th, std::move(arguments));
         default: assert(0); return {};
         }
     }
