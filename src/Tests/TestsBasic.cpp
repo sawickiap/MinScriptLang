@@ -6,7 +6,7 @@ Homepage: https://github.com/sawickiap/MinScriptLang
 Author: Adam Sawicki, adam__REMOVE_THIS__@asawicki.info, https://asawicki.info
 
 ================================================================================
-Modified MIT License
+MIT License
 
 Copyright (c) 2019-2021 Adam Sawicki
 
@@ -18,9 +18,7 @@ copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software. A notice about using the
-Software shall be included in both textual documentation and in About/Credits
-window or screen (if one exists) within the software that uses it.
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -929,5 +927,15 @@ TEST_CASE("Basic")
         const char* code = "a=[1, 2, 3]; print(min(a[0], a[1], a[2])); print(max(a[0], a[1], a[2]));";
         env.Execute(code);
         REQUIRE(env.GetOutput() == "1\n3\n");
+    }
+    SECTION("Side effects breaking string lvalue crashing the host")
+    {
+        const char* code = "globalArr = ['AAA', 'BBB', 'CCC']; \n"
+            "function getNewChar() { \n"
+            "  globalArr = 1; // Unwanted side effect \n"
+            "  return 'D'; \n"
+            "} \n"
+            "globalArr[0][0] = getNewChar(); \n";
+        env.Execute(code);
     }
 }

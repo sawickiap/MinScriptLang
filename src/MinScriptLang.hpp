@@ -6,7 +6,7 @@ Homepage: https://github.com/sawickiap/MinScriptLang
 Author: Adam Sawicki, adam__REMOVE_THIS__@asawicki.info, https://asawicki.info
 
 ================================================================================
-Modified MIT License
+MIT License
 
 Copyright (c) 2019-2021 Adam Sawicki
 
@@ -18,9 +18,7 @@ copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software. A notice about using the
-Software shall be included in both textual documentation and in About/Credits
-window or screen (if one exists) within the software that uses it.
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -2383,7 +2381,12 @@ Value BinaryOperator::Evaluate(ExecuteContext& ctx, ThisType* outThis) const
     case BinaryOperatorType::AssignmentBitwiseAnd:
     case BinaryOperatorType::AssignmentBitwiseXor:
     case BinaryOperatorType::AssignmentBitwiseOr:
-        return Assignment(Operands[0]->GetLValue(ctx), Operands[1]->Evaluate(ctx, nullptr));
+    {
+        // Getting these explicitly so the order of thier evaluation is defined, unlike in C++ function call arguments.
+        Value rhsVal = Operands[1]->Evaluate(ctx, nullptr);
+        LValue lhsLval = Operands[0]->GetLValue(ctx);
+        return Assignment(std::move(lhsLval), std::move(rhsVal));
+    }
     }
     
     // Remaining operators use r-values.
