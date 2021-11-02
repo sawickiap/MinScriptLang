@@ -11,13 +11,12 @@ Standalone interpreter executable, modules with some standard library, samples, 
 
 # Introduction
 
-MinScriptLang is a new, minimalistic scripting language, with main purpose of having reference implementation of its (hand-written) parser and interpreter contained in a single, short C++ header file, which currently has only around 3600 lines of code, while still being useful, supporting modern and convenient features. Main file is [MinScriptLang.hpp](src/MinScriptLang.hpp).
+MinScriptLang is a minimalistic scripting language, with main purpose of having reference implementation of its parser and interpreter contained in a single, short, C++ header file (which currently has only around 3600 lines of code) while still being useful, supporting modern and convenient features. Main file is **[MinScriptLang.hpp](src/MinScriptLang.hpp)**.
 
 **Language features**
 
 - Syntax similar mostly to JavaScript, also inspired by C++ and other languages in this group, using curly brackets `{}` etc.
 - Dynamically typed.
-- Two types of collections: `Array` (sequence of values indexed by number) and `Object` (set of values accessed through string key).
 - Compatible with JSON - every JSON document is a valid expression of MinScriptLang.
 - Object-oriented features (prototype-based) - classes and object instances can be used, although they are all just objects.
 - Functional features - data types and functions are first-class values, callable objects with embedded state can be created.
@@ -26,7 +25,7 @@ MinScriptLang is a new, minimalistic scripting language, with main purpose of ha
 **Reference implementation**
 
 - Contained within a single, short header file ("STB-style" - implementation needs to be extracted using a special macro).
-- Implemented in C++ using some features of C++17. Exceptions are also used.
+- Implemented in C++ using some features of C++17.
 - The only external dependency is standard C and C++ library.
 - Has form of a library that can be easily used by a program to make it sciptable in this language.
 - Parser is hand-written - no parser generator is used.
@@ -34,7 +33,7 @@ MinScriptLang is a new, minimalistic scripting language, with main purpose of ha
 
 Following are not the goals of this implementation:
 
-- Maximum performance - the implementation cares for performance where possible (e.g using move semantics), but not at the expense of more complex code. A separate implementation of the language with a more complex, optimizing compiler and some intermediate representation could be created as a separate project.
+- Maximum performance - the implementation cares for performance where possible (e.g using C++ move semantics), but not at the expense of more complex code. A separate implementation of the language with a more complex, optimizing compiler and some intermediate representation could be created as a separate project.
 - Maximum safety - although errors are correctly reported as exceptions, some tricky cases can still crash the host application.
 
 **Other components**
