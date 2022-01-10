@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="PCH.cpp" />
+    <ClCompile Include="MinScriptLangUsage.cpp" />
+    <ClCompile Include="TestsBasic.cpp" />
+    <ClCompile Include="TestsFunctions.cpp" />
+    <ClCompile Include="TestsObjects.cpp" />
+    <ClCompile Include="TestsTypes.cpp" />
+    <ClCompile Include="TestsArrays.cpp" />
+    <ClCompile Include="..\Modules\ModuleMath.cpp">
+      <Filter>Modules</Filter>
+    </ClCompile>
+    <ClCompile Include="TestsModuleMath.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="PCH.hpp" />
+    <ClInclude Include="..\MinScriptLang.hpp">
+      <Filter>MinScriptLang</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rdParty\Catch2\catch.hpp">
+      <Filter>3rdParty</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Modules\ModuleMath.hpp">
+      <Filter>Modules</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="MinScriptLang">
+      <UniqueIdentifier>{7df1c351-7904-42b4-8570-a9fcbffdded2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdParty">
+      <UniqueIdentifier>{5ac08972-6df3-45a6-bcfe-67aa9e9e9aec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Modules">
+      <UniqueIdentifier>{99377382-428e-41b4-933a-235b1792cfaf}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
