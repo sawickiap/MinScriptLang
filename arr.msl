@@ -1,0 +1,8 @@
+
+str = "foo";
+print("str.length=", str.length, "\n");
+
+a = ["red", "green", "blue"];
+a.add("purple");
+
+print("a.count=", a.count, ", a[3]=", a[3], "\n");

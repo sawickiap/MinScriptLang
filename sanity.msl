@@ -1034,7 +1034,7 @@ class C
     },
     print: function ()
     {
-        global.print(this.var);
+        global.print("this.var=", this.var, "\n");
     }
 }
 C(2);
@@ -1049,7 +1049,7 @@ class A
     },
     print: function ()
     {
-        global.print(this.var);
+        global.print("this.var=", this.var, "\n");
     }
 }
 class B: A

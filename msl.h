@@ -131,6 +131,8 @@ namespace MSL
     namespace AST
     {
         class /**/FunctionDefinition;
+        class /**/ExecutionContext;
+        class /**/ThisType;
     }
     class /**/Value;
     class /**/Object;
@@ -139,7 +141,8 @@ namespace MSL
     enum class /**/SystemFunction;
 
     using HostFunction = Value(Environment&, const PlaceInCode&, std::vector<Value>&&);
-
+    using MemberMethodFunction = Value(AST::ExecutionContext&, const PlaceInCode&, const AST::ThisType&, std::vector<Value>&&);
+    using MemberPropertyFunction = Value(AST::ExecutionContext&, const PlaceInCode&, Value&&);
     class Value
     {
         public:
@@ -151,6 +154,8 @@ namespace MSL
                 Function,
                 SystemFunction,
                 HostFunction,
+                MemberMethod,
+                MemberProperty,
                 Object,
                 Array,
                 Type,
@@ -162,6 +167,8 @@ namespace MSL
             using AstFuncValType = const AST::FunctionDefinition*;
             using HostFuncValType = HostFunction*;
             using SystemFuncValType = SystemFunction;
+            using MemberFuncValType = MemberMethodFunction*;
+            using MemberPropValType = MemberPropertyFunction*;
             using ObjectValType = std::shared_ptr<Object>;
             using ArrayValType = std::shared_ptr<Array>;
             // redundant use of redundant names cause redundancy, claim redundancy students of a study about redundancy
@@ -181,6 +188,10 @@ namespace MSL
                 SystemFuncValType,
                 // Value::Type::HostFunction
                 HostFuncValType,
+                // Value::Type::MemberMethod
+                MemberFuncValType,
+                // Value::Type::MemberProperty
+                MemberPropValType,
                 // Value::Type::Object
                 ObjectValType,
                 // Value::Type::Array
@@ -218,6 +229,14 @@ namespace MSL
             {
                 assert(func);
             }
+
+            inline explicit Value(MemberMethodFunction func): m_type{Type::MemberMethod}, m_variant{func}
+            {
+            }
+
+            inline explicit Value(MemberPropertyFunction func): m_type{Type::MemberProperty}, m_variant{func}
+            {
+            }        
 
             inline explicit Value(std::shared_ptr<Object>&& obj) : m_type{ Type::Object }, m_variant(obj)
             {
@@ -270,6 +289,18 @@ namespace MSL
             {
                 assert(m_type == Type::HostFunction);
                 return std::get<HostFuncValType>(m_variant);
+            }
+
+            inline MemberFuncValType getMemberFunction() const
+            {
+                assert(m_type == Type::MemberMethod);
+                return std::get<MemberFuncValType>(m_variant);
+            }
+
+            inline MemberPropValType getPropertyFunction() const
+            {
+                assert(m_type == Type::MemberProperty);
+                return std::get<MemberPropValType>(m_variant);
             }
 
             inline Object* getObject() const
@@ -1288,6 +1319,12 @@ namespace MSL
 
     namespace Builtins
     {
+
+        Value func_typeof(Environment& env, const PlaceInCode& place, std::vector<Value>&& args);
+        Value func_print(Environment& env, const PlaceInCode& place, std::vector<Value>&& args);
+        Value func_min(Environment& ctx, const PlaceInCode& place, std::vector<Value>&& args);
+        Value func_max(Environment& ctx, const PlaceInCode& place, std::vector<Value>&& args);
+
         Value ctor_null(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
         Value ctor_number(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
         Value ctor_string(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
@@ -1295,14 +1332,14 @@ namespace MSL
         Value ctor_array(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
         Value ctor_function(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
         Value ctor_type(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value func_typeof(Environment& env, const PlaceInCode& place, std::vector<Value>&& args);
-        Value func_print(Environment& env, const PlaceInCode& place, std::vector<Value>&& args);
-        Value func_min(Environment& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value func_max(Environment& ctx, const PlaceInCode& place, std::vector<Value>&& args);
+
+
         Value memberfn_object_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
-        Value memberfn_array_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
+
         Value memberfn_string_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
         Value memberfn_string_resize(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
+
+        Value memberfn_array_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
         Value memberfn_array_add(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
         Value memberfn_array_insert(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
         Value memberfn_array_remove(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);

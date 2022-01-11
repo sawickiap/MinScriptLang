@@ -12,7 +12,6 @@ namespace MSL
             Parser parser{ tokenizer };
             parser.ParseScript(script);
         }
-
         try
         {
             AST::ExecutionContext executeContext{ *this, m_globalscope };
