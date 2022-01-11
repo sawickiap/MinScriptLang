@@ -49,7 +49,7 @@ int main(int argc, char* argv[])
         {
             try
             {
-                env.Execute(filedata);
+                env.execute(filedata);
             }
             catch(MSL::Error& e)
             {

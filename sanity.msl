@@ -1,443 +1,1180 @@
 
-// basic 
+// basic
 // Single line comment
-/* multi line comment 
-*/ ;;;; 
+/* multi line comment
+ */
+;
+;
+;
+;
 
-print(123); print(-00444); print(+0xaF250); print(-0xFF); print(0xAA00FF5544CD);
-print(01.00); print(10.5); print(23.); print(.25); print(1e3); print(1e+2); print(.001e-1); print(3.E+0);
-print(2 + 6 - 3);
-print(2 + 3 * 4); print(2 - 10 / 2 + 7 % 3); print(60 / 3 * 2);
-print(2 + 3 * ((4))); print((2 + 3) * 4);
-a=4; print(a, +a, -a);
-print(1); { print(2); print(3); } print(4); { }
-print(null); print(false); print(true); print(true + true - false);
-if(true) print(true); if(false) print(2); if(2); if(2-2) { } else { print(10); print(11); }
-if(false) print(1); else if(false) print(2); else print(3); 
-if(true) if(false) print(1); else print(2);
-print(false ? 1 : 0); print(true ? false ? 1 : 2 : true ? 3 : 4);
-a=1; print(a); b=a+1; print(b); c=d=b*b; print(b, c, d);
-a1234_3252saczf434=1; print(a1234_3252saczf434+1);
-a=6; while(a) { print(a); a = a - 2; }
-a=6; do { print(a); a = a - 2; } while(a);
-for(a=10; a; a=a-2) { print(a); }
-for(a=0; a<10; ++a) ; print('a');
-a=10; for(; a;) { print(a); a=a-2; }
-for(a=-4; a; ++a) { print(a); }
-print(!true); print(!!0);
-a=2; print(a<<0); print(a<<2); print(a<<33); print(a>>1); print(a>>2); print(-a<<3); print(-256>>4);
-a=226; a=~a+1; print(a);
-a=-10; b=2; c=1000000000000; print(a<b); print(c<=b); print(c>a); print(b>=b); 
-print(a==a); print(a==b); print(a!=b); print(b==4/2);
-a=4294967295; /*0xFFFFFFFF*/ print(a&10); print(a&1|4); print(16 | a & 65535 ^ 12345);
-a=3; print(1==1 && a==3); print(false || true); print(false || true && false);
-(print(101)||true)&&print(102); (print(201)||false)&&print(202);print(301)||print(302); (print(401)||true)||print(402);
-five=5; six=6; zero=0; nth=null; 
-print(five && zero); print(zero && five); print(zero && zero); print(five && six); print(zero && nth); print(nth && zero); 
-print(five || zero); print(zero || five); print(zero || zero); print(five || six); print(zero || nth); print(nth || zero); 
+print("numbers:\n");
+numbers = [
+    123,
+    -00444,
+    +0xaF250,
+    -0xFF,
+    0xAA00FF5544CD,
+    01.00,
+    10.5,
+    23.,
+    .25,
+    1e3,
+    1e+2,
+    .001e-1,
+    3.E+0,
+    2 + 6 - 3,
+    2 + 3 * 4,
+    2 - 10 / 2 + 7 % 3,
+    60 / 3 * 2,
+    2 + 3 * ((4)),
+    (2 + 3) * 4,
+];
 
-a=(1,2,4); print(a, 3, 5); print((a, 3, 5));
-for(i=0; i<5; ++i) print(i);
-for(i=0;; ++i) { print(i); if(i>=5) break; }i=5; while(true) { print(i); break; }do { print(i); if(--i==0) break; } while(true);i=0; for(;;) { print(i); if(++i==4) { break; } }
-for(i=0; i<10; ++i) { if(i>5) continue; print(i); }i=-10; while(true) { ++i; if(i<-5) { continue; } print(i); if(i>0) break; }
-for(i=0; i<3; i++) print(i); print(i++); print(i); print(i--); print(i);
-a=1; a+=3; print(a); a-=10; print(a); a*=-2; print(a); a/=4; print(a); a%=2; print(a); a<<=2; print(a); a>>=1; print(a);a=6; a|=8; print(a); a&=3; print(a); a^=3; print(a);a=1; b=2; b*=a+=7;  print(a);  print(b);
-a=b=c=2; b=3; print(a, b, c);
-a=1; ++----++++a; print(a);
-a=1; b=2; c=a+b+b-2+b*3; print(c);
-a=false; b=true; c=a&&b&&a&&b||a||a&&a; print(c);
-a="aaa"; b='bbb
-ccc'; print(a, a?1:0); empty=''; print(empty?1:0); 
-print('aa' 'bb' /* comment */ "cc");
-print('\\ \" \' \b \f \n \r \t \? \a \v \/ \0a');
-print('\xA5 \xa5');
-print('\u0104 \U00000104');
-s='aa' + 'bb'; s += 'cc'; s += s; print(s);
-b=true; v=b?123:'aaa'; print(v);
-n1=1; n2=n1; n3=3; 
-print(n1==n1, n1==n2, n1==n3, n1!=n1, n1!=n2, n1!=n3); 
+print("basic branching:\n");
+if (true)
+{
+}
+if (false)
+    throw "fail";
+if (2);
+if (2 - 2)
+{
+    throw "fail";
+}
+else
+{
+}
+if (false)
+    throw "fail";
+else if (false)
+    throw "fail";
+else
+    print(3);
+if (true)
+    if (false)
+        throw "fail";
+    else
+        print("ok\n");
 
-s1='A'; s2=s1; s3='C'; 
-print(s1==s1, s1==s2, s1==s3, s1!=s1, s1!=s2, s1!=s3); 
+print("loops:\n");
+for (i = 0; i < 5; ++i)
+    print("for-loop: i=", i, "\n");
+for (i = 0; ; ++i)
+{
+    print("for-without-cond: i=", i, "\n");
+    if (i >= 5)
+    {
+        break;
+        throw "fail";
+    }
+}
+i = 5;
+while (true)
+{
+    print("while(true): i=", i, "\n");
+    break;
+    throw "fail";
+}
+do
+{
+    print("do-while: i=", i, "\n");
+    if (--i == 0)
+    {
+        break;
+        throw "fail";
+    }
+} while (true);
+i = 0;
+for(;;)
+{
+    print("empty-for: i=", i, "\n");
+    if (++i == 4)
+    {
+        break;
+        throw "fail";
+    }
+}
+for (i = 0; i < 10; ++i)
+{
+    if (i > 5)
+    {
+        continue;
+        throw "fail";
+    }
+    print("for-with-continue: i=", i, "\n");
+}
+i = -10;
+while (true)
+{
+    ++i;
+    if (i < -5)
+    {
+        continue;
+        throw "fail";
+    }
+    print("while-true-with-continue: i=", i, "\n");
+    if (i > 0)
+    {
+        break;
+        throw "fail";
+    }
+}
+print("unary ops (i=", i, "): ");
+print("i++ = ", i++, "\n");
+print("i now = ", i, "\n");
+print("i-- = ", i--, "\n");
+print("i now = ", i, "\n");
+a = 1;
+print("other ops (+, -, /, *, %, etc) (a=", a, "):\n");
+a += 3;
+print("a after '+=' = ", a, "\n");
+a -= 10;
+print("a after '-=' = ", a, "\n");
+a *= -2;
+print("a after '*=' = ", a, "\n");
+a /= 4;
+print("a after '/=' = ", a, "\n");
+a %= 2;
+print("a after '%=' = ", a, "\n");
+a <<= 2;
+print("a after '<<=' = ", a, "\n");
+a >>= 1;
+print("a after '>>=' = ", a, "\n");
+a = 6;
+print("binary ops (a=", a, "):\n");
+a |= 8;
+print("a after '|=' = ", a, "\n");
+a &= 3;
+print("a after '&=' = ", a, "\n");
+a ^= 3;
+print("a after '^=' = ", a, "\n");
+a = 1;
+b = 2;
+print("multiple assignment:\n");
+b *= a += 7;
+print("b *= a += 7 = a=", a, ", b=", b, "\n");
+a = b = c = 2;
+print("a=b=c=2 = a=", a, ", b=", b, ", c=", c, "\n");
+b = 3;
+a = 1;
+++----++++a;
+print("a=1; ++----++++a = ", a, "\n");
+a = 1;
+b = 2;
+c = a + b + b - 2 + b * 3;
+print("operator precedence: a+b+b-2+b*3 = ", c, "\n");
+a = false;
+b = true;
+c = a && b && a && b || a || a && a;
+print("operator precedence: a&&b&&a&&b||a||a&&a = ", c, "\n");
 
-f1=function(){}; f2=f1; f3=function(){}; 
-print(f1==f1, f1==f2, f1==f3, f1!=f1, f1!=f2, f1!=f3); 
+print("syntax testing ....\n");
+a = "aaa";
+b = 'bbb
+    ccc';
+print("a = ", a, ", ?: = ", a ? 1 : 0, "\n");
+empty = '';
+print("empty = ", empty ? 1 : 0, "\n");
+tmp = ('aa' 'bb' /* comment */ "cc");
+print("string literal concat = ", tmp, "\n");
+//print('\\ \" \' \b \f \n \r \t \? \a \v \/ \0a');
+print("hexadecimal escapes in sq string =", '\xA5 \xa5', "\n");
+print("unicode escapes in sq string=", '\u0104 \U00000104', "\n");
+s = 'aa' + 'bb';
+s += 'cc';
+s += s;
+print("string concat = ", s, "\n");
+b = true;
+v = b ? 123 : 'aaa';
+print("ternary: v=", v, "\n");
+n1 = 1;
+n2 = n1;
+n3 = 3;
+print("eq comparison: ", n1 == n1, n1 == n2, n1 == n3, n1 != n1, n1 != n2, n1 != n3, "\n");
 
-sf1=print; sf2=sf1; sf3=print; 
-print(sf1==sf1, sf1==sf2, sf1==sf3, sf1!=sf1, sf1!=sf2, sf1!=sf3); 
+s1 = 'A';
+s2 = s1;
+s3 = 'C';
+print("eq comparison: ", s1 == s1, s1 == s2, s1 == s3, s1 != s1, s1 != s2, s1 != s3, "\n");
 
-a='aa'; b='bb'; n=1; 
-print(a==a); print(a==b); print(b!=b); print(b!=a); print(a==n); print(n!=b);
-a='aa'; b='bb'; 
-print(a<b); print(a<a); print(a<=a); print(b>=a); print(b>b);
-s='ABCDEF'; print(s[1]); i=3; t=s[i-1]; print(t + t);
-s='ABCD'; 
-for(i=0; i<s.count; ++i) { print(i, s[i]); }
-s='ABCDEF'; print(s); s[0]='a'; print(s); s[5]='z'; i=2; s[i*i]='w'; print(s);
-a='ABC'; b=a; b[0]='X'; print(a); print(b); b='DEF'; print(a); print(b);
-function f(x){ print(x); x=x+x; print(x); x='A'; print(x); }a='ABC'; f('---'); f(a); print(a); f(a); print(a);
-s='ABCD'; 
-for(ch : s) print(ch); 
-for(i, ch : s) print(i, ch); 
-print(i, ch);
+f1 = function ()  {};
+f2 = f1;
+f3 = function ()  {};
+print("eq comparison (functions): ", f1 == f1, f1 == f2, f1 == f3, f1 != f1, f1 != f2, f1 != f3, "\n");
 
-switch(123) { case 1: print(1); case 'a': print('a'); case 123: print(123); default: print('Boo!'); }
-switch(123) { case 1: print(1);break; case 'a': print('a');break; case 123: print(123);break; default: print('Boo!');break; }
-switch(124) { default: print('Boo!');break; case 1: print(1);break; case 'a': print('a');break; case 123: print(123);break; }
-switch(124) { case 1: print(1);break; case 'a': print('a');break; case 123: print(123);break; }
-for(i=0; i<5; ++i) { switch(i) { case 0:print(0);break; case 1:print('1');continue; case 2:print(2);break; case 3:default:print('Other'); } }
-function ChangeDefault() { print(a); a=1; print(a); }function ChangeGlobal() { print(a); global.a=2; print(a); }function ChangeLocal() { print(a); local.a=3; print(a); }        ChangeDefault(); ChangeGlobal(); ChangeLocal();a=10;   ChangeDefault(); ChangeGlobal(); ChangeLocal();a=null; ChangeDefault(); ChangeGlobal(); ChangeLocal();
-function Outer() { 
-   function InnerNone() { print('InnerNone'); } 
-   local.InnerLocal = function() { print('InnerLocal'); }; 
-   global.InnerGlobal = function() { print('InnerGlobal'); }; 
-   InnerNone(); InnerLocal(); InnerGlobal(); 
-} Outer(); InnerGlobal(); 
-
-f=123; n1=0/0; n2=n1; 
-print(n1==f, n1==n2, n1!=f, n1!=n2, n1<n2, n1?'T':'F');
-num0=0; num1=1; 
-print(num0==nul, num0!=nul, num1==nul, num1!=nul, nul==nul, nul!=nul);
-s0=''; s1='AAA'; 
-print(s0==nul, s0!=nul, s1==nul, s1!=nul, nul==nul, nul!=nul);
-print(a);a=1; print(a);a=null; print(a);a='A'; print(a);
-        print(a == a); print(a != a); print(a == null); print(null != a);a=1;    print(a == a); print(a != a); print(a == null); print(null != a);a=null; print(a == a); print(a != a); print(a == null); print(null != a);
-function f(a) { print(a); print(a != null); }f(1); f(x); f(null);
-function f(){return;} function g(){return null;}x=1; print(x); x=f(); print(x);x=1; print(x); x=g(); print(x);
-x=null;if(null) print(true); else print(false);if(x) print(true); else print(false);if(y) print(true); else print(false);if(true) print(true); else print(false);
-try { throw 1; print('Should not get here'); } catch(ex) print(ex); 
-
-function f() { 
-  for(i = 0; i < 10; ++i) { 
-    if(i == 6) throw 'AAA'; 
- } 
-} 
-try { f(); } 
-catch(ex) { print(ex); } 
-
-try { a='AAA' + 5 + null; } 
-catch(ex) { 
-  print(ex.type); 
-  print(ex.index < 1000); 
-  print(ex.row); 
-  print(ex.column < 1000); 
-  print(typeOf(ex.message)); 
-} 
-
-try print('A'); finally print('B'); 
-
-try { print('A'); throw 1; } catch(ex) print('EX'); finally print('B'); 
-
-for(i : [1, 2, 3, 4, 5]) {
-  try {
-    print(i * 100); 
-    if(i == 4) break; 
-  } 
-  finally { 
-    print(i); 
-  } 
-} 
-
-for(i : [1, 2, 3, 4, 5]) {
-  try {
-    if(i == 4) continue; 
-    print(i * 100); 
-  } 
-  finally { 
-    print(i); 
-  } 
-} 
-
-function fn() {
-  try {
-    print('Try'); 
-    return 1; 
-  } 
-  catch(ex) print('Catch'); 
-  finally print('Finally'); 
-} 
-print(fn()); 
-
-a=[1, 2, 3]; 
-for(i = 0; i < 10; ++i) { 
-  try { 
-    print(i); 
-    a[i] += 100; 
-  } 
-  catch(ex) break; 
-} 
-print(a[2]); 
-
-try { 
-  try { 
-    throw [555, 666, 777]; 
-  } 
-  catch(ex) { print('CATCH'); throw ex; } 
-} 
-catch(ex) print(ex[1]); 
-
-function f() { 
-  try { 
-    print('AAA'); 
-  } 
-  finally { throw 123; } 
-} 
-try { f(); } catch(ex) { print(ex); } 
-
-function f() { 
-  try { 
-    print('try before throw'); 
-    throw 1; 
-    print('try after throw'); 
-  } 
-  finally { print('try finally'); } 
-} 
-try { f(); } catch(ex) { print('catch', ex); } 
-
-function f() { 
-  try { 
-    throw 1; 
-    print('AAA'); 
-  } 
-  finally { throw 123; } 
-} 
-try { f(); } catch(ex) { print(ex); } 
-
-s='A'; print(s); return s;
-a=[1, 2, 3]; print(min(a[0], a[1], a[2])); print(max(a[0], a[1], a[2]));
-globalArr = ['AAA', 'BBB', 'CCC']; 
-function getNewChar() { 
-  globalArr = 1; // Unwanted side effect 
-  return 'D'; 
-} 
-globalArr[0][0] = getNewChar(); 
+sf1 = print;
+sf2 = sf1;
+sf3 = print;
+print("eq comparison (copied native funcs): ", sf1 == sf1, sf1 == sf2, sf1 == sf3, sf1 != sf1, sf1 != sf2, sf1 != sf3, "\n");
 
 
+s = 'ABCD';
+for (ch: s)
+    print("for-range: ch=", ch, "\n");
+for (i, ch: s)
+    print("for-range with index: i=",i, ", ch=", ch, "\n");
+print("after loop: i=", i, "ch=", ch, "\n");
+
+print("switch statements:\n");
+switch (123)
+{
+    case 1:
+        throw "fail";
+    case 'a':
+        throw "fail";
+    case 123:
+        print("switch-fallthrough...\n");
+    default:
+        print("switch-fallthrough: ok\n");
+}
+switch (123)
+{
+    case 1:
+        throw "fail";
+        break;
+    case 'a':
+        throw "fail";
+        break;
+    case 123:
+        print("swith with break\n");
+        break;
+    default:
+        throw "fail";
+        break;
+}
+switch (124)
+{
+    default:
+        print("switch with default");;
+        break;
+    case 1:
+        throw "fail";
+        break;
+    case 'a':
+        throw "fail";
+        break;
+    case 123:
+        throw "fail";
+        break;
+}
+for (i = 0; i < 5; ++i)
+{
+    switch (i)
+    {
+        case 0:
+            print("switch-in-for: 0\n");
+            break;
+        case 1:
+            print("switch-in-for: 1\n");
+            continue;
+        case 2:
+            print("switch-in-for: 2\n");
+            break;
+        case 3:
+        default:
+            print("switch-in-for: Other\n");
+    }
+}
+function ChangeDefault()
+{
+    print("changedefault: before: a=", a, "\n");
+    a = 1;
+    print("changedefault: after: a=", a, "\n");
+}
+function ChangeGlobal()
+{
+    print("changeglobal: before: a=", a, "\n");
+    global.a = 2;
+    print("changeglobal: after: a=", a, "\n");
+}
+function ChangeLocal()
+{
+    print("changelocal: before: a=", a, "\n");
+    local.a = 3;
+    print("changelocal: after: a=", a, "\n");
+}
+ChangeDefault();
+ChangeGlobal();
+ChangeLocal();
+a = 10;
+ChangeDefault();
+ChangeGlobal();
+ChangeLocal();
+a = null;
+ChangeDefault();
+ChangeGlobal();
+ChangeLocal();
+function Outer()
+{
+    function InnerNone()
+    {
+        print("functions: InnerNone called\n");
+    }
+    local.InnerLocal = function ()
+    {
+        print("functions: InnerLocal called\n");
+    };
+    global.InnerGlobal = function ()
+    {
+        print("functions: InnerGlobal called\n");
+    };
+    InnerNone();
+    InnerLocal();
+    InnerGlobal();
+}
+Outer();
+InnerGlobal();
+
+try
+{
+    throw 1;
+    print("***ERROR*** Should not get here ....\n");
+}
+catch (ex)
+    print("try-catch: caugh exception: ", ex, "\n");
+
+function f()
+{
+    for (i = 0; i < 10; ++i)
+    {
+        if (i == 6)
+        {
+            throw 'AAA';
+        }
+    }
+}
+try
+{
+    f();
+}
+catch (ex)
+{
+    print("try-catch from function: ex=", ex, "\n");
+}
+
+try
+{
+    a = 'AAA' + 5 + null;
+}
+catch (ex)
+{
+    print("try-catch runtime: type=", ex.type, "\n");
+    print("try-catch runtime: index=", ex.index, "\n");
+    print("try-catch runtime: row=", ex.row, "\n");
+    print("try-catch runtime: column=", ex.column, "\n");
+    print("try-catch runtime: message=(", typeOf(ex.message), ") ", ex.message, "\n");
+}
+
+
+try
+    print("try-finally: in try ...\n");
+finally
+    print("try-finally in finally\n");
+
+try
+{
+    print('A');
+    throw 1;
+}
+catch (ex)
+    print('EX');
+finally
+    print('B');
+
+for (i: [1, 2, 3, 4, 5])
+{
+    try
+    {
+        print(i * 100);
+        if (i == 4)
+            break;
+    }
+    finally
+    {
+        print(i);
+    }
+}
+
+for (i: [1, 2, 3, 4, 5])
+{
+    try
+    {
+        if (i == 4)
+            continue;
+        print(i * 100);
+    }
+    finally
+    {
+        print(i);
+    }
+}
+
+function fn()
+{
+    try
+    {
+        print('Try');
+    }
+    catch (ex)
+        print('Catch');
+    finally
+        print('Finally');
+}
+print(fn());
+
+a = [1, 2, 3];
+for (i = 0; i < 10; ++i)
+{
+    try
+    {
+        print(i);
+        a[i] += 100;
+    }
+    catch (ex)
+        break;
+}
+print(a[2]);
+
+try
+{
+    try
+    {
+        throw [555, 666, 777];
+    }
+    catch (ex)
+    {
+        print('CATCH');
+        throw ex;
+    }
+}
+catch (ex)
+    print(ex[1]);
+
+function f()
+{
+    try
+    {
+        print('AAA');
+    }
+    finally
+    {
+        throw 123;
+    }
+}
+try
+{
+    f();
+}
+catch (ex)
+{
+    print(ex);
+}
+
+function f()
+{
+    try
+    {
+        print('try before throw');
+        throw 1;
+        print('try after throw');
+    }
+    finally
+    {
+        print('try finally');
+    }
+}
+try
+{
+    f();
+}
+catch (ex)
+{
+    print('catch', ex);
+}
+
+function f()
+{
+    try
+    {
+        throw 1;
+        print('AAA');
+    }
+    finally
+    {
+        throw 123;
+    }
+}
+try
+{
+    f();
+}
+catch (ex)
+{
+    print(ex);
+}
+
+s = 'A';
+print(s);
+a = [1, 2, 3];
+print(min(a[0], a[1], a[2]));
+print(max(a[0], a[1], a[2]));
+globalArr = ['AAA', 'BBB', 'CCC'];
+function getNewChar()
+{
+    globalArr = 1; // Unwanted side effect
+    return 'D';
+}
+//globalArr[0][0] = getNewChar();
+print("typeOf(globalArr) = ", typeOf(globalArr));
 
 // arrays
 
-a1=[]; print(a1); 
+a1 = [];
+print(a1);
 
-a1=[1, 2, 3]; 
-print(a1[0], a1[1], a1[2]); 
+a1 = [1, 2, 3];
+print(a1[0], a1[1], a1[2]);
 
-a1=[1, 2, 3, 4, 5]; 
-a1[0]=10; a1[1]+=10; a1[2]*=10; a1[3]++; ++a1[4];
-print(a1[0], a1[1], a1[2], a1[3], a1[4]); 
+a1 = [1, 2, 3, 4, 5];
+a1[0] = 10;
+a1[1] += 10;
+a1[2] *= 10;
+a1[3]++;
+++a1[4];
+print(a1[0], a1[1], a1[2], a1[3], a1[4]);
 
-a1=[1, 2, 3]; a2=a1; 
-function f(arg) { arg[1]++; return arg; } 
-a3=f(a2); 
-print(a1[0], a1[1], a1[2], a3[1], a1==a3, a1!=a3); 
+a1 = [1, 2, 3];
+a2 = a1;
+function f(arg)
+{
+    arg[1]++;
+    return arg;
+}
+a3 = f(a2);
+print(a1[0], a1[1], a1[2], a3[1], a1 == a3, a1 != a3);
 
-a1=[1, 2, 3]; a2=Array(a1); a0=Array(); 
-print(a2[0], a2[1], a2[2], a1==a2, a1==a0); 
+a1 = [1, 2, 3];
+a2 = Array(a1);
+a0 = Array();
+print(a2[0], a2[1], a2[2], a1 == a2, a1 == a0);
 
-a=[1, 2, 3,]; print(a[0], a[1], a[2]);
-a=[1, 2, 3]; a[1]=null; a[2]=null; 
+a = [1, 2, 3, ];
 print(a[0], a[1], a[2]);
-a=[1, 2, 3]; 
-for(val : a) print(val); 
-print(val); 
+a = [1, 2, 3];
+a[1] = null;
+a[2] = null;
+print(a[0], a[1], a[2]);
+a = [1, 2, 3];
+for (val: a)
+    print(val);
+print(val);
 
-a=[1, 2, 3]; 
-for(i, val : a) { { print(i, val); } ;;; } 
-print(i, val); 
+a = [1, 2, 3];
+for (i, val: a)
+{
+    {
+        print(i, val);
+    }; ; ;
+}
+print(i, val);
 
-function f() { 
-  a=[1, 2, 3]; 
-  for(i, v : a) { print(i, v); } 
-} 
-i='A'; v='B'; 
-f(); 
-print(i, v); 
+function f()
+{
+    a = [1, 2, 3];
+    for (i, v: a)
+    {
+        print(i, v);
+    }
+}
+i = 'A';
+v = 'B';
+f();
+print(i, v);
 
-a0=[]; a3=[1, 2, 3]; n=null;
-print(a0?'Y':'N', a3?'Y':'N', n?'Y':'N'); 
+a0 = [];
+a3 = [1, 2, 3];
+n = null;
+print(a0 ? 'Y' : 'N', a3 ? 'Y' : 'N', n ? 'Y' : 'N');
 
-a0=[]; a3=[1, 2, 3]; 
-print(a0.count, a3.count); 
+a0 = [];
+a3 = [1, 2, 3];
+print(a0.count, a3.count);
 
-a=[1, 2, 3]; 
-a.add(4); a.add(5); a.add(6); /* 1, 2, 3, 4, 5, 6 */ 
-a.remove(0); a.remove(a.count-1); a.remove(1); /* 2, 4, 5 */ 
-a.insert(3, 100); a.insert(2, 101); a.insert(0, 102); /* 102, 2, 4, 101, 5, 100 */ 
-print(a.count, a[0], a[1], a[2], a[3], a[4], a[5]); 
+a = [1, 2, 3];
+a.add(4);
+a.add(5);
+a.add(6); /* 1, 2, 3, 4, 5, 6 */
+a.remove(0);
+a.remove(a.count - 1);
+a.remove(1); /* 2, 4, 5 */
+a.insert(3, 100);
+a.insert(2, 101);
+a.insert(0, 102); /* 102, 2, 4, 101, 5, 100 */
+print(a.count, a[0], a[1], a[2], a[3], a[4], a[5]);
 
-for(i:[1,2,3,4,5,6]) { print(i); if(i==3) break; }
-
-
-
+for (i: [1, 2, 3, 4, 5, 6])
+{
+    print(i);
+    if (i == 3)
+        break;
+}
 
 // types
-t1=Null; t2=Number; t3=String; t4=Object; 
+t1 = Null;
+t2 = Number;
+t3 = String;
+t4 = Object;
 print(t1, t2, t3, t4);
-tn1=Number; n2=123; tn2=typeOf(n2); tnull=typeOf(nonExistent); 
-print(tn1, tn2, tnull); 
-print(tn1==tn2, tn1!=tn2, tn2==tnull, tn2!=tnull); 
+tn1 = Number;
+n2 = 123;
+tn2 = typeOf(n2);
+tnull = typeOf(nonExistent);
+print(tn1, tn2, tnull);
+print(tn1 == tn2, tn1 != tn2, tn2 == tnull, tn2 != tnull);
 
-tobj=typeOf({a:1, b:2}); tnull=typeOf(nonExistent); 
-print(tobj?1:0, tnull?1:0); 
+tobj = typeOf(
+    {
+        a: 1,
+        b: 2
+    }
+    );
+tnull = typeOf(nonExistent);
+print(tobj ? 1 : 0, tnull ? 1 : 0);
 
-v1=Null(); v2=Null(nonExistent); 
-print(v1, v2); 
+v1 = Null();
+v2 = Null(nonExistent);
+print(v1, v2);
 
-v1=2; v2=Number(v1); 
-print(v1, v2); 
+v1 = 2;
+v2 = Number(v1);
+print(v1, v2);
 
-v1='A'; v2=String(v1); 
-print(v1, v2); 
+v1 = 'A';
+v2 = String(v1);
+print(v1, v2);
 
-v1={a:1, b:2}; v2=Object(v1); 
-print(v1.a, v2.a, v1==v2); 
+v1 =
+{
+    a: 1,
+    b: 2
+};
+v2 = Object(v1);
+print(v1.a, v2.a, v1 == v2);
 
-function f(){return 123;} v2=Function(f); v3=print;
-print(f==v2, v2==v3, v2()); 
+function f()
+{
+    return 123;
+}
+v2 = Function(f);
+v3 = print;
+print(f == v2, v2 == v3, v2());
 
-v1=typeOf(125); v2=Type(v1); v3=v2(123);
-print(v1==v2, v3); 
+v1 = typeOf(125);
+v2 = Type(v1);
+v3 = v2(123);
+print(v1 == v2, v3);
 
-a={}; print(a); print(a.x);a={'x':2}; print(a); print(a.x);a={'x':2,}; print(a); print(a.x);a={'x':2,'y':3}; print(a); print(a.y);a={'x':2,'y':3,}; print(a); print(a.y);a.z=5; a.w=a.z; a.z=4; print(a.z); print(a.w);
-obj={a:1, b:2, c:3}; print(obj.a, obj.b, obj.c);
-a={ 'AAA' /*comment*/ "BBB": 5 }; print(a.AAABBB);
-{ print(1); { print(2); } { } print(3); } { }; {'a':1, 'b':false}; { print(4); } print(5);
-o1 = { 'x': 1 }; 
-o2 = { 'y': o1 }; 
-print(o2.y.x); 
+a = {};
+print(a);
+print(a.x);
+a =
+{
+    'x': 2
+};
+print(a);
+print(a.x);
+a =
+{
+    'x': 2,
+};
+print(a);
+print(a.x);
+a =
+{
+    'x': 2,
+    'y': 3
+};
+print(a);
+print(a.y);
+a =
+{
+    'x': 2,
+    'y': 3,
+};
+print(a);
+print(a.y);
+a.z = 5;
+a.w = a.z;
+a.z = 4;
+print(a.z);
+print(a.w);
+obj =
+{
+    a: 1,
+    b: 2,
+    c: 3
+};
+print(obj.a, obj.b, obj.c);
+a =
+{
+    'AAA' /*comment*/ "BBB": 5
+};
+print(a.AAABBB);
+{
+    print(1);
+    {
+        print(2);
+    }
+    {}
+    print(3);
+}
+{};
+{
+    'a': 1,
+    'b': false
+};
+{
+    print(4);
+}
+print(5);
+o1 =
+{
+    'x': 1
+};
+o2 =
+{
+    'y': o1
+};
+print(o2.y.x);
 
-o1 = { 'x': { 'y': 5 } }; 
-o1.x.y += 5; 
-print(o1.x.y); 
+o1 =
+{
+    'x':
+    {
+        'y': 5
+    }
+};
+o1.x.y += 5;
+print(o1.x.y);
 
-o1 = { 'x': 1 }; 
-o2 = o1; 
-o2.x += 1; 
-function f(arg) { arg.x += 2; return arg; } 
-print(f(o2).x); 
-print(o1.x); 
+o1 =
+{
+    'x': 1
+};
+o2 = o1;
+o2.x += 1;
+function f(arg)
+{
+    arg.x += 2;
+    return arg;
+}
+print(f(o2).x);
+print(o1.x);
 
-o1 = { 'f1': function() { return o2; }, 'val1': 1 }; 
-o2 = { 'f2': function() { return o1; }, 'val2': 2 }; 
-print(o1.f1().f2().val1); 
+o1 =
+{
+    'f1': function ()
+    {
+        return o2;
+    },
+    'val1': 1
+};
+o2 =
+{
+    'f2': function ()
+    {
+        return o1;
+    },
+    'val2': 2
+};
+print(o1.f1().f2().val1);
 
-o1 = { 'x': 1, 'y': 2, 'a b c': 3 }; 
-index = 'y'; 
-print(o1['x'], o1[index], o1['a b' + ' c']); 
+o1 =
+{
+    'x': 1,
+    'y': 2,
+    'a b c': 3
+};
+index = 'y';
+print(o1['x'], o1[index], o1['a b' + ' c']);
 
-o1 = { 'x': { 'y': { 'z': 5 } } }; 
-print(o1['x'].y['z']); 
+o1 =
+{
+    'x':
+    {
+        'y':
+        {
+            'z': 5
+        }
+    }
+};
+print(o1['x'].y['z']);
 
-o={}; o['A A'] = 1; o['A A'] += 5; 
-print(o['A A']); 
+o = {};
+o['A A'] = 1;
+o['A A'] += 5;
+print(o['A A']);
 
-o={}; o['A'] = {}; o['A']['B'] = {}; o['A']['B'].c = 10; 
-print(o.A.B['c']); 
+o = {};
+o['A'] = {};
+o['A']['B'] = {};
+o['A']['B'].c = 10;
+print(o.A.B['c']);
 
-o1={'a':1, 'b':2}; o2=o1; o3={'a':1, 'b':2}; 
-print(o1==o1, o1==o2, o1==o3, o1!=o1, o1!=o2, o1!=o3); 
+o1 =
+{
+    'a': 1,
+    'b': 2
+};
+o2 = o1;
+o3 =
+{
+    'a': 1,
+    'b': 2
+};
+print(o1 == o1, o1 == o2, o1 == o3, o1 != o1, o1 != o2, o1 != o3);
 
-obj={'a':1, 'b':2, 'd':null}; obj.c=3; obj.b=null; 
-print(obj.count); 
+obj =
+{
+    'a': 1,
+    'b': 2,
+    'd': null
+};
+obj.c = 3;
+obj.b = null;
+print(obj.count);
 
-obj={'a':1, 'bbbb':4, 'cc':10}; 
-sum = 0; for(val: obj) sum += val; print(sum);
-sumKeyLen = 0; sumVal = 0; for(key, val: obj) { sumKeyLen += key.count; sumVal += val; } print(sumKeyLen, sumVal); 
-print(key, val); 
+obj =
+{
+    'a': 1,
+    'bbbb': 4,
+    'cc': 10
+};
+sum = 0;
+for (val: obj)
+    sum += val;
+print(sum);
+sumKeyLen = 0;
+sumVal = 0;
+for (key, val: obj)
+{
+    sumKeyLen += key.count;
+    sumVal += val;
+}
+print(sumKeyLen, sumVal);
+print(key, val);
 
-obj={ 'x': 2, 'f1': function() { x += 1; print(x); } }; 
-obj.f1(); obj['f1'](); (101, '102', obj.f1)(); 
-obj2={'subObj':obj}; obj2.subObj.f1();
-obj={ 'x': 2, 'f1': function() { this.y = 1; this.x += y; print(this.x); } }; 
-obj.f1(); obj['f1'](); (101, '102', obj.f1)(); 
-obj2={'subObj':obj}; obj2.subObj.f1();
-obj={ 'x': 2, 'f': function() { this.x += 1; return this; } }; 
-obj2 = obj.f(); print(obj2.x); 
+obj =
+{
+    'x': 2,
+    'f1': function ()
+    {
+        x += 1;
+        print(x);
+    }
+};
+obj.f1();
+obj['f1']();
+(101, '102', obj.f1)();
+obj2 =
+{
+    'subObj': obj
+};
+obj2.subObj.f1();
+obj =
+{
+    'x': 2,
+    'f1': function ()
+    {
+        this.y = 1;
+        this.x += y;
+        print(this.x);
+    }
+};
+obj.f1();
+obj['f1']();
+(101, '102', obj.f1)();
+obj2 =
+{
+    'subObj': obj
+};
+obj2.subObj.f1();
+obj =
+{
+    'x': 2,
+    'f': function ()
+    {
+        this.x += 1;
+        return this;
+    }
+};
+obj2 = obj.f();
+print(obj2.x);
 
-obj={ 'x': 2, f: function() { print(++this.x); } }; 
-obj.f(); obj['f'](); 
+obj =
+{
+    'x': 2,
+    f: function ()
+    {
+        print(++this.x);
+    }
+};
+obj.f();
+obj['f']();
 
-obj={ 'x': 2, f: function() { print(++this.x); } }; 
-((obj)).f(); (111, 'AAA', obj.f)(); 
+obj =
+{
+    'x': 2,
+    f: function ()
+    {
+        print(++this.x);
+    }
+};
+((obj)).f();
+(111, 'AAA', obj.f)();
 
-obj1={ x: 2, f: function() { print(++this.x); } }; 
-obj2={ f: function() { print('obj2f'); } }; 
-function call_f(cond) { (cond ? obj1 : obj2).f(); } 
-call_f(true); call_f(false); 
+obj1 =
+{
+    x: 2,
+    f: function ()
+    {
+        print(++this.x);
+    }
+};
+obj2 =
+{
+    f: function ()
+    {
+        print('obj2f');
+    }
+};
+function call_f(cond)
+{
+    (cond ? obj1 : obj2).f();
+}
+call_f(true);
+call_f(false);
 
-x=100; 
-obj={ x: 2, f: function() { print(++x); } }; 
-fn = obj.f; 
-fn(); obj.f(); fn(); obj.f(); 
+x = 100;
+obj =
+{
+    x: 2,
+    f: function ()
+    {
+        print(++x);
+    }
+};
+fn = obj.f;
+fn();
+obj.f();
+fn();
+obj.f();
 
-objInner = { x: 2, f: function() { print(++x); } }; 
-objOuter = { o: objInner }; 
-objOuter.o.f(); 
+objInner =
+{
+    x: 2,
+    f: function ()
+    {
+        print(++x);
+    }
+};
+objOuter =
+{
+    o: objInner
+};
+objOuter.o.f();
 
-obj={ 'x': 2, 'f1': function() { f2(); this.f2(); }, 'f2': function() { print(x); print(this.x); } }; 
-obj.f1(); 
+obj =
+{
+    'x': 2,
+    'f1': function ()
+    {
+        f2();
+        this.f2();
+    },
+    'f2': function ()
+    {
+        print(x);
+        print(this.x);
+    }
+};
+obj.f1();
 
-obj={ var: 2, fn: function() { print(var); } }; 
-obj.fn(); 
+obj =
+{
+    var: 2,
+    fn: function ()
+    {
+        print(var);
+    }
+};
+obj.fn();
 
-obj={ var: 2, fn: function() { print('fn'); }, '':function(a) { print('Default', a); } }; 
-obj(3); 
+obj =
+{
+    var: 2,
+    fn: function ()
+    {
+        print('fn');
+    },
+    '': function (a)
+    {
+        print('Default', a);
+    }
+};
+obj(3);
 
-class C { 
-   var: 1, 
-   '': function(x) { var=x; }, 
-   print: function() { global.print(this.var); } 
-} 
-C(2); C.print(); 
+class C
+{
+    var: 1,
+    '': function (x)
+    {
+        var = x;
+    },
+    print: function ()
+    {
+        global.print(this.var);
+    }
+}
+C(2);
+C.print();
 
-class A { 
-   var: 1, 
-   '': function(x) { var=x; }, 
-   print: function() { global.print(this.var); } 
-} 
-class B : A { 
-   '': function(x) { var=x+1; } 
-} 
- 
-B(2); B.print(); A.print(); 
+class A
+{
+    var: 1,
+    '': function (x)
+    {
+        var = x;
+    },
+    print: function ()
+    {
+        global.print(this.var);
+    }
+}
+class B: A
+{
+    '': function (x)
+    {
+        var = x + 1;
+    }
+}
 
-class Base { a: 121, b: 122, c: 123 }; 
-class Derived : Base { b: 124, c: null }; 
-print(Derived.a, Derived.b, Derived.c);
-o1={a:123}; o2={}; 
-print(o1?'T':'F', o2?'T':'F');
-o1={a:123, b:124,}; o2={'a':o1.a, 'b':o1.b,}; 
-print(o1['a'], o1['b'], o2.a, o2.b);
+B(2);
+B.print();
+A.print();
 
+class Base
+{
+    a: 121,
+    b: 122,
+    c: 123
+};
+class Derived: Base
+{
+    b: 124,
+    c: null
+};
+print("Derived.a=", Derived.a, ", Derived.b=", Derived.b, ", Derived.c=", Derived.c, "\n");
+o1 =
+{
+    a: 123
+};
+o2 = {};
+print("o1=", o1 ? 'T' : 'F', ", o2=", o2 ? 'T' : 'F', "\n");
+o1 =
+{
+    a: 123,
+    b: 124,
+};
+o2 =
+{
+    'a': o1.a,
+    'b': o1.b,
+};
+print("o1['a']=", o1['a'], ", o1['b']=", o1['b'], ", o2.a=", o2.a, ", o2.b=", o2.b, "\n");
 
-// math
-a=-10; print(a, math.abs(a)); 
+try
+    print(math.abs());
+catch (ex)
+    print("exception.message = ", ex.message, "\n");
 
-print(math.abs(math.E - 2.71828182) < 1e-6, math.abs(math.PI - 3.14159265) < 1e-6); 
+try
+    print(math.abs(1, 2, 3));
+catch (ex)
+    print("exception.message = ", ex.message, "\n");
 
-try print(math.abs()); catch(ex) print(ex.message);
-
-try print(math.abs(1, 2, 3)); catch(ex) print(ex.message);
-
-try print(math.abs([1, 2, 3])); catch(ex) print(ex.message);
-
-
+try
+    print(math.abs([1, 2, 3]));
+catch (ex)
+    print("exception.message = ", ex.message, "\n");
 
 // functions
 
-f = function() { print('Foo'); };
-f(); f();
-a=1; print(a); f=function(){ b=2; print(b); print(a); a=10; print(a); };
-f(); print(a);
-f=function(){ a=1; print(a); }; f(); print(a);
-f=function(a, b){ a='['+a+'] ['+b+']'; print(a); }; 
-f('AAA', 'BBB'); f('CCC', 'DDD');
-functionNotReturning = function(){ print('functionNotReturning'); }; 
-functionReturningNull = function(){ print('functionReturningNull'); return; print('DUPA'); }; 
-functionReturningSomething = function(){ print('functionReturningSomething'); return 123; print('DUPA'); }; 
-print(functionNotReturning()); print(functionReturningNull()); print(functionReturningSomething());
-function add(a, b){ return a+b; }
-print(add(2, 5));
-function factorial(n){ if(n==0) return 1; return n*factorial(n-1); } 
-print(factorial(0)); print(factorial(3)); print(factorial(4));
+f = function ()
+{
+    print("Foo\n");
+};
+f();
+f();
+a = 1;
+print("a = ", a, "\n");
+f = function ()
+{
+    b = 2;
+    print("b = ", b, ", a=", a, "\n");
+    a = 10;
+    print(a);
+};
+f();
+print("a = ", a, "\n");
+f = function ()
+{
+    a = 1;
+    print("a = ", a, "\n");
+};
+f();
+print(a);
+f = function (a, b)
+{
+    a = '[' + a + '] [' + b + ']';
+    print("a(a+b) = ", a, "\n");
+};
+f('AAA', 'BBB');
+f('CCC', 'DDD');
+functionNotReturning = function ()
+{
+    print("in functionNotReturning\n");
+};
+functionReturningNull = function ()
+{
+    print("in functionReturningNull\n");
+    return;
+    throw "fail";
+};
+functionReturningSomething = function ()
+{
+    print("in functionReturningSomething\n");
+    return 123;
+    throw "fail";
+};
+print("functionNotReturning()     = ", functionNotReturning(), "\n");
+print("functionReturningNull()    = ", functionReturningNull(), "\n");
+print("functionReturningSomething = ", functionReturningSomething(), "\n");
+function add(a, b)
+{
+    return a + b;
+}
+print("add(2,5)=", add(2, 5), "\n");
+function factorial(n)
+{
+    if (n == 0)
+        return 1;
+    return n * factorial(n - 1);
+}
+print("factorial(0) = ", factorial(0), "\n");
+print("factorial(3) = ", factorial(3), "\n");
+print("factorial(4) = ", factorial(4), "\n");
 
-
+print("\n\n");
+print("if you can read this, everything is (probably) ok!\n");
