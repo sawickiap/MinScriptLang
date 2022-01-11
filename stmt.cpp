@@ -872,10 +872,13 @@ namespace MSL
                 }
                 else if(m_membername == "add")
                 {
-                    //return Value{ SystemFunction::ArrayAddFunc };
+                    #if 0
+                    return Value{ SystemFunction::ArrayAddFunc };
+                    #else
                     auto v= Value{ Builtins::memberfn_array_add };
                     fprintf(stderr, "v.type()=%d\n", v.type());
                     return v;
+                    #endif
                 }
                 else if(m_membername == "insert")
                 {
@@ -1393,6 +1396,7 @@ namespace MSL
             }
             if(callee.type() == Value::Type::Type)
             {
+                fprintf(stderr, "callee.getTypeValue()=%d\n", callee.getTypeValue());
                 switch(callee.getTypeValue())
                 {
                     case Value::Type::Null:
@@ -1435,6 +1439,7 @@ namespace MSL
     using MemberMethodFunction = Value(AST::ExecutionContext&, const PlaceInCode&, const AST::ThisType&, std::vector<Value>&&);
     using MemberPropertyFunction = Value(AST::ExecutionContext&, const PlaceInCode&, Value&&);
 */
+                    #if 1
                     case Value::Type::MemberMethod:
                         {
                             return callee.getMemberFunction()(ctx, getPlace(), th, std::move(arguments));
@@ -1445,19 +1450,22 @@ namespace MSL
                             return callee.getPropertyFunction()(ctx, getPlace(), std::move(callee));
                         }
                         break;
+                    #endif
                     default:
                         assert(0);
                         return {};
                 }
             }
-            else if(callee.type() == Value::Type::MemberMethod)
+            if(callee.type() == Value::Type::MemberMethod)
             {
                 return callee.getMemberFunction()(ctx, getPlace(), th, std::move(arguments));
             }
-            else if(callee.type() == Value::Type::MemberProperty)
+            #if 1
+            if(callee.type() == Value::Type::MemberProperty)
             {
                 return callee.getPropertyFunction()(ctx, getPlace(), std::move(callee));
             }
+            #endif
             throw ExecutionError(getPlace(), "invalid function call");
         }
 

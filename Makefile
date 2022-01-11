@@ -1,6 +1,6 @@
 
 CXX = g++ -std=c++20
-CFLAGS = 
+CFLAGS = -g3 -ggdb3
 CXXFLAGS = $(CFLAGS) -Wall -Wextra
 LDFLAGS = -ldl -lm
 target = run

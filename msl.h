@@ -140,8 +140,8 @@ namespace MSL
     class /**/Environment;
     enum class /**/SystemFunction;
 
-    using HostFunction = Value(Environment&, const PlaceInCode&, std::vector<Value>&&);
-    using MemberMethodFunction = Value(AST::ExecutionContext&, const PlaceInCode&, const AST::ThisType&, std::vector<Value>&&);
+    using HostFunction           = Value(Environment&, const PlaceInCode&, std::vector<Value>&&);
+    using MemberMethodFunction   = Value(AST::ExecutionContext&, const PlaceInCode&, const AST::ThisType&, std::vector<Value>&&);
     using MemberPropertyFunction = Value(AST::ExecutionContext&, const PlaceInCode&, Value&&);
     class Value
     {
@@ -154,11 +154,11 @@ namespace MSL
                 Function,
                 SystemFunction,
                 HostFunction,
-                MemberMethod,
-                MemberProperty,
                 Object,
                 Array,
                 Type,
+                MemberMethod,
+                MemberProperty,
                 Count
             };
 
@@ -188,16 +188,16 @@ namespace MSL
                 SystemFuncValType,
                 // Value::Type::HostFunction
                 HostFuncValType,
-                // Value::Type::MemberMethod
-                MemberFuncValType,
-                // Value::Type::MemberProperty
-                MemberPropValType,
                 // Value::Type::Object
                 ObjectValType,
                 // Value::Type::Array
                 ArrayValType,
                 // Value::Type::Type
-                TypeValType
+                TypeValType,
+                // Value::Type::MemberMethod
+                MemberFuncValType,
+                // Value::Type::MemberProperty
+                MemberPropValType
             >;
 
         private:

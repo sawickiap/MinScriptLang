@@ -17,7 +17,7 @@ print("foo=", foo, "\n");
 f = foo.new();
 print("f=", f, "\n");
 b = foo.new();
-print("b=", b, "\n");
+print("b=", b.count, "\n");
 print("foo=", foo, "\n");
 
 print("------------\n");
