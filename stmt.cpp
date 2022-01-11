@@ -1,4 +1,5 @@
 
+#include <array>
 #include "msl.h"
 
 #define DEBUG_PRINT_FORMAT_STR_BEG "(%u,%u) %s%.*s"
@@ -20,13 +21,72 @@ namespace MSL
         MemberPropertyFunction* func;
     };
 
-    static StandardObjectPropertyFunc stdobjproperties_string[] =
+    static constexpr auto stdobjproperties_string = std::to_array<StandardObjectPropertyFunc>(
     {
-        {"count", Builtins::memberfn_string_count},
-        {"length", Builtins::memberfn_string_count},
-        {"size", Builtins::memberfn_string_count},
-    };
+        {"count", Builtins::protofn_string_length},
+        {"length", Builtins::protofn_string_length},
+        {"size", Builtins::protofn_string_length},
+    });
 
+    static constexpr auto stdobjmethods_string = std::to_array<StandardObjectMemberFunc>(
+    {
+        {"resize", Builtins::memberfn_string_resize},
+    });
+
+    static constexpr auto stdobjproperties_object = std::to_array<StandardObjectPropertyFunc>(
+    {
+        {"count", Builtins::protofn_object_count},
+    });
+
+    static constexpr auto stdobjmethods_object = std::to_array<StandardObjectMemberFunc>(
+    {
+        {nullptr, nullptr},
+    });
+
+    static constexpr auto stdobjproperties_array = std::to_array<StandardObjectPropertyFunc>(
+    {
+        {"count", Builtins::protofn_array_length},
+        {"length", Builtins::protofn_array_length},
+
+    });
+
+    static constexpr auto stdobjmethods_array = std::to_array<StandardObjectMemberFunc>(
+    {
+        {"add", Builtins::memberfn_array_add},
+        {"insert", Builtins::memberfn_array_insert},
+        {"remove", Builtins::memberfn_array_remove},
+    });
+
+    template<typename Type, size_t sz, typename DestType>
+    bool get_thing(const std::array<Type, sz>& ary, std::string_view name, DestType& dest)
+    {
+        size_t i;
+        for(i=0; i<sz; i++)
+        {
+            if(ary[i].name == nullptr)
+            {
+                break;
+            }
+            if(name == ary[i].name)
+            {
+                dest = ary[i];
+                return true;
+            }
+        }
+        return false;
+    }
+
+    template<typename Type, size_t sz>
+    bool get_property(const std::array<Type, sz>& ary, std::string_view name, StandardObjectPropertyFunc& dest)
+    {
+        return get_thing<Type, sz>(ary, name, dest);
+    }
+
+    template<typename Type, size_t sz>
+    bool get_method(const std::array<Type, sz>& ary, std::string_view name, StandardObjectMemberFunc& dest)
+    {
+        return get_thing<Type, sz>(ary, name, dest);
+    }
 
     static std::shared_ptr<Object> ConvertExecutionErrorToObject(const ExecutionError& err)
     {
@@ -833,6 +893,8 @@ namespace MSL
         {
             Value vobj;
             const Value* memberval;
+            StandardObjectPropertyFunc prop;
+            StandardObjectMemberFunc meth;
             vobj = m_operand->evaluate(ctx, nullptr);
             if(vobj.isObject())
             {
@@ -843,21 +905,26 @@ namespace MSL
                         *othis = ThisType{ vobj.getObjectRef() };
                     return *memberval;
                 }
-                if(m_membername == "count")
-                    return Builtins::memberfn_object_count(ctx, getPlace(), std::move(vobj));
+                if(get_property(stdobjproperties_object, m_membername, prop))
+                {
+                    return prop.func(ctx, getPlace(), std::move(vobj));
+                }
+                else if(get_method(stdobjmethods_object, m_membername, meth))
+                {
+                    return Value{ meth.func };
+                }
                 return {};
             }
             if(vobj.isString())
             {
-                if((m_membername == "count") || (m_membername == "length") || (m_membername == "size"))
+                if(get_property(stdobjproperties_string, m_membername, prop))
                 {
-                    return Builtins::memberfn_string_count(ctx, getPlace(), std::move(vobj));
+                    return prop.func(ctx, getPlace(), std::move(vobj));
                 }
-                else if(m_membername == "resize")
+                else if(get_method(stdobjmethods_string, m_membername, meth))
                 {
-                    return Value{ SystemFunction::StringResizeFunc };
-                }
-                
+                    return Value{ meth.func };
+                }                
                 throw ExecutionError(getPlace(), "no such String member");
             }
             if(vobj.isArray())
@@ -866,27 +933,13 @@ namespace MSL
                 {
                     *othis = ThisType{ vobj.getArrayRef() };
                 }
-                if(m_membername == "count")
+                if(get_property(stdobjproperties_array, m_membername, prop))
                 {
-                    return Builtins::memberfn_array_count(ctx, getPlace(), std::move(vobj));
+                    return prop.func(ctx, getPlace(), std::move(vobj));
                 }
-                else if(m_membername == "add")
+                else if(get_method(stdobjmethods_array, m_membername, meth))
                 {
-                    #if 0
-                    return Value{ SystemFunction::ArrayAddFunc };
-                    #else
-                    auto v= Value{ Builtins::memberfn_array_add };
-                    fprintf(stderr, "v.type()=%d\n", v.type());
-                    return v;
-                    #endif
-                }
-                else if(m_membername == "insert")
-                {
-                    return Value{ SystemFunction::ArrayInsertFunc };
-                }
-                else if(m_membername == "remove")
-                {
-                    return Value{ SystemFunction::ArrayRemoveFunc };
+                    return Value{ meth.func };
                 }
                 throw ExecutionError(getPlace(), "no such Array member");
             }
@@ -1323,7 +1376,6 @@ namespace MSL
             {
                 arguments[i] = m_oplist[i + 1]->evaluate(ctx, nullptr);
             }
-            fprintf(stderr, "callee.type()=%d\n", callee.type());
             // Calling an object: Call its function under '' key.
             if(callee.isObject())
             {
@@ -1396,7 +1448,6 @@ namespace MSL
             }
             if(callee.type() == Value::Type::Type)
             {
-                fprintf(stderr, "callee.getTypeValue()=%d\n", callee.getTypeValue());
                 switch(callee.getTypeValue())
                 {
                     case Value::Type::Null:

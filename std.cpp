@@ -180,7 +180,7 @@ namespace MSL
                     }
                     break;
                     default:
-                        assert(0);
+                        fprintf(stderr, "unhandled type %d\n", val.type());
                 }
             }
             return {};
@@ -228,21 +228,21 @@ namespace MSL
             return Value{ result };
         }
 
-        Value memberfn_object_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal)
+        Value protofn_object_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal)
         {
             (void)ctx;
             MINSL_EXECUTION_CHECK(((objVal.isObject()) && (objVal.getObject())), place, ERROR_MESSAGE_EXPECTED_OBJECT);
             return Value{ (double)objVal.getObject()->size() };
         }
 
-        Value memberfn_array_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal)
+        Value protofn_array_length(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal)
         {
             (void)ctx;
             MINSL_EXECUTION_CHECK(((objVal.isArray()) && objVal.getArray()), place, ERROR_MESSAGE_EXPECTED_ARRAY);
             return Value{ (double)objVal.getArray()->m_items.size() };
         }
 
-        Value memberfn_string_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal)
+        Value protofn_string_length(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal)
         {
             (void)ctx;
             MINSL_EXECUTION_CHECK((objVal.isString()), place, ERROR_MESSAGE_EXPECTED_STRING);

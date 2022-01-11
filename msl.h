@@ -1334,12 +1334,12 @@ namespace MSL
         Value ctor_type(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
 
 
-        Value memberfn_object_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
+        Value protofn_object_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
 
-        Value memberfn_string_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
+        Value protofn_string_length(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
         Value memberfn_string_resize(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
 
-        Value memberfn_array_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
+        Value protofn_array_length(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
         Value memberfn_array_add(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
         Value memberfn_array_insert(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
         Value memberfn_array_remove(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);

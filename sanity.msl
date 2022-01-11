@@ -444,7 +444,7 @@ try
     }
     catch (ex)
     {
-        print('CATCH');
+        print("throwing in catch\n");
         throw ex;
     }
 }
@@ -455,7 +455,7 @@ function f()
 {
     try
     {
-        print('AAA');
+        print("before finally\n");
     }
     finally
     {
@@ -468,20 +468,20 @@ try
 }
 catch (ex)
 {
-    print(ex);
+    print("ex=", ex, "\n");
 }
 
 function f()
 {
     try
     {
-        print('try before throw');
+        print("try before throw\n");
         throw 1;
-        print('try after throw');
+        print("try after throw\n");
     }
     finally
     {
-        print('try finally');
+        print("try finally\n");
     }
 }
 try
@@ -490,7 +490,7 @@ try
 }
 catch (ex)
 {
-    print('catch', ex);
+    print('catch', ex, "\n");
 }
 
 function f()
@@ -526,7 +526,7 @@ function getNewChar()
     return 'D';
 }
 //globalArr[0][0] = getNewChar();
-print("typeOf(globalArr) = ", typeOf(globalArr));
+print("typeOf(globalArr) = ", typeOf(globalArr), "\n");
 
 // arrays
 
@@ -611,11 +611,11 @@ a.remove(1); /* 2, 4, 5 */
 a.insert(3, 100);
 a.insert(2, 101);
 a.insert(0, 102); /* 102, 2, 4, 101, 5, 100 */
-print(a.count, a[0], a[1], a[2], a[3], a[4], a[5]);
+print("array: count=", a.count, ", 0=", a[0], ", 1=", a[1], "2=", a[2], ", 3=", a[3], ", 4=", a[4], ", 5=", a[5], "\n");
 
 for (i: [1, 2, 3, 4, 5, 6])
 {
-    print(i);
+    print("array-iterate: i=", i, "\n");
     if (i == 3)
         break;
 }
