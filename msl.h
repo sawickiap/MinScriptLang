@@ -58,13 +58,13 @@ SOFTWARE.
     do                                                        \
     {                                                         \
         if(!(condition))                                      \
-            throw ExecutionError((place), (errorMessage));    \
+            throw Error::ExecutionError((place), (errorMessage));    \
     } while(false)
 
 #define MINSL_EXECUTION_FAIL(place, errorMessage)      \
     do                                                 \
     {                                                  \
-        throw ExecutionError((place), (errorMessage)); \
+        throw Error::ExecutionError((place), (errorMessage)); \
     } while(false)
 
 namespace MSL
@@ -76,57 +76,97 @@ namespace MSL
         uint32_t textcolumn;
     };
 
-    class Error : public std::exception
+    namespace Error
     {
-        private:
-            const PlaceInCode m_place;
-            mutable std::string m_what;
+        class Exception : public std::exception
+        {
+            private:
+                const PlaceInCode m_place;
+                mutable std::string m_what;
 
-        public:
-            inline Error(const PlaceInCode& place) : m_place{ place }
-            {
-            }
+            public:
+                inline Exception(const PlaceInCode& place) : m_place{ place }
+                {
+                }
 
-            inline const PlaceInCode& getPlace() const
-            {
-                return m_place;
-            }
+                inline const PlaceInCode& getPlace() const
+                {
+                    return m_place;
+                }
 
-            virtual const char* podMessage() const;
-            virtual std::string_view getMessage() const = 0;
-    };
+                inline virtual std::string_view name() const
+                {
+                    return "Exception";
+                }
 
-    class ParsingError : public Error
-    {
-        private:
-            const std::string_view m_message;// Externally owned
+                virtual std::string prettyMessage() const;
+                virtual std::string_view getMessage() const = 0;
+        };
 
-        public:
-            inline ParsingError(const PlaceInCode& place, const std::string_view& message) : Error{ place }, m_message{ message }
-            {
-            }
+        class ParsingError : public Exception
+        {
+            private:
+                const std::string_view m_message;// Externally owned
 
-            inline virtual std::string_view getMessage() const override
-            {
-                return m_message;
-            }
-    };
+            public:
+                inline ParsingError(const PlaceInCode& place, const std::string_view& message) : Exception{ place }, m_message{ message }
+                {
+                }
 
-    class ExecutionError : public Error
-    {
-        private:
-            const std::string m_message;
+                inline virtual std::string_view name() const override
+                {
+                    return "ParsingError";
+                }                    
 
-        public:
-            inline ExecutionError(const PlaceInCode& place, const std::string_view& message) : Error{ place }, m_message{ message }
-            {
-            }
+                inline virtual std::string_view getMessage() const override
+                {
+                    return m_message;
+                }
+        };
 
-            inline virtual std::string_view getMessage() const override
-            {
-                return m_message;
-            }
-    };
+        class ExecutionError : public Exception
+        {
+            private:
+                const std::string m_message;
+
+            public:
+                inline ExecutionError(const PlaceInCode& place, const std::string_view& message) : Exception{ place }, m_message{ message }
+                {
+                }
+
+                inline virtual std::string_view name() const override
+                {
+                    return "ExecutionError";
+                }
+
+                inline virtual std::string_view getMessage() const override
+                {
+                    return m_message;
+                }
+        };
+
+        class TypeError: public ExecutionError
+        {
+            public:
+                using ExecutionError::ExecutionError;
+
+                inline virtual std::string_view name() const override
+                {
+                    return "TypeError";
+                }
+        };
+
+        class ArgumentError: public ExecutionError
+        {
+            public:
+                using ExecutionError::ExecutionError;
+
+                inline virtual std::string_view name() const override
+                {
+                    return "ArgumentError";
+                }
+        };
+    }
 
     namespace AST
     {
@@ -138,11 +178,11 @@ namespace MSL
     class /**/Object;
     class /**/Array;
     class /**/Environment;
-    enum class /**/SystemFunction;
 
     using HostFunction           = Value(Environment&, const PlaceInCode&, std::vector<Value>&&);
     using MemberMethodFunction   = Value(AST::ExecutionContext&, const PlaceInCode&, const AST::ThisType&, std::vector<Value>&&);
     using MemberPropertyFunction = Value(AST::ExecutionContext&, const PlaceInCode&, Value&&);
+
     class Value
     {
         public:
@@ -152,7 +192,6 @@ namespace MSL
                 Number,
                 String,
                 Function,
-                SystemFunction,
                 HostFunction,
                 Object,
                 Array,
@@ -166,13 +205,39 @@ namespace MSL
             using StringValType = std::string;
             using AstFuncValType = const AST::FunctionDefinition*;
             using HostFuncValType = HostFunction*;
-            using SystemFuncValType = SystemFunction;
             using MemberFuncValType = MemberMethodFunction*;
             using MemberPropValType = MemberPropertyFunction*;
             using ObjectValType = std::shared_ptr<Object>;
             using ArrayValType = std::shared_ptr<Array>;
             // redundant use of redundant names cause redundancy, claim redundancy students of a study about redundancy
             using TypeValType = Type;
+
+        public:
+            inline static std::string_view getTypeName(Type t)
+            {
+                switch(t)
+                {
+                    case Type::Null:
+                        return "Null";
+                    case Type::Number:
+                        return "Number";
+                    case Type::String:
+                        return "String";
+                    case Type::Function:
+                    case Type::HostFunction:
+                    case Type::MemberMethod:
+                        return "Function";
+                    case Type::Object:
+                        return "Object";
+                    case Type::Array:
+                        return "Array";
+                    case Type::Type:
+                        return "Type";
+                    default:
+                        break;
+                }
+                return "Null";
+            }
 
         private:
             using VariantType = std::variant<
@@ -184,8 +249,6 @@ namespace MSL
                 StringValType,
                 // Value::Type::Function
                 AstFuncValType,
-                // Value::Type::SystemFunction
-                SystemFuncValType,
                 // Value::Type::HostFunction
                 HostFuncValType,
                 // Value::Type::Object
@@ -218,10 +281,6 @@ namespace MSL
             }
 
             inline explicit Value(const AST::FunctionDefinition* func) : m_type{ Type::Function }, m_variant{ func }
-            {
-            }
-
-            inline explicit Value(SystemFunction func) : m_type{ Type::SystemFunction }, m_variant{ func }
             {
             }
 
@@ -277,12 +336,6 @@ namespace MSL
             {
                 assert(m_type == Type::Function && std::get<AstFuncValType>(m_variant));
                 return std::get<AstFuncValType>(m_variant);
-            }
-
-            inline SystemFuncValType getSysFunction() const
-            {
-                assert(m_type == Type::SystemFunction);
-                return std::get<SystemFuncValType>(m_variant);
             }
 
             inline HostFuncValType getHostFunction() const
@@ -442,54 +495,9 @@ namespace MSL
             }
     };
 
-
     // I would like it to be higher, but above that, even at 128, it crashes with
     // native "stack overflow" in Debug configuration.
     static const size_t LOCAL_SCOPE_STACK_MAX_SIZE = 100;
-
-    static constexpr std::string_view ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT
-    = "Unexpected end of file inside multiline comment.";
-    static constexpr std::string_view ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING = "Unexpected end of file inside string.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_EXPRESSION = "Expected expression.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_STATEMENT = "Expected statement.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_CONSTANT_VALUE = "Expected constant value.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_IDENTIFIER = "Expected identifier.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_LVALUE = "Expected l-value.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_NUMBER = "Expected number.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_STRING = "Expected string.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_OBJECT = "Expected object.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_ARRAY = "Expected array.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER = "Expected object member.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_SINGLE_CHARACTER_STRING = "Expected single character string.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_SYMBOL = "Expected symbol.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_SYMBOL_COLON = "Expected symbol ':'.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON = "Expected symbol ';'.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN = "Expected symbol '('.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE = "Expected symbol ')'.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN = "Expected symbol '{'.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE = "Expected symbol '}'.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE = "Expected symbol ']'.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_SYMBOL_DOT = "Expected symbol '.'.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE = "Expected 'while'.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT = "Expected unique constant.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_1_ARGUMENT = "Expected 1 argument.";
-    static constexpr std::string_view ERROR_MESSAGE_EXPECTED_2_ARGUMENTS = "Expected 2 arguments.";
-    static constexpr std::string_view ERROR_MESSAGE_VARIABLE_DOESNT_EXIST = "Variable doesn't exist.";
-    static constexpr std::string_view ERROR_MESSAGE_OBJECT_MEMBER_DOESNT_EXIST = "Object member doesn't exist.";
-    static constexpr std::string_view ERROR_MESSAGE_NOT_IMPLEMENTED = "Not implemented.";
-    static constexpr std::string_view ERROR_MESSAGE_BREAK_WITHOUT_LOOP = "Break without a loop.";
-    static constexpr std::string_view ERROR_MESSAGE_CONTINUE_WITHOUT_LOOP = "Continue without a loop.";
-    static constexpr std::string_view ERROR_MESSAGE_INCOMPATIBLE_TYPES = "Incompatible types.";
-    static constexpr std::string_view ERROR_MESSAGE_INDEX_OUT_OF_BOUNDS = "Index out of bounds.";
-    static constexpr std::string_view ERROR_MESSAGE_PARAMETER_NAMES_MUST_BE_UNIQUE = "Parameter naems must be unique.";
-    static constexpr std::string_view ERROR_MESSAGE_NO_LOCAL_SCOPE = "There is no local scope here.";
-    static constexpr std::string_view ERROR_MESSAGE_NO_THIS = "There is no 'this' here.";
-    static constexpr std::string_view ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT = "Repeating key in object.";
-    static constexpr std::string_view ERROR_MESSAGE_STACK_OVERFLOW = "Stack overflow.";
-    static constexpr std::string_view ERROR_MESSAGE_BASE_MUST_BE_OBJECT = "Base must be object.";
-
-    static constexpr std::string_view VALUE_TYPE_NAMES[]
-    = { "Null", "Number", "String", "Function", "Function", "Function", "Object", "Array", "Type" };
 
     static constexpr std::string_view SYMBOL_STR[] = {
         // Token types
@@ -647,17 +655,6 @@ namespace MSL
             void getNextToken(Token& out);
     };
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // Value definition
-
-    enum class SystemFunction
-    {
-        StringResizeFunc,
-        ArrayAddFunc,
-        ArrayInsertFunc,
-        ArrayRemoveFunc,
-        FuncCount
-    };
     static constexpr std::string_view SYSTEM_FUNCTION_NAMES[] =
     {
         "resize", "add", "insert", "remove",
@@ -737,7 +734,9 @@ namespace MSL
                         : m_context{ ctx }
                         {
                             if(ctx.m_localscopes.size() == LOCAL_SCOPE_STACK_MAX_SIZE)
-                                throw ExecutionError{ place, ERROR_MESSAGE_STACK_OVERFLOW };
+                            {
+                                throw Error::ExecutionError{ place, "stack overflow" };
+                            }
                             ctx.m_localscopes.push_back(localScope);
                             ctx.m_thislist.push_back(std::move(thisObj));
                         }
@@ -991,7 +990,7 @@ namespace MSL
             virtual LValue getLeftValue(ExecutionContext& ctx) const
             {
                 (void)ctx;
-                MINSL_EXECUTION_CHECK(false, getPlace(), ERROR_MESSAGE_EXPECTED_LVALUE);
+                MINSL_EXECUTION_CHECK(false, getPlace(), "expected lvalue");
             }
 
             virtual void execute(ExecutionContext& ctx) const
@@ -1223,10 +1222,7 @@ namespace MSL
 
     }// namespace AST
 
-    static inline void CheckNumberOperand(const AST::Expression* operand, const Value& value)
-    {
-        MINSL_EXECUTION_CHECK(value.isNumber(), operand->getPlace(), ERROR_MESSAGE_EXPECTED_NUMBER);
-    }
+
 
     ////////////////////////////////////////////////////////////////////////////////
     // Parser definition
@@ -1317,31 +1313,4 @@ namespace MSL
     std::shared_ptr<Object> CopyObject(const Object& src);
     bool NumberToIndex(size_t& outIndex, double number);
 
-    namespace Builtins
-    {
-
-        Value func_typeof(Environment& env, const PlaceInCode& place, std::vector<Value>&& args);
-        Value func_print(Environment& env, const PlaceInCode& place, std::vector<Value>&& args);
-        Value func_min(Environment& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value func_max(Environment& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-
-        Value ctor_null(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value ctor_number(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value ctor_string(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value ctor_object(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value ctor_array(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value ctor_function(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value ctor_type(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-
-
-        Value protofn_object_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
-
-        Value protofn_string_length(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
-        Value memberfn_string_resize(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
-
-        Value protofn_array_length(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
-        Value memberfn_array_add(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_array_insert(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_array_remove(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
-    }
 }

@@ -37,6 +37,11 @@ bool readfile(const std::string& fname, std::string& destbuf)
     return true;
 }
 
+void printException(const MSL::Error::Exception& e)
+{
+    std::cerr << "uncaught error line " << e.getPlace().textrow << ": (" << e.prettyMessage() << std::endl;
+}
+
 int main(int argc, char* argv[])
 {
     std::string filename;
@@ -51,9 +56,9 @@ int main(int argc, char* argv[])
             {
                 env.execute(filedata);
             }
-            catch(MSL::Error& e)
+            catch(MSL::Error::Exception& e)
             {
-                fprintf(stderr, "error: %s\n", e.podMessage());
+                printException(e);
             }
         }
         else

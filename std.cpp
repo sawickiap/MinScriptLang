@@ -67,8 +67,8 @@ namespace MSL
         Value ctor_null(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
         {
             (void)ctx;
-            MINSL_EXECUTION_CHECK((args.empty() || ((args.size() == 1) && (args[0].isNull()))), place,
-                                  "Null can be constructed only from no arguments or from another null value.");
+            (void)place;
+            (void)args;
             return {};
         }
 
@@ -97,8 +97,10 @@ namespace MSL
             {
                 return Value{ std::make_shared<Object>() };
             }
-            MINSL_EXECUTION_CHECK(((args.size() == 1) && (args[0].isObject())), place,
-                                  "Object can be constructed only from no arguments or from another object value.");
+            if((args.size() == 0) || !args[0].isObject())
+            {
+                throw Error::ArgumentError(place, "Object can be constructed only from no arguments or from another object value.");
+            }
             return Value{ CopyObject(*args[0].getObject()) };
         }
 
@@ -109,143 +111,137 @@ namespace MSL
             {
                 return Value{ std::make_shared<Array>() };
             }
-            MINSL_EXECUTION_CHECK(((args.size() == 1) && (args[0].isArray())), place,
-                                  "Array can be constructed only from no arguments or from another array value.");
+            if((args.size() == 0) || !args[0].isArray())
+            {
+                throw Error::ArgumentError(place, "Array can be constructed only from no arguments or from another array value.");
+            }
             return Value{ CopyArray(*args[0].getArray()) };
         }
 
         Value ctor_function(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
         {
             (void)ctx;
-            MINSL_EXECUTION_CHECK(
-                ((args.size() == 1) && ((args[0].type() == Value::Type::Function) || (args[0].type() == Value::Type::SystemFunction))),
-                                  place, "Function can be constructed only from another function value.");
+            if((args.size() == 0) || ((args[0].type() != Value::Type::Function) && (args[0].type() != Value::Type::MemberMethod)))
+            {
+                throw Error::ArgumentError(place, "Function can be constructed only from another function value.");
+            }
             return Value{ args[0] };
         }
 
         Value ctor_type(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
         {
             (void)ctx;
-            MINSL_EXECUTION_CHECK(
-                ((args.size() == 1) && (args[0].type() == Value::Type::Type)), place,
-                                  "Type can be constructed only from another type value.");
+            {
+                if(args.size() > 0)
+                {
+                    fprintf(stderr, "ctor_type: args[0].type()=%d\n", args[0].type());
+                }
+            }
+            if((args.size() == 0) || (args[0].type() != Value::Type::Type))
+            {
+                
+                throw Error::ArgumentError(place, "Type can be constructed only from another type value.");
+            }
             return Value{ args[0] };
-        }
-
-        Value func_typeof(Environment& env, const PlaceInCode& place, std::vector<Value>&& args)
-        {
-            (void)env;
-            MINSL_EXECUTION_CHECK((args.size() == 1), place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
-            return Value{ args[0].type() };
-        }
-
-        Value func_print(Environment& env, const PlaceInCode& place, std::vector<Value>&& args)
-        {
-            std::string s;
-            (void)place;
-            for(const auto& val : args)
-            {
-                switch(val.type())
-                {
-                    case Value::Type::Null:
-                        env.Print("null");
-                        break;
-                    case Value::Type::Number:
-                        s = Format("%g", val.getNumber());
-                        env.Print(s);
-                        break;
-                    case Value::Type::String:
-                        if(!val.getString().empty())
-                        {
-                            env.Print(val.getString());
-                        }
-                        break;
-                    case Value::Type::Function:
-                    case Value::Type::SystemFunction:
-                    case Value::Type::HostFunction:
-                        env.Print("function");
-                        break;
-                    case Value::Type::Object:
-                        env.Print("object");
-                        break;
-                    case Value::Type::Array:
-                        env.Print("array");
-                        break;
-                    case Value::Type::Type:
-                    {
-                        const size_t typeIndex = (size_t)val.getTypeValue();
-                        const std::string_view& typeName = VALUE_TYPE_NAMES[typeIndex];
-                        s = Format("%.*s", (int)typeName.length(), typeName.data());
-                        env.Print(s);
-                    }
-                    break;
-                    default:
-                        fprintf(stderr, "unhandled type %d\n", val.type());
-                }
-            }
-            return {};
-        }
-        Value func_min(Environment& ctx, const PlaceInCode& place, std::vector<Value>&& args)
-        {
-            size_t i;
-            size_t argCount;
-            double result;
-            double argNum;
-            (void)ctx;
-            argCount = args.size();
-            MINSL_EXECUTION_CHECK((argCount > 0), place, "Built-in function min requires at least 1 argument.");
-            result = 0.0;
-            for(i = 0; i < argCount; ++i)
-            {
-                MINSL_EXECUTION_CHECK(args[i].isNumber(), place, "Built-in function min requires number arguments.");
-                argNum = args[i].getNumber();
-                if(i == 0 || argNum < result)
-                {
-                    result = argNum;
-                }
-            }
-            return Value{ result };
-        }
-        Value func_max(Environment& ctx, const PlaceInCode& place, std::vector<Value>&& args)
-        {
-            size_t i;
-            size_t argCount;
-            double argNum;
-            double result;
-            (void)ctx;
-            argCount = args.size();
-            MINSL_EXECUTION_CHECK((argCount > 0), place, "Built-in function min requires at least 1 argument.");
-            result = 0.0;
-            for(i = 0; i < argCount; ++i)
-            {
-                MINSL_EXECUTION_CHECK(args[i].isNumber(), place, "Built-in function min requires number arguments.");
-                argNum = args[i].getNumber();
-                if(i == 0 || argNum > result)
-                {
-                    result = argNum;
-                }
-            }
-            return Value{ result };
         }
 
         Value protofn_object_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal)
         {
             (void)ctx;
-            MINSL_EXECUTION_CHECK(((objVal.isObject()) && (objVal.getObject())), place, ERROR_MESSAGE_EXPECTED_OBJECT);
-            return Value{ (double)objVal.getObject()->size() };
+            Object* obj;
+            if(!objVal.isObject() || ((obj = objVal.getObject()) == nullptr))
+            {
+                throw Error::TypeError(place, "Object() requires an object");
+            }
+            return Value{ (double)obj->size() };
         }
 
         Value protofn_array_length(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal)
         {
             (void)ctx;
-            MINSL_EXECUTION_CHECK(((objVal.isArray()) && objVal.getArray()), place, ERROR_MESSAGE_EXPECTED_ARRAY);
+            Array* arr;
+            if(!objVal.isArray() || ((arr = objVal.getArray()) == nullptr))
+            {
+                throw Error::TypeError(place, "Array.length called on something not an Array");
+            }
             return Value{ (double)objVal.getArray()->m_items.size() };
+        }
+
+
+        Value memberfn_array_add(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
+        {
+            size_t i;
+            Array* arr;
+            (void)ctx;
+            (void)th;
+            arr = th.getArray();
+            if(!arr)
+            {
+                throw Error::TypeError(place, "Array.add() called on something not an Array");
+            }
+            if(args.size() == 0)
+            {
+                throw Error::ArgumentError(place, "Array.add() requires at least 1 argument");
+            }
+            for(i=0; i<args.size(); i++)
+            {
+                arr->m_items.push_back(std::move(args[i]));
+            }
+            return {};
+        }
+
+        Value memberfn_array_insert(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
+        {
+            Array* arr;
+            (void)ctx;
+            arr = th.getArray();
+            if(!arr)
+            {
+                throw Error::ArgumentError(place, "Array.insert() called on something not an Array");
+            }
+            if(args.size() != 2)
+            {
+                throw Error::ArgumentError(place, "Array.insert() requires at least 2 arguments");
+            }
+            size_t index;
+            index= 0;
+            if(!args[0].isNumber() || !NumberToIndex(index, args[0].getNumber()))
+            {
+                throw Error::ExecutionError(place, "cannot insert out-of-bounds");
+            }
+            arr->m_items.insert(arr->m_items.begin() + index, std::move(args[1]));
+            return {};
+        }
+
+        Value memberfn_array_remove(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
+        {
+            Array* arr;
+            (void)ctx;
+            arr = th.getArray();
+            if(!arr)
+            {
+                throw Error::TypeError(place, "expected array object");
+            }
+            if(args.size() == 0)
+            {
+                throw Error::TypeError(place, "too few arguments");
+            }
+            size_t index = 0;
+            if(!args[0].isNumber() || !NumberToIndex(index, args[0].getNumber()))
+            {
+                throw Error::ExecutionError(place, "cannot remove out-of-bounds");
+            }
+            arr->m_items.erase(arr->m_items.begin() + index);
+            return {};
         }
 
         Value protofn_string_length(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal)
         {
             (void)ctx;
-            MINSL_EXECUTION_CHECK((objVal.isString()), place, ERROR_MESSAGE_EXPECTED_STRING);
+            if(!objVal.isString())
+            {
+                throw Error::TypeError(place, "expected string object");
+            }
             return Value{ (double)objVal.getString().length() };
         }
 
@@ -259,45 +255,6 @@ namespace MSL
             return {};
         }
 
-        Value memberfn_array_add(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
-        {
-            Array* arr;
-            (void)ctx;
-            (void)th;
-            arr = th.getArray();
-            MINSL_EXECUTION_CHECK(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
-            MINSL_EXECUTION_CHECK(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
-            arr->m_items.push_back(std::move(args[0]));
-            return {};
-        }
-
-        Value memberfn_array_insert(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
-        {
-            Array* arr;
-            (void)ctx;
-            arr = th.getArray();
-            MINSL_EXECUTION_CHECK(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
-            MINSL_EXECUTION_CHECK(args.size() == 2, place, ERROR_MESSAGE_EXPECTED_2_ARGUMENTS);
-            size_t index = 0;
-            MINSL_EXECUTION_CHECK(args[0].isNumber() && NumberToIndex(index, args[0].getNumber()),
-                                  place, "cannot insert out-of-bounds");
-            arr->m_items.insert(arr->m_items.begin() + index, std::move(args[1]));
-            return {};
-        }
-
-        Value memberfn_array_remove(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
-        {
-            Array* arr;
-            (void)ctx;
-            arr = th.getArray();
-            MINSL_EXECUTION_CHECK(arr, place, ERROR_MESSAGE_EXPECTED_ARRAY);
-            MINSL_EXECUTION_CHECK(args.size() == 1, place, ERROR_MESSAGE_EXPECTED_1_ARGUMENT);
-            size_t index = 0;
-            MINSL_EXECUTION_CHECK(args[0].isNumber() && NumberToIndex(index, args[0].getNumber()),
-                                  place, "cannot remove out-of-bounds");
-            arr->m_items.erase(arr->m_items.begin() + index);
-            return {};
-        }
     }
 }
 

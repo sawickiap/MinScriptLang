@@ -21,9 +21,10 @@ print("b=", b.count, "\n");
 print("foo=", foo, "\n");
 
 print("------------\n");
-print("String=", String, "\n");
+print("String=", Array(), "\n");
 print("\"foo\".length() = ", "foo".length, "\n");
 
+/*
 String["qurk"] = function()
 {
     print("qurk() called: self=\"", this, "\"\n");
@@ -31,4 +32,4 @@ String["qurk"] = function()
 };
 
 print("\"foo\".qurk() = ","foo".qurk(), "\n");
-
+*/

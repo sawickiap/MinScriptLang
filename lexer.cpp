@@ -166,7 +166,7 @@ namespace MSL
                 for(m_code.MoveChars(2);; m_code.moveOneChar())
                 {
                     if(m_code.isAtEnd())
-                        throw ParsingError(m_code.getCurrentPlace(), ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_MULTILINE_COMMENT);
+                        throw Error::ParsingError(m_code.getCurrentPlace(), "unexpected EOF while looking for end of comment block");
                     else if(m_code.peekNext("*/", 2))
                     {
                         m_code.MoveChars(2);
@@ -204,7 +204,7 @@ namespace MSL
             while(tokenLen < currentCodeLen && IsHexadecimalNumber(currentCode[tokenLen]))
                 ++tokenLen;
             if(tokenLen < 3)
-                throw ParsingError(out.m_place, "invalid number");
+                throw Error::ParsingError(out.m_place, "invalid number");
             n = 0;
             for(i = 2; i < tokenLen; ++i)
             {
@@ -239,11 +239,11 @@ namespace MSL
                 while(tokenLen < currentCodeLen && IsDecimalNumber(currentCode[tokenLen]))
                     ++tokenLen;
                 if(tokenLen - tokenLenBeforeExponent == 0)
-                    throw ParsingError(out.m_place, "invalid number: bad exponent");
+                    throw Error::ParsingError(out.m_place, "invalid number: bad exponent");
             }
             if(tokenLen >= kBufSize)
             {
-                throw ParsingError(out.m_place, "invalid number");
+                throw Error::ParsingError(out.m_place, "invalid number");
             }
             memcpy(sz, currentCode, tokenLen);
             sz[tokenLen] = 0;
@@ -251,7 +251,7 @@ namespace MSL
         }
         // Letters straight after number are invalid.
         if(tokenLen < currentCodeLen && IsAlpha(currentCode[tokenLen]))
-            throw ParsingError(out.m_place, "invalid number followed by alpha letters");
+            throw Error::ParsingError(out.m_place, "invalid number followed by alpha letters");
         out.symtype = Token::Type::Number;
         m_code.MoveChars(tokenLen);
         return true;
@@ -276,14 +276,14 @@ namespace MSL
         for(;;)
         {
             if(tokenLen == currCodeLen)
-                throw ParsingError(out.m_place, ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING);
+                throw Error::ParsingError(out.m_place, "unexpected EOF while parsing string");
             if(currCode[tokenLen] == delimiterCh)
                 break;
             if(currCode[tokenLen] == '\\')
             {
                 ++tokenLen;
                 if(tokenLen == currCodeLen)
-                    throw ParsingError(out.m_place, ERROR_MESSAGE_UNEXPECTED_END_OF_FILE_IN_STRING);
+                    throw Error::ParsingError(out.m_place, "unexpected EOF while parsing string");
                 switch(currCode[tokenLen])
                 {
                     case '\\':
@@ -342,7 +342,7 @@ namespace MSL
                     {
                         uint32_t val = 0;
                         if(tokenLen + 2 >= currCodeLen || !parseHexLiteral(val, std::string_view{ currCode + tokenLen + 1, 2 }))
-                            throw ParsingError(out.m_place, "invalid string escape sequence: '\\x' too short");
+                            throw Error::ParsingError(out.m_place, "invalid string escape sequence: '\\x' too short");
                         out.stringval += (char)(uint8_t)val;
                         tokenLen += 3;
                         break;
@@ -351,9 +351,9 @@ namespace MSL
                     {
                         uint32_t val = 0;
                         if(tokenLen + 4 >= currCodeLen || !parseHexLiteral(val, std::string_view{ currCode + tokenLen + 1, 4 }))
-                            throw ParsingError(out.m_place, "invalid string escape sequence: unicode too short");
+                            throw Error::ParsingError(out.m_place, "invalid string escape sequence: unicode too short");
                         if(!appendUTF8Char(out.stringval, val))
-                            throw ParsingError(out.m_place, "invalid string escape sequence: invalid unicode");
+                            throw Error::ParsingError(out.m_place, "invalid string escape sequence: invalid unicode");
                         tokenLen += 5;
                         break;
                     }
@@ -361,14 +361,14 @@ namespace MSL
                     {
                         uint32_t val = 0;
                         if(tokenLen + 8 >= currCodeLen || !parseHexLiteral(val, std::string_view{ currCode + tokenLen + 1, 8 }))
-                            throw ParsingError(out.m_place, "invalid string escape sequence: bad hexadecimal");
+                            throw Error::ParsingError(out.m_place, "invalid string escape sequence: bad hexadecimal");
                         if(!appendUTF8Char(out.stringval, val))
-                            throw ParsingError(out.m_place,"invalid string escape sequence: bad unicode");
+                            throw Error::ParsingError(out.m_place,"invalid string escape sequence: bad unicode");
                         tokenLen += 9;
                         break;
                     }
                     default:
-                        throw ParsingError(out.m_place, "invalid string escape sequence: unknown escape sequence");
+                        throw Error::ParsingError(out.m_place, "invalid string escape sequence: unknown escape sequence");
                 }
             }
             else
@@ -377,7 +377,7 @@ namespace MSL
         ++tokenLen;
         // Letters straight after string are invalid.
         if(tokenLen < currCodeLen && IsAlpha(currCode[tokenLen]))
-            throw ParsingError(out.m_place, "invalid string followed by letters");
+            throw Error::ParsingError(out.m_place, "invalid string followed by letters");
         m_code.MoveChars(tokenLen);
         return true;
     }
@@ -450,7 +450,7 @@ namespace MSL
             m_code.MoveChars(tokenLen);
             return;
         }
-        throw ParsingError(out.m_place, "unexpected token");
+        throw Error::ParsingError(out.m_place, "unexpected token");
     }
 }
 

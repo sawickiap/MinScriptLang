@@ -3,6 +3,119 @@
 
 namespace MSL
 {
+    namespace Builtins
+    {
+        Value func_typeof(Environment& env, const PlaceInCode& place, std::vector<Value>&& args)
+        {
+            (void)env;
+            if(args.size() == 0)
+            {
+                throw Error::ArgumentError(place, "typeof() requires exactly 1 argument");
+            }
+            return Value{ args[0].type() };
+        }
+
+        Value func_print(Environment& env, const PlaceInCode& place, std::vector<Value>&& args)
+        {
+            std::string s;
+            (void)place;
+            for(const auto& val : args)
+            {
+                switch(val.type())
+                {
+                    case Value::Type::Null:
+                        env.Print("null");
+                        break;
+                    case Value::Type::Number:
+                        s = Format("%g", val.getNumber());
+                        env.Print(s);
+                        break;
+                    case Value::Type::String:
+                        if(!val.getString().empty())
+                        {
+                            env.Print(val.getString());
+                        }
+                        break;
+                    case Value::Type::Function:
+                    case Value::Type::HostFunction:
+                        env.Print("function");
+                        break;
+                    case Value::Type::Object:
+                        env.Print("object");
+                        break;
+                    case Value::Type::Array:
+                        env.Print("array");
+                        break;
+                    case Value::Type::Type:
+                    {
+                        //const size_t typeIndex = (size_t)val.getTypeValue();
+                        //const std::string_view& typeName = VALUE_TYPE_NAMES[typeIndex];
+                        const std::string_view& typeName = Value::getTypeName(val.getTypeValue());
+                        s = Format("%.*s", (int)typeName.length(), typeName.data());
+                        env.Print(s);
+                    }
+                    break;
+                    default:
+                        fprintf(stderr, "unhandled type %d\n", val.type());
+                }
+            }
+            return {};
+        }
+        Value func_min(Environment& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+        {
+            size_t i;
+            size_t argCount;
+            double result;
+            double argNum;
+            (void)ctx;
+            argCount = args.size();
+            if(argCount == 0)
+            {
+                throw Error::ArgumentError(place, "Built-in function min requires at least 1 argument.");
+            }
+            result = 0.0;
+            for(i = 0; i < argCount; ++i)
+            {
+                if(!args[i].isNumber())
+                {
+                    throw Error::ArgumentError(place, "Built-in function min requires number arguments.");
+                }
+                argNum = args[i].getNumber();
+                if(i == 0 || argNum < result)
+                {
+                    result = argNum;
+                }
+            }
+            return Value{ result };
+        }
+        Value func_max(Environment& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+        {
+            size_t i;
+            size_t argCount;
+            double argNum;
+            double result;
+            (void)ctx;
+            argCount = args.size();
+            if(argCount == 0)
+            {
+                throw Error::ArgumentError(place, "Built-in function min requires at least 1 argument.");
+            }
+            result = 0.0;
+            for(i = 0; i < argCount; ++i)
+            {
+                if(!args[i].isNumber())
+                {
+                    throw Error::ArgumentError(place, "Built-in function min requires number arguments.");
+                }
+                argNum = args[i].getNumber();
+                if(i == 0 || argNum > result)
+                {
+                    result = argNum;
+                }
+            }
+            return Value{ result };
+        }
+    }
 
     Value EnvironmentPimpl::execute(const std::string_view& code)
     {
@@ -26,8 +139,9 @@ namespace MSL
 
     std::string_view EnvironmentPimpl::getTypeName(Value::Type type) const
     {
-        return VALUE_TYPE_NAMES[(size_t)type];
+        //return VALUE_TYPE_NAMES[(size_t)type];
         // TODO support custom types
+        return Value::getTypeName(type);
     }
 
     ////////////////////////////////////////////////////////////////////////////////

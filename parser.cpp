@@ -7,7 +7,7 @@ namespace MSL
         do                                                                  \
         {                                                                   \
             if(!(result))                                                   \
-                throw ParsingError(getCurrentTokenPlace(), (errorMessage)); \
+                throw Error::ParsingError(getCurrentTokenPlace(), (errorMessage)); \
         } while(false)
 
     void Parser::ParseScript(AST::Script& outScript)
@@ -27,7 +27,7 @@ namespace MSL
 
         parseBlock(outScript);
         if(m_toklist[m_tokidx].symtype != Token::Type::End)
-            throw ParsingError(getCurrentTokenPlace(), "parsing error: expected End");
+            throw Error::ParsingError(getCurrentTokenPlace(), "parsing error: expected End");
 
         //outScript.debugPrint(0, "Script: "); // #DELME
     }
@@ -49,7 +49,7 @@ namespace MSL
         // 'default' ':' Block
         if(tryParseSymbol(Token::Type::Default))
         {
-            MUST_PARSE(tryParseSymbol(Token::Type::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON);
+            MUST_PARSE(tryParseSymbol(Token::Type::Colon), "expected ':'");
             switchStatement.m_itemvals.push_back(std::unique_ptr<AST::ConstantValue>{});
             switchStatement.m_itemblocks.push_back(std::make_unique<AST::Block>(place));
             parseBlock(*switchStatement.m_itemblocks.back());
@@ -59,9 +59,9 @@ namespace MSL
         if(tryParseSymbol(Token::Type::Case))
         {
             std::unique_ptr<AST::ConstantValue> constVal;
-            MUST_PARSE(constVal = tryParseConstVal(), ERROR_MESSAGE_EXPECTED_CONSTANT_VALUE);
+            MUST_PARSE(constVal = tryParseConstVal(), "expected constant value");
             switchStatement.m_itemvals.push_back(std::move(constVal));
-            MUST_PARSE(tryParseSymbol(Token::Type::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON);
+            MUST_PARSE(tryParseSymbol(Token::Type::Colon), "expected ':'");
             switchStatement.m_itemblocks.push_back(std::make_unique<AST::Block>(place));
             parseBlock(*switchStatement.m_itemblocks.back());
             return true;
@@ -71,21 +71,21 @@ namespace MSL
 
     void Parser::parseFuncDef(AST::FunctionDefinition& funcDef)
     {
-        MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN);
+        MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), "expected '(' while parsing function definition");
         if(m_toklist[m_tokidx].symtype == Token::Type::Identifier)
         {
             funcDef.m_paramlist.push_back(m_toklist[m_tokidx++].stringval);
             while(tryParseSymbol(Token::Type::Comma))
             {
-                MUST_PARSE(m_toklist[m_tokidx].symtype == Token::Type::Identifier, ERROR_MESSAGE_EXPECTED_IDENTIFIER);
+                MUST_PARSE(m_toklist[m_tokidx].symtype == Token::Type::Identifier, "expected identifier while parsing function definition");
                 funcDef.m_paramlist.push_back(m_toklist[m_tokidx++].stringval);
             }
         }
-        MUST_PARSE(funcDef.areParamsUnique(), ERROR_MESSAGE_PARAMETER_NAMES_MUST_BE_UNIQUE);
-        MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE);
-        MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN);
+        MUST_PARSE(funcDef.areParamsUnique(), "expected argument list of function definition to be unique");
+        MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected ')' while parsing function definition");
+        MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketOpen), "expected '{' while parsing function definition");
         parseBlock(funcDef.m_body);
-        MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE);
+        MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketClose), "expected '}' while parsing function definition");
     }
 
     bool Parser::peekSymbols(std::initializer_list<Token::Type> symbols)
@@ -111,31 +111,31 @@ namespace MSL
         {
             auto block = std::make_unique<AST::Block>(getCurrentTokenPlace());
             parseBlock(*block);
-            MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE);
+            MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketClose), "expected '}' after block");
             return block;
         }
 
         // Condition: 'if' '(' Expr17 ')' Statement [ 'else' Statement ]
         if(tryParseSymbol(Token::Type::If))
         {
-            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN);
+            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), "expected '(' after 'if'");
             auto condition = std::make_unique<AST::Condition>(place);
-            MUST_PARSE(condition->m_condexpr = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
-            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE);
-            MUST_PARSE(condition->m_statements[0] = tryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+            MUST_PARSE(condition->m_condexpr = TryParseExpr17(), "expected expression after 'if'");
+            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected ')'");
+            MUST_PARSE(condition->m_statements[0] = tryParseStatement(), "expected a statement after 'if'");
             if(tryParseSymbol(Token::Type::Else))
-                MUST_PARSE(condition->m_statements[1] = tryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+                MUST_PARSE(condition->m_statements[1] = tryParseStatement(), "expected statement after 'else'");
             return condition;
         }
 
         // Loop: 'while' '(' Expr17 ')' Statement
         if(tryParseSymbol(Token::Type::While))
         {
-            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN);
+            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), "expected '(' after 'while'");
             auto loop = std::make_unique<AST::WhileLoop>(place, AST::WhileLoop::Type::While);
-            MUST_PARSE(loop->m_condexpr = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
-            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE);
-            MUST_PARSE(loop->m_body = tryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+            MUST_PARSE(loop->m_condexpr = TryParseExpr17(), "expected expression after 'while'");
+            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected ')'");
+            MUST_PARSE(loop->m_body = tryParseStatement(), "expected statement after 'while'");
             return loop;
         }
 
@@ -143,35 +143,35 @@ namespace MSL
         if(tryParseSymbol(Token::Type::Do))
         {
             auto loop = std::make_unique<AST::WhileLoop>(place, AST::WhileLoop::Type::DoWhile);
-            MUST_PARSE(loop->m_body = tryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
-            MUST_PARSE(tryParseSymbol(Token::Type::While), ERROR_MESSAGE_EXPECTED_SYMBOL_WHILE);
-            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN);
-            MUST_PARSE(loop->m_condexpr = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
-            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE);
+            MUST_PARSE(loop->m_body = tryParseStatement(), "expect a statement after 'do'");
+            MUST_PARSE(tryParseSymbol(Token::Type::While), "expected 'while' after 'do' block");
+            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), "expected '(' after 'while' in 'do...while'");
+            MUST_PARSE(loop->m_condexpr = TryParseExpr17(), "expected expression after ''while in 'do...while'");
+            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected ')'");
             MUST_PARSE(tryParseSymbol(Token::Type::Semicolon), "expected ';'");
             return loop;
         }
 
         if(tryParseSymbol(Token::Type::For))
         {
-            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN);
+            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), "expected '(' after 'for'");
             // Range-based loop: 'for' '(' TOKEN_IDENTIFIER [ ',' TOKEN_IDENTIFIER ] ':' Expr17 ')' Statement
             if(peekSymbols({ Token::Type::Identifier, Token::Type::Colon })
                || peekSymbols({ Token::Type::Identifier, Token::Type::Comma, Token::Type::Identifier, Token::Type::Colon }))
             {
                 auto loop = std::make_unique<AST::RangeBasedForLoop>(place);
                 loop->m_valuevar = tryParseIdentifier();
-                MUST_PARSE(!loop->m_valuevar.empty(), ERROR_MESSAGE_EXPECTED_IDENTIFIER);
+                MUST_PARSE(!loop->m_valuevar.empty(), "expected identifier in range-based for-loop");
                 if(tryParseSymbol(Token::Type::Comma))
                 {
                     loop->m_keyvar = std::move(loop->m_valuevar);
                     loop->m_valuevar = tryParseIdentifier();
-                    MUST_PARSE(!loop->m_valuevar.empty(), ERROR_MESSAGE_EXPECTED_IDENTIFIER);
+                    MUST_PARSE(!loop->m_valuevar.empty(), "expected identifier in range-based for-loop");
                 }
-                MUST_PARSE(tryParseSymbol(Token::Type::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON);
-                MUST_PARSE(loop->m_rangeexpr = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
-                MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON);
-                MUST_PARSE(loop->m_body = tryParseStatement(), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON);
+                MUST_PARSE(tryParseSymbol(Token::Type::Colon), "expected ':' in range-based for-loop");
+                MUST_PARSE(loop->m_rangeexpr = TryParseExpr17(), "expected expression in range-based for-loop");
+                MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected ':'");
+                MUST_PARSE(loop->m_body = tryParseStatement(), "expected ':'");
                 return loop;
             }
             // Loop: 'for' '(' Expr17? ';' Expr17? ';' Expr17? ')' Statement
@@ -180,20 +180,20 @@ namespace MSL
                 auto loop = std::make_unique<AST::ForLoop>(place);
                 if(!tryParseSymbol(Token::Type::Semicolon))
                 {
-                    MUST_PARSE(loop->m_initexpr = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+                    MUST_PARSE(loop->m_initexpr = TryParseExpr17(), "expected expression for init of for-loop");
                     MUST_PARSE(tryParseSymbol(Token::Type::Semicolon), "expected ';'");
                 }
                 if(!tryParseSymbol(Token::Type::Semicolon))
                 {
-                    MUST_PARSE(loop->m_condexpr = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+                    MUST_PARSE(loop->m_condexpr = TryParseExpr17(), "expected expression for condition of for-loop");
                     MUST_PARSE(tryParseSymbol(Token::Type::Semicolon), "expected ';'");
                 }
                 if(!tryParseSymbol(Token::Type::RoundBracketClose))
                 {
-                    MUST_PARSE(loop->m_iterexpr = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
-                    MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE);
+                    MUST_PARSE(loop->m_iterexpr = TryParseExpr17(), "expected expression for iterator of for-loop");
+                    MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected ')'");
                 }
-                MUST_PARSE(loop->m_body = tryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+                MUST_PARSE(loop->m_body = tryParseStatement(), "expected statement after for-loop");
                 return loop;
             }
         }
@@ -225,14 +225,14 @@ namespace MSL
         if(tryParseSymbol(Token::Type::Switch))
         {
             auto stmt = std::make_unique<AST::SwitchStatement>(place);
-            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN);
-            MUST_PARSE(stmt->m_cond = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
-            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE);
-            MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_OPEN);
+            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), "expected '(' after 'switch'");
+            MUST_PARSE(stmt->m_cond = TryParseExpr17(), "expected expression after 'switch'");
+            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected closing ')' after expression after 'switch'");
+            MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketOpen), "expected '{' after 'switch'");
             while(tryParseSwitchItem(*stmt))
             {
             }
-            MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE);
+            MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketClose), "expected closing '}' after 'switch' block");
             // Check uniqueness. Warning: O(n^2) complexity!
             for(size_t i = 0, count = stmt->m_itemvals.size(); i < count; ++i)
             {
@@ -241,11 +241,11 @@ namespace MSL
                     if(j != i)
                     {
                         if(!stmt->m_itemvals[i] && !stmt->m_itemvals[j])// 2x default
-                            throw ParsingError(place, ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT);
+                            throw Error::ParsingError(place, "duplicate 'case' clause");
                         if(stmt->m_itemvals[i] && stmt->m_itemvals[j])
                         {
                             if(stmt->m_itemvals[i]->m_val.isEqual(stmt->m_itemvals[j]->m_val))
-                                throw ParsingError(stmt->m_itemvals[j]->getPlace(), ERROR_MESSAGE_EXPECTED_UNIQUE_CONSTANT);
+                                throw Error::ParsingError(stmt->m_itemvals[j]->getPlace(), "expected a constant value for 'case' clause");
                         }
                     }
                 }
@@ -257,8 +257,8 @@ namespace MSL
         if(tryParseSymbol(Token::Type::Throw))
         {
             auto stmt = std::make_unique<AST::ThrowStatement>(place);
-            MUST_PARSE(stmt->m_thrownexpr = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
-            MUST_PARSE(tryParseSymbol(Token::Type::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON);
+            MUST_PARSE(stmt->m_thrownexpr = TryParseExpr17(), "expected expression after 'throw'");
+            MUST_PARSE(tryParseSymbol(Token::Type::Semicolon), "expected ';'");
             return stmt;
         }
 
@@ -266,18 +266,18 @@ namespace MSL
         if(tryParseSymbol(Token::Type::Try))
         {
             auto stmt = std::make_unique<AST::TryStatement>(place);
-            MUST_PARSE(stmt->m_tryblock = tryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+            MUST_PARSE(stmt->m_tryblock = tryParseStatement(), "expected statement after 'try'");
             if(tryParseSymbol(Token::Type::Finally))
-                MUST_PARSE(stmt->m_finallyblock = tryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+                MUST_PARSE(stmt->m_finallyblock = tryParseStatement(), "expected statement after 'finally'");
             else
             {
                 MUST_PARSE(tryParseSymbol(Token::Type::Catch), "Expected 'catch' or 'finally'.");
-                MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_OPEN);
-                MUST_PARSE(!(stmt->m_exvarname = tryParseIdentifier()).empty(), ERROR_MESSAGE_EXPECTED_IDENTIFIER);
-                MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE);
-                MUST_PARSE(stmt->m_catchblock = tryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+                MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), "expected '(' after 'catch'");
+                MUST_PARSE(!(stmt->m_exvarname = tryParseIdentifier()).empty(), "expected identifier for 'catch' clause");
+                MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected terminating ')' for 'catch' clause");
+                MUST_PARSE(stmt->m_catchblock = tryParseStatement(), "expected statement after 'catch'");
                 if(tryParseSymbol(Token::Type::Finally))
-                    MUST_PARSE(stmt->m_finallyblock = tryParseStatement(), ERROR_MESSAGE_EXPECTED_STATEMENT);
+                    MUST_PARSE(stmt->m_finallyblock = tryParseStatement(), "expected statement after 'finally'");
             }
             return stmt;
         }
@@ -286,7 +286,7 @@ namespace MSL
         std::unique_ptr<AST::Expression> expr = TryParseExpr17();
         if(expr)
         {
-            MUST_PARSE(tryParseSymbol(Token::Type::Semicolon), ERROR_MESSAGE_EXPECTED_SYMBOL_SEMICOLON);
+            MUST_PARSE(tryParseSymbol(Token::Type::Semicolon), "expected ';'");
             return expr;
         }
 
@@ -340,10 +340,10 @@ namespace MSL
         if(t.symtype == Token::Type::Local || t.symtype == Token::Type::Global)
         {
             ++m_tokidx;
-            MUST_PARSE(tryParseSymbol(Token::Type::Dot), ERROR_MESSAGE_EXPECTED_SYMBOL_DOT);
-            MUST_PARSE(m_tokidx < m_toklist.size(), ERROR_MESSAGE_EXPECTED_IDENTIFIER);
+            MUST_PARSE(tryParseSymbol(Token::Type::Dot), "expected '.'");
+            MUST_PARSE(m_tokidx < m_toklist.size(), "expected identifier after '.'");
             const Token& tIdentifier = m_toklist[m_tokidx++];
-            MUST_PARSE(tIdentifier.symtype == Token::Type::Identifier, ERROR_MESSAGE_EXPECTED_IDENTIFIER);
+            MUST_PARSE(tIdentifier.symtype == Token::Type::Identifier, "expected identifier after '.'");
             AST::Identifier::Scope identifierScope = AST::Identifier::Scope::Count;
             switch(t.symtype)
             {
@@ -409,7 +409,7 @@ namespace MSL
         if(tryParseSymbol(Token::Type::Class))
         {
             std::string className = tryParseIdentifier();
-            MUST_PARSE(!className.empty(), ERROR_MESSAGE_EXPECTED_IDENTIFIER);
+            MUST_PARSE(!className.empty(), "expected identifier after 'class'");
             auto assignmentOp = std::make_unique<AST::BinaryOperator>(beginPlace, AST::BinaryOperator::Type::Assignment);
             assignmentOp->m_oplist[0]
             = std::make_unique<AST::Identifier>(beginPlace, AST::Identifier::Scope::None, std::move(className));
@@ -417,12 +417,12 @@ namespace MSL
             if(tryParseSymbol(Token::Type::Colon))
             {
                 baseExpr = TryParseExpr16();
-                MUST_PARSE(baseExpr, ERROR_MESSAGE_EXPECTED_EXPRESSION);
+                MUST_PARSE(baseExpr, "expected expression after ':' in class definition");
             }
             auto objExpr = tryParseObject();
             objExpr->m_baseexpr = std::move(baseExpr);
             assignmentOp->m_oplist[1] = std::move(objExpr);
-            MUST_PARSE(assignmentOp->m_oplist[1], ERROR_MESSAGE_EXPECTED_OBJECT);
+            MUST_PARSE(assignmentOp->m_oplist[1], "expected object");
             return assignmentOp;
         }
         return std::unique_ptr<AST::ObjectExpression>();
@@ -440,20 +440,20 @@ namespace MSL
             {
                 std::string memberName;
                 std::unique_ptr<AST::Expression> memberValue;
-                MUST_PARSE(memberValue = tryParseObjMember(memberName), ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER);
+                MUST_PARSE(memberValue = tryParseObjMember(memberName), "expected object member");
                 MUST_PARSE(objExpr->m_items.insert(std::make_pair(std::move(memberName), std::move(memberValue))).second,
-                           ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT);
+                           "duplicate object member");
                 if(!tryParseSymbol(Token::Type::CurlyBracketClose))
                 {
                     while(tryParseSymbol(Token::Type::Comma))
                     {
                         if(tryParseSymbol(Token::Type::CurlyBracketClose))
                             return objExpr;
-                        MUST_PARSE(memberValue = tryParseObjMember(memberName), ERROR_MESSAGE_EXPECTED_OBJECT_MEMBER);
+                        MUST_PARSE(memberValue = tryParseObjMember(memberName), "expected object member");
                         MUST_PARSE(objExpr->m_items.insert(std::make_pair(std::move(memberName), std::move(memberValue))).second,
-                                   ERROR_MESSAGE_REPEATING_KEY_IN_OBJECT);
+                                   "duplicate object member");
                     }
-                    MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_CURLY_BRACKET_CLOSE);
+                    MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketClose), "expected '}' after object definition");
                 }
             }
             return objExpr;
@@ -469,7 +469,7 @@ namespace MSL
             if(!tryParseSymbol(Token::Type::SquareBracketClose))
             {
                 std::unique_ptr<AST::Expression> itemValue;
-                MUST_PARSE(itemValue = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+                MUST_PARSE(itemValue = TryParseExpr16(), "expected expression in array literal");
                 arrExpr->m_items.push_back((std::move(itemValue)));
                 if(!tryParseSymbol(Token::Type::SquareBracketClose))
                 {
@@ -477,10 +477,10 @@ namespace MSL
                     {
                         if(tryParseSymbol(Token::Type::SquareBracketClose))
                             return arrExpr;
-                        MUST_PARSE(itemValue = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+                        MUST_PARSE(itemValue = TryParseExpr16(), "expected expression in array literal");
                         arrExpr->m_items.push_back((std::move(itemValue)));
                     }
-                    MUST_PARSE(tryParseSymbol(Token::Type::SquareBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE);
+                    MUST_PARSE(tryParseSymbol(Token::Type::SquareBracketClose), "expected terminating ']' after array literal");
                 }
             }
             return arrExpr;
@@ -496,8 +496,8 @@ namespace MSL
         if(tryParseSymbol(Token::Type::RoundBracketOpen))
         {
             std::unique_ptr<AST::Expression> expr;
-            MUST_PARSE(expr = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
-            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE);
+            MUST_PARSE(expr = TryParseExpr17(), "expected expression");
+            MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected ')'");
             return expr;
         }
 
@@ -559,11 +559,11 @@ namespace MSL
                     // Further arguments
                     while(tryParseSymbol(Token::Type::Comma))
                     {
-                        MUST_PARSE(expr = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+                        MUST_PARSE(expr = TryParseExpr16(), "expected expression");
                         op->m_oplist.push_back(std::move(expr));
                     }
                 }
-                MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_ROUND_BRACKET_CLOSE);
+                MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected ')'");
                 expr = std::move(op);
             }
             // Indexing: Expr0 '[' Expr17 ']'
@@ -571,8 +571,8 @@ namespace MSL
             {
                 auto op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperator::Type::Indexing);
                 op->m_oplist[0] = std::move(expr);
-                MUST_PARSE(op->m_oplist[1] = TryParseExpr17(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
-                MUST_PARSE(tryParseSymbol(Token::Type::SquareBracketClose), ERROR_MESSAGE_EXPECTED_SYMBOL_SQUARE_BRACKET_CLOSE);
+                MUST_PARSE(op->m_oplist[1] = TryParseExpr17(), "expected expression");
+                MUST_PARSE(tryParseSymbol(Token::Type::SquareBracketClose), "expected ']'");
                 expr = std::move(op);
             }
             // Member access: Expr2 '.' TOKEN_IDENTIFIER
@@ -581,7 +581,7 @@ namespace MSL
                 auto op = std::make_unique<AST::MemberAccessOperator>(place);
                 op->m_operand = std::move(expr);
                 auto identifier = tryParseIdentVal();
-                MUST_PARSE(identifier && identifier->m_scope == AST::Identifier::Scope::None, ERROR_MESSAGE_EXPECTED_IDENTIFIER);
+                MUST_PARSE(identifier && identifier->m_scope == AST::Identifier::Scope::None, "expected identifier");
                 op->m_membername = std::move(identifier->m_ident);
                 expr = std::move(op);
             }
@@ -598,7 +598,7 @@ namespace MSL
         if(tryParseSymbol(symbol))                                                        \
         {                                                                                 \
             auto op = std::make_unique<AST::UnaryOperator>(place, (unaryOperatorType));        \
-            MUST_PARSE(op->m_operand = tryParseOperator(), ERROR_MESSAGE_EXPECTED_EXPRESSION); \
+            MUST_PARSE(op->m_operand = tryParseOperator(), "expected expression"); \
             return op;                                                                    \
         }
         PARSE_UNARY_OPERATOR(Token::Type::DoublePlus, AST::UnaryOperator::Type::Preincrementation)
@@ -616,7 +616,7 @@ namespace MSL
         {                                                                                       \
             auto op = std::make_unique<AST::BinaryOperator>(place, (binaryOperatorType));            \
             op->m_oplist[0] = std::move(expr);                                                  \
-            MUST_PARSE(op->m_oplist[1] = (exprParseFunc)(), ERROR_MESSAGE_EXPECTED_EXPRESSION); \
+            MUST_PARSE(op->m_oplist[1] = (exprParseFunc)(), "expected expression"); \
             expr = std::move(op);                                                               \
         }
 
@@ -815,9 +815,9 @@ namespace MSL
         {
             auto op = std::make_unique<AST::TernaryOperator>(getCurrentTokenPlace());
             op->m_oplist[0] = std::move(expr);
-            MUST_PARSE(op->m_oplist[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
-            MUST_PARSE(tryParseSymbol(Token::Type::Colon), ERROR_MESSAGE_EXPECTED_SYMBOL_COLON);
-            MUST_PARSE(op->m_oplist[2] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION);
+            MUST_PARSE(op->m_oplist[1] = TryParseExpr16(), "expected expression");
+            MUST_PARSE(tryParseSymbol(Token::Type::Colon), "expected ':'");
+            MUST_PARSE(op->m_oplist[2] = TryParseExpr16(), "expected expression");
             return op;
         }
         // Assignment: Expr15 = Expr16, and variants like += -=
@@ -826,7 +826,7 @@ namespace MSL
         {                                                                                             \
             auto op = std::make_unique<AST::BinaryOperator>(getCurrentTokenPlace(), (binaryOperatorType)); \
             op->m_oplist[0] = std::move(expr);                                                        \
-            MUST_PARSE(op->m_oplist[1] = TryParseExpr16(), ERROR_MESSAGE_EXPECTED_EXPRESSION);        \
+            MUST_PARSE(op->m_oplist[1] = TryParseExpr16(), "expected expression");        \
             return op;                                                                                \
         }
         TRY_PARSE_ASSIGNMENT(Token::Type::Equals, AST::BinaryOperator::Type::Assignment)
