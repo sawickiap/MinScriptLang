@@ -136,7 +136,7 @@ namespace MSL
         obj->entry("index") = Value{ (double)err.getPlace().textindex };
         obj->entry("line") = Value{ (double)err.getPlace().textline };
         obj->entry("column") = Value{ (double)err.getPlace().textcolumn };
-        obj->entry("message") = Value{ std::string{ err.getMessage() } };
+        obj->entry("message") = Value{ std::string{ err.message() } };
         return obj;
     }
 

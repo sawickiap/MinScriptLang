@@ -28,124 +28,191 @@ namespace MSL
         * tbd:
         *    '%<n>' (i.e., %1, %2, %3, ....) calls args[n].toStream()
         */
-        template<typename CharT, typename StreamT>
-        void format_handler(
-            Environment& env,
-            const Location& place,
-            StreamT& os,
-            const std::basic_string<CharT>& fmt,
-            const std::vector<Value>& args,
-            bool shouldflush
-        )
+        class StringFormatter
         {
-            int ch;
-            int nch;
-            size_t i;
-            size_t argi;
-            (void)env;
-            ch = -1;
-            nch = -1;
-            argi = 0;
-            for(i=0; i<fmt.size(); i++)
-            {
-                ch = fmt[i];
-                nch = -1;
-                if((i + 1) < fmt.size())
+            public:
+
+            private:
+                Environment& m_env;
+                const Location& m_place;
+                
+                std::string_view m_fmtstr;
+                const std::vector<Value>& m_args;
+                int m_currch;
+                int m_nextch;
+                size_t m_curridx;
+                size_t m_argcnt;
+                size_t m_fmtsize;
+                size_t m_argi;
+
+            public:
+                StringFormatter(Environment& env, const Location& place, std::string_view fmt, const std::vector<Value>& args):
+                m_env(env), m_place(place), m_fmtstr(fmt), m_args(args)
                 {
-                    nch = fmt[i + 1];
+                    (void)m_env;
+                    m_currch = -1;
+                    m_nextch = -1;
+                    m_argi = 0;
+                    m_argcnt = m_args.size();
+                    m_fmtsize = m_fmtstr.size();
                 }
-                if(ch == '%')
+
+                template<typename StreamT>
+                void parseIndexed(StreamT& os)
                 {
-                    i++;
-                    if(nch == '%')
+                    size_t start;
+                    size_t aidx;
+                    size_t thismuch;
+                    if(std::isdigit(int(m_fmtstr[m_curridx+1])))
                     {
-                        os << '%';
-                        if(shouldflush)
+                        start = m_curridx+1;
+                        thismuch = 0;
+                        m_curridx++;
+                        while(m_curridx < m_fmtsize)
                         {
-                            os << std::flush;
+                            if(m_fmtstr[m_curridx] == ')')
+                            {
+                                break;
+                            }
+                            if(!std::isdigit(int(m_fmtstr[m_curridx])))
+                            {
+                                //fprintf(stderr, "m_fmtstr[%d] = '%c'\n", m_curridx, m_fmtstr[m_curridx]);
+                                throw Error::ArgumentError(m_place,
+                                    "directive '%(...)' may only contain numbers (perhaps you forgot a ')')");
+                            }
+                            m_curridx++;
+                            thismuch++;
                         }
+                        if(m_curridx == m_fmtsize)
+                        {
+                            throw Error::ArgumentError(m_place, "directive '%(...)' missing closing ')'");
+                        }
+                        /*
+                        std::cerr << "m_fmtstr(" << m_fmtsize << ") idx: start=" << start << ", end=" << thismuch << " = \"" << m_fmtstr.substr(start, thismuch) << "\"" << std::endl;
+                        */
+                        aidx = std::stoi(std::string(m_fmtstr.substr(start, thismuch)));
+                        if(aidx > m_argcnt)
+                        {
+                            throw Error::ArgumentError(m_place,
+                                Util::joinArgs("directive %(<n>) (where n=", aidx, ", args=", m_argcnt,") out of bounds"));
+                        }
+                        m_args[aidx].toStream(os);
                     }
                     else
                     {
-                        if(argi == args.size())
-                        {
-                            throw Error::ArgumentError(place, "format has more directives than arguments");
-                        }
-                        const auto& av = args[argi];
-                        switch(nch)
-                        {
-                            case 'v':
-                                {
-                                    av.toStream(os);
-                                }
-                                break;
-                            case 'p':
-                                {
-                                    av.reprToStream(os);
-                                }
-                                break;
-                            case 's':
-                                {
-                                    os << av.getString();
-                                    if(shouldflush)
-                                    {
-                                        os << std::flush;
-                                    }
-                                }
-                                break;
-                            case 'c':
-                                {
-                                    if(av.isNumber())
-                                    {
-                                        os << char(av.getNumber());
-                                        if(shouldflush)
-                                        {
-                                            os << std::flush;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        throw Error::TypeError(place, "format directive expected number");
-                                    }
-                                }
-                                break;
-                            case 'd':
-                            case 'f':
-                            case 'g':
-                                {
-                                    if(av.isNumber())
-                                    {
-                                        os << av.getNumber();
-                                        if(shouldflush)
-                                        {
-                                            os << std::flush;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        throw Error::TypeError(place, "format directive expected number");
-                                    }
-                                }
-                                break;
-                            default:
-                                {
-                                    throw Error::ArgumentError(place, "invalid format directive");
-                                }
-                                break;
-                        }
-                        argi++;
+                        throw Error::ArgumentError(m_place, "directive '%(...)' must start with a digit");
                     }
                 }
-                else
+
+                template<typename StreamT>
+                void run(StreamT& os, bool shouldflush)
                 {
-                    os << char(ch);
-                    if(shouldflush)
+                    for(m_curridx=0; m_curridx<m_fmtsize; m_curridx++)
                     {
-                        os << std::flush;
+                        m_currch = m_fmtstr[m_curridx];
+                        m_nextch = -1;
+                        if((m_curridx + 1) < m_fmtsize)
+                        {
+                            m_nextch = m_fmtstr[m_curridx + 1];
+                        }
+                        if(m_currch == '%')
+                        {
+                            m_curridx++;
+                            if(m_nextch == '%')
+                            {
+                                os << '%';
+                                if(shouldflush)
+                                {
+                                    os << std::flush;
+                                }
+                            }
+                            else
+                            {
+                                if(m_argi == m_argcnt)
+                                {
+                                    throw Error::ArgumentError(m_place, "format has more directives than arguments");
+                                }
+                                const auto& av = m_args[m_argi];
+                                switch(m_nextch)
+                                {
+                                    case 'v':
+                                        {
+                                            av.toStream(os);
+                                        }
+                                        break;
+                                    case 'p':
+                                        {
+                                            av.reprToStream(os);
+                                        }
+                                        break;
+                                    case 's':
+                                        {
+                                            os << av.getString();
+                                            if(shouldflush)
+                                            {
+                                                os << std::flush;
+                                            }
+                                        }
+                                        break;
+                                    case 'c':
+                                        {
+                                            if(av.isNumber())
+                                            {
+                                                os << char(av.getNumber());
+                                                if(shouldflush)
+                                                {
+                                                    os << std::flush;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                throw Error::TypeError(m_place, "format directive expected number");
+                                            }
+                                        }
+                                        break;
+                                    case 'd':
+                                    case 'f':
+                                    case 'g':
+                                        {
+                                            if(av.isNumber())
+                                            {
+                                                os << av.getNumber();
+                                                if(shouldflush)
+                                                {
+                                                    os << std::flush;
+                                                }
+                                            }
+                                            else
+                                            {
+                                                throw Error::TypeError(m_place, "format directive expected number");
+                                            }
+                                        }
+                                        break;
+                                    case '(':
+                                        {
+                                            parseIndexed(os);
+                                        }
+                                        break;
+                                    default:
+                                        {
+                                            throw Error::ArgumentError(m_place, "invalid format directive");
+                                        }
+                                        break;
+                                }
+                                m_argi++;
+                            }
+                        }
+                        else
+                        {
+                            os << char(m_currch);
+                            if(shouldflush)
+                            {
+                                os << std::flush;
+                            }
+                        }
                     }
                 }
-            }
-        }
+        };
 
         class IOHandle: public Object
         {
@@ -159,6 +226,8 @@ namespace MSL
 
                 Value io_write(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
                 {
+                    (void)ctx;
+                    (void)place;
                     for(const auto& a: args)
                     {
                         auto tmpstr = a.toString();
@@ -170,7 +239,17 @@ namespace MSL
         };
 
         /*
-        // "why C file handles :(((((("
+        // here's how this works for now:
+        // since stdout/stdin/etc are global pointers, we don't need to worry about them.
+        // IOHandle, deriving Object, stores the pointer, and the member method is
+        // a lambda that wraps the actual call to a shared_ptr instance of IOHandle.
+        // this works fine, no leakage of any kind, buuuut...:
+        // there is no real "constructor" (beyond what you see in makeStdHandle), and
+        // no destructor, apart from whenever the shared_ptr gets destroyed.
+        // and that's likely going to be a bit of an issue for other userdata, since with
+        // this method, the object likely lives on beyond the scope of creation.
+        //
+        // as for "why C file handles :((((((" ...
         // because C++ streams are not inter-compatible, which is to say,
         // you can have a reference, perhaps even a pointer to say, a ostream.
         // but that interface (templated or not), *might* include code for istream, or if
@@ -183,6 +262,7 @@ namespace MSL
         */
         void makeStdHandle(Environment& upenv, const Location& upplace, const std::string& name, FILE* strm)
         {
+            (void)upplace;
             auto obj = std::make_shared<IOHandle>(strm);
             /*
             // NP. do not capture obj by reference, since it is a shared_ptr, which are ref-counted.
@@ -319,17 +399,7 @@ namespace MSL
             fmtfunc_checkargs("sprintf", place, args);
             fmtstr = args[0].toString();
             auto restargs = std::vector<Value>(args.begin() + 1, args.end());
-            #if 0
-            {
-                std::cerr << "fmtstr=\"" << fmtstr << "\"" << std::endl;
-                std::cerr << "restargs(" << restargs.size() << "): " << std::endl;
-                for(size_t i=0; i<restargs.size(); i++)
-                {
-                    std::cerr << "  restargs[" << i << "] = " << restargs[i].toString() << std::endl;
-                }
-            }
-            #endif
-            format_handler(env, place, ss, fmtstr, restargs, false);
+            StringFormatter(env, place, fmtstr, restargs).run(ss, false);
             return Value{ss.str()};
         }
 
@@ -339,7 +409,7 @@ namespace MSL
             fmtfunc_checkargs("printf", place, args);
             fmtstr = args[0].toString();
             auto restargs = std::vector<Value>(args.begin() + 1, args.end());
-            format_handler(env, place, std::cout, fmtstr, restargs, true);
+            StringFormatter(env, place, fmtstr, restargs).run(std::cout, true);
             return {};
         }
     }

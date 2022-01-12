@@ -91,7 +91,7 @@ namespace MSL
         std::string Format(const char* format, ...);
 
         template<typename CharT, typename Type>
-        void joinArgsNext(std::basic_ostream<CharT>& os, Type&& thing)
+        void joinArgsNext(std::basic_ostream<CharT>& os, std::basic_string_view<CharT>, Type&& thing)
         {
             os << thing;
         }
@@ -99,9 +99,9 @@ namespace MSL
         template<typename CharT, typename Type, typename... ArgsT>
         void joinArgsNext(std::basic_ostream<CharT>& os, std::basic_string_view<CharT> sep, Type&& thing, ArgsT&&... args)
         {
-            joinArgsNext(os, thing);
+            joinArgsNext(os, sep, thing);
             os << sep;
-            joinArgsNext(os, args...);
+            joinArgsNext(os, sep, args...);
         }
 
         template<typename... ArgsT>
@@ -115,7 +115,7 @@ namespace MSL
         template<typename... ArgsT>
         std::string joinArgs(ArgsT&&... args)
         {
-            return joinArgsWith("", args...);
+            return joinArgsWith("", std::string(), args...);
         }
     }
 
@@ -151,7 +151,7 @@ namespace MSL
                 }
 
                 virtual std::string prettyMessage() const;
-                virtual std::string_view getMessage() const = 0;
+                virtual std::string_view message() const = 0;
         };
 
         class ParsingError : public Exception
@@ -169,7 +169,7 @@ namespace MSL
                     return "ParsingError";
                 }                    
 
-                inline virtual std::string_view getMessage() const override
+                inline virtual std::string_view message() const override
                 {
                     return m_message;
                 }
@@ -190,7 +190,7 @@ namespace MSL
                     return "ExecutionError";
                 }
 
-                inline virtual std::string_view getMessage() const override
+                inline virtual std::string_view message() const override
                 {
                     return m_message;
                 }

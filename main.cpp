@@ -47,7 +47,7 @@ bool readfile(const std::string& fname, std::string& destbuf)
 
 void printException(const MSL::Error::Exception& e)
 {
-    std::cerr << "uncaught error line " << e.getPlace().textline << ": (" << e.prettyMessage() << std::endl;
+    std::cerr << "uncaught error at " << e.getPlace().textline << "," << e.getPlace().textcolumn << ": (" << e.name() << ") " << e.message() << std::endl;
 }
 
 void setARGV(MSL::Environment& env, const std::vector<std::string>& va)
