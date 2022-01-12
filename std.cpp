@@ -64,7 +64,7 @@ namespace MSL
 
     namespace Builtins
     {
-        Value ctor_null(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+        Value ctor_null(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
         {
             (void)ctx;
             (void)place;
@@ -72,14 +72,14 @@ namespace MSL
             return {};
         }
 
-        Value ctor_number(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+        Value ctor_number(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
         {
             Environment& env = ctx.m_env.getOwner();
             MINSL_LOAD_ARGS_1_NUMBER("Number", val);
             return Value{ val };
         }
 
-        Value ctor_string(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+        Value ctor_string(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
         {
             if(args.empty())
             {
@@ -90,7 +90,7 @@ namespace MSL
             return Value{ std::move(str) };
         }
 
-        Value ctor_object(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+        Value ctor_object(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
         {
             (void)ctx;
             if(args.empty())
@@ -104,7 +104,7 @@ namespace MSL
             return Value{ CopyObject(*args[0].getObject()) };
         }
 
-        Value ctor_array(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+        Value ctor_array(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
         {
             (void)ctx;
             if(args.empty())
@@ -118,7 +118,7 @@ namespace MSL
             return Value{ CopyArray(*args[0].getArray()) };
         }
 
-        Value ctor_function(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+        Value ctor_function(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
         {
             (void)ctx;
             if((args.size() == 0) || ((args[0].type() != Value::Type::Function) && (args[0].type() != Value::Type::MemberMethod)))
@@ -128,7 +128,7 @@ namespace MSL
             return Value{ args[0] };
         }
 
-        Value ctor_type(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+        Value ctor_type(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
         {
             (void)ctx;
             {
@@ -145,7 +145,7 @@ namespace MSL
             return Value{ args[0] };
         }
 
-        Value protofn_object_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal)
+        Value protofn_object_count(AST::ExecutionContext& ctx, const Location& place, Value&& objVal)
         {
             (void)ctx;
             Object* obj;
@@ -156,7 +156,7 @@ namespace MSL
             return Value{ (double)obj->size() };
         }
 
-        Value protofn_array_length(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal)
+        Value protofn_array_length(AST::ExecutionContext& ctx, const Location& place, Value&& objVal)
         {
             (void)ctx;
             Array* arr;
@@ -168,7 +168,7 @@ namespace MSL
         }
 
 
-        Value memberfn_array_add(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
+        Value memberfn_array_add(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args)
         {
             size_t i;
             Array* arr;
@@ -190,7 +190,7 @@ namespace MSL
             return {};
         }
 
-        Value memberfn_array_insert(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
+        Value memberfn_array_insert(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args)
         {
             Array* arr;
             (void)ctx;
@@ -213,7 +213,7 @@ namespace MSL
             return {};
         }
 
-        Value memberfn_array_remove(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
+        Value memberfn_array_remove(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args)
         {
             Array* arr;
             (void)ctx;
@@ -235,7 +235,7 @@ namespace MSL
             return {};
         }
 
-        Value protofn_string_length(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal)
+        Value protofn_string_length(AST::ExecutionContext& ctx, const Location& place, Value&& objVal)
         {
             (void)ctx;
             if(!objVal.isString())
@@ -245,7 +245,23 @@ namespace MSL
             return Value{ (double)objVal.getString().length() };
         }
 
-        Value memberfn_string_resize(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args)
+        Value protofn_string_chars(AST::ExecutionContext& ctx, const Location& place, Value&& objVal)
+        {
+            
+            (void)ctx;
+            if(!objVal.isString())
+            {
+                throw Error::TypeError(place, "expected string object");
+            }
+            auto res = std::make_shared<Array>();
+            for(auto ch: objVal.getString())
+            {
+                res->m_items.push_back(Value{ch});
+            }
+            return Value{ std::move(res) };
+        }
+
+        Value memberfn_string_resize(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args)
         {
             // TODO
             (void)ctx;
@@ -255,6 +271,17 @@ namespace MSL
             return {};
         }
 
+        Value memberfn_string_startswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args)
+        {
+            double res;
+            if(args.size() == 0)
+            {
+                throw Error::ArgumentError(place, "String.startsWith() needs exactly 1 argument");
+            }
+            auto findme = args[0];
+            res = (th.getString().rfind(findme.getString(), 0) == 0);
+            return Value{res};
+        }
     }
 }
 

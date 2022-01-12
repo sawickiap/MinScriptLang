@@ -69,11 +69,12 @@ SOFTWARE.
 
 namespace MSL
 {
-    struct PlaceInCode
+    struct Location
     {
         uint32_t textindex;
-        uint32_t textrow;
+        uint32_t textline;
         uint32_t textcolumn;
+        std::string_view filename = "none";
     };
 
     namespace Error
@@ -81,15 +82,15 @@ namespace MSL
         class Exception : public std::exception
         {
             private:
-                const PlaceInCode m_place;
+                const Location m_place;
                 mutable std::string m_what;
 
             public:
-                inline Exception(const PlaceInCode& place) : m_place{ place }
+                inline Exception(const Location& place) : m_place{ place }
                 {
                 }
 
-                inline const PlaceInCode& getPlace() const
+                inline const Location& getPlace() const
                 {
                     return m_place;
                 }
@@ -109,7 +110,7 @@ namespace MSL
                 const std::string_view m_message;// Externally owned
 
             public:
-                inline ParsingError(const PlaceInCode& place, const std::string_view& message) : Exception{ place }, m_message{ message }
+                inline ParsingError(const Location& place, std::string_view message) : Exception{ place }, m_message{ message }
                 {
                 }
 
@@ -130,7 +131,7 @@ namespace MSL
                 const std::string m_message;
 
             public:
-                inline ExecutionError(const PlaceInCode& place, const std::string_view& message) : Exception{ place }, m_message{ message }
+                inline ExecutionError(const Location& place, std::string_view message) : Exception{ place }, m_message{ message }
                 {
                 }
 
@@ -179,9 +180,9 @@ namespace MSL
     class /**/Array;
     class /**/Environment;
 
-    using HostFunction           = Value(Environment&, const PlaceInCode&, std::vector<Value>&&);
-    using MemberMethodFunction   = Value(AST::ExecutionContext&, const PlaceInCode&, const AST::ThisType&, std::vector<Value>&&);
-    using MemberPropertyFunction = Value(AST::ExecutionContext&, const PlaceInCode&, Value&&);
+    using HostFunction           = Value(Environment&, const Location&, std::vector<Value>&&);
+    using MemberMethodFunction   = Value(AST::ExecutionContext&, const Location&, AST::ThisType&, std::vector<Value>&&);
+    using MemberPropertyFunction = Value(AST::ExecutionContext&, const Location&, Value&&);
 
     class Value
     {
@@ -266,6 +267,14 @@ namespace MSL
         private:
             Type m_type = Type::Null;
             VariantType m_variant;
+
+        private:
+            void actualToStream(std::ostream& os, bool repr) const;
+
+            inline void reprToStream(std::ostream& os) const
+            {
+                actualToStream(os, true);
+            }
 
         public:
             inline Value()
@@ -420,6 +429,30 @@ namespace MSL
             {
                 return (m_type == Type::Array);
             }
+
+            template<typename CharT, typename TraitsT>
+            std::basic_ostream<CharT, TraitsT>& toStream(std::basic_ostream<CharT,TraitsT>& os, bool repr) const
+            {
+                actualToStream(os, repr);
+                return os;
+            }
+
+            template<typename CharT, typename TraitsT>
+            std::basic_ostream<CharT, TraitsT>& toStream(std::basic_ostream<CharT,TraitsT>& os) const
+            {
+                actualToStream(os, false);
+                return os;
+            }
+
+            template<typename CharT, typename TraitsT>
+            std::basic_ostream<CharT, TraitsT>& reprToStream(std::basic_ostream<CharT,TraitsT>& os) const
+            {
+                actualToStream(os, true);
+                return os;
+            }
+
+            std::string toString() const;
+            std::string toRepr() const;
     };
 
     class Object
@@ -478,11 +511,11 @@ namespace MSL
 
             ~Environment();
 
-            Value execute(const std::string_view& code);
+            Value execute(std::string_view code);
 
             std::string_view getTypeName(Value::Type type) const;
 
-            void Print(const std::string_view& s);
+            void Print(std::string_view s);
 
             inline Object& global()
             {
@@ -594,7 +627,7 @@ namespace MSL
             Count
         };
 
-        PlaceInCode m_place;
+        Location m_place;
         Type symtype;
         // Only when symtype == Type::Number
         double numberval;
@@ -614,12 +647,12 @@ namespace MSL
     {
         private:
             const std::string_view m_code;
-            PlaceInCode m_place;
+            Location m_place;
 
         public:
-            CodeReader(const std::string_view& code);
+            CodeReader(std::string_view code);
             bool isAtEnd() const;
-            const PlaceInCode& getCurrentPlace() const;
+            const Location& getCurrentPlace() const;
             const char* getCurrentCode() const;
             size_t getCurrentLength() const;
             char getCurrentChar() const;
@@ -637,7 +670,7 @@ namespace MSL
     {
         public:
             static bool parseHexChar(uint8_t& out, char ch);
-            static bool parseHexLiteral(uint32_t& out, const std::string_view& chars);
+            static bool parseHexLiteral(uint32_t& out, std::string_view chars);
             static bool appendUTF8Char(std::string& inout, uint32_t charVal);
 
         private:
@@ -649,7 +682,7 @@ namespace MSL
             bool parseString(Token& out);
 
         public:
-            Tokenizer(const std::string_view& code) : m_code{ code }
+            Tokenizer(std::string_view code) : m_code{ code }
             {
             }
             void getNextToken(Token& out);
@@ -681,13 +714,13 @@ namespace MSL
 
     struct LValue : public std::variant<ObjectMemberLValue, StringCharacterLValue, ArrayItemLValue>
     {
-        Value* getValueRef(const PlaceInCode& place) const;// Always returns non-null or throws exception.
-        Value getValue(const PlaceInCode& place) const;
+        Value* getValueRef(const Location& place) const;// Always returns non-null or throws exception.
+        Value getValue(const Location& place) const;
     };
 
     struct ReturnException
     {
-        const PlaceInCode place;
+        const Location place;
         Value thrownvalue;
     };
 
@@ -696,7 +729,13 @@ namespace MSL
 
     namespace AST
     {
-        struct ThisType : public std::variant<std::monostate, std::shared_ptr<Object>, std::shared_ptr<Array>>
+        using ThisVariant = std::variant<
+            std::monostate,
+            std::shared_ptr<Object>,
+            std::shared_ptr<Array>,
+            Value::StringValType
+        >;
+        struct ThisType : public ThisVariant
         {
             inline bool isEmpty() const
             {
@@ -705,14 +744,24 @@ namespace MSL
 
             inline Object* getObject() const
             {
-                const std::shared_ptr<Object>* objectPtr = std::get_if<std::shared_ptr<Object>>(this);
+                auto objectPtr = std::get_if<std::shared_ptr<Object>>(this);
                 return objectPtr ? objectPtr->get() : nullptr;
             }
 
             inline Array* getArray() const
             {
-                const std::shared_ptr<Array>* arrayPtr = std::get_if<std::shared_ptr<Array>>(this);
+                auto arrayPtr = std::get_if<std::shared_ptr<Array>>(this);
                 return arrayPtr ? arrayPtr->get() : nullptr;
+            }
+
+            inline Value::StringValType& getString()
+            {
+                return std::get<Value::StringValType>(*this);
+            }
+
+            inline Value::StringValType getString() const
+            {
+                return std::get<Value::StringValType>(*this);
             }
 
             inline void clear()
@@ -730,7 +779,7 @@ namespace MSL
                         ExecutionContext& m_context;
 
                     public:
-                        LocalScopePush(ExecutionContext& ctx, Object* localScope, ThisType&& thisObj, const PlaceInCode& place)
+                        LocalScopePush(ExecutionContext& ctx, Object* localScope, ThisType&& thisObj, const Location& place)
                         : m_context{ ctx }
                         {
                             if(ctx.m_localscopes.size() == LOCAL_SCOPE_STACK_MAX_SIZE)
@@ -786,13 +835,13 @@ namespace MSL
         class Statement
         {
             private:
-                const PlaceInCode m_place;
+                const Location m_place;
 
             protected:
                 void assign(const LValue& lhs, Value&& rhs) const;
 
             public:
-                explicit Statement(const PlaceInCode& place) : m_place{ place }
+                explicit Statement(const Location& place) : m_place{ place }
                 {
                 }
 
@@ -800,26 +849,27 @@ namespace MSL
                 {
                 }
 
-                const PlaceInCode& getPlace() const
+                const Location& getPlace() const
                 {
                     return m_place;
                 }
 
-                virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const = 0;
+                virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const = 0;
 
-                virtual void execute(ExecutionContext& ctx) const = 0;
+                virtual Value execute(ExecutionContext& ctx) const = 0;
         };
 
         struct EmptyStatement : public Statement
         {
-            explicit EmptyStatement(const PlaceInCode& place) : Statement{ place }
+            explicit EmptyStatement(const Location& place) : Statement{ place }
             {
             }
 
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
 
-            virtual void execute(ExecutionContext&) const
+            virtual Value execute(ExecutionContext&) const
             {
+                return {};
             }
         };
 
@@ -831,13 +881,13 @@ namespace MSL
             std::unique_ptr<Expression> m_condexpr;
             std::unique_ptr<Statement> m_statements[2];
 
-            explicit Condition(const PlaceInCode& place) : Statement{ place }
+            explicit Condition(const Location& place) : Statement{ place }
             {
             }
 
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
 
-            virtual void execute(ExecutionContext& ctx) const;
+            virtual Value execute(ExecutionContext& ctx) const;
         };
 
         struct WhileLoop : public Statement
@@ -848,11 +898,11 @@ namespace MSL
             std::unique_ptr<Expression> m_condexpr;
             std::unique_ptr<Statement> m_body;
 
-            explicit WhileLoop(const PlaceInCode& place, Type type) : Statement{ place }, m_type{ type }
+            explicit WhileLoop(const Location& place, Type type) : Statement{ place }, m_type{ type }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
-            virtual void execute(ExecutionContext& ctx) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+            virtual Value execute(ExecutionContext& ctx) const;
         };
 
         struct ForLoop : public Statement
@@ -864,11 +914,11 @@ namespace MSL
             // Optional
             std::unique_ptr<Expression> m_iterexpr;
             std::unique_ptr<Statement> m_body;
-            explicit ForLoop(const PlaceInCode& place) : Statement{ place }
+            explicit ForLoop(const Location& place) : Statement{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
-            virtual void execute(ExecutionContext& ctx) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+            virtual Value execute(ExecutionContext& ctx) const;
         };
 
         struct RangeBasedForLoop : public Statement
@@ -879,11 +929,11 @@ namespace MSL
             std::string m_valuevar;
             std::unique_ptr<Expression> m_rangeexpr;
             std::unique_ptr<Statement> m_body;
-            explicit RangeBasedForLoop(const PlaceInCode& place) : Statement{ place }
+            explicit RangeBasedForLoop(const Location& place) : Statement{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
-            virtual void execute(ExecutionContext& ctx) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+            virtual Value execute(ExecutionContext& ctx) const;
         };
 
 
@@ -897,11 +947,11 @@ namespace MSL
             };
             Type m_type;
 
-            explicit LoopBreakStatement(const PlaceInCode& place, Type type) : Statement{ place }, m_type{ type }
+            explicit LoopBreakStatement(const Location& place, Type type) : Statement{ place }, m_type{ type }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
-            virtual void execute(ExecutionContext& ctx) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+            virtual Value execute(ExecutionContext& ctx) const;
         };
 
         struct ReturnStatement : public Statement
@@ -909,22 +959,22 @@ namespace MSL
             // Can be null.
             std::unique_ptr<Expression> m_retvalue;
 
-            explicit ReturnStatement(const PlaceInCode& place) : Statement{ place }
+            explicit ReturnStatement(const Location& place) : Statement{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
-            virtual void execute(ExecutionContext& ctx) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+            virtual Value execute(ExecutionContext& ctx) const;
         };
 
         struct Block : public Statement
         {
             std::vector<std::unique_ptr<Statement>> m_statements;
 
-            explicit Block(const PlaceInCode& place) : Statement{ place }
+            explicit Block(const Location& place) : Statement{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
-            virtual void execute(ExecutionContext& ctx) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+            virtual Value execute(ExecutionContext& ctx) const;
         };
 
         struct /**/ConstantValue;
@@ -937,21 +987,21 @@ namespace MSL
             // Can be null if empty.
             std::vector<std::unique_ptr<AST::Block>> m_itemblocks;
 
-            explicit SwitchStatement(const PlaceInCode& place) : Statement{ place }
+            explicit SwitchStatement(const Location& place) : Statement{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
-            virtual void execute(ExecutionContext& ctx) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+            virtual Value execute(ExecutionContext& ctx) const;
         };
 
         struct ThrowStatement : public Statement
         {
             std::unique_ptr<Expression> m_thrownexpr;
-            explicit ThrowStatement(const PlaceInCode& place) : Statement{ place }
+            explicit ThrowStatement(const Location& place) : Statement{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
-            virtual void execute(ExecutionContext& ctx) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+            virtual Value execute(ExecutionContext& ctx) const;
         };
 
         struct TryStatement : public Statement
@@ -960,24 +1010,24 @@ namespace MSL
             std::unique_ptr<Statement> m_catchblock;// Optional
             std::unique_ptr<Statement> m_finallyblock;// Optional
             std::string m_exvarname;
-            explicit TryStatement(const PlaceInCode& place) : Statement{ place }
+            explicit TryStatement(const Location& place) : Statement{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
-            virtual void execute(ExecutionContext& ctx) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+            virtual Value execute(ExecutionContext& ctx) const;
         };
 
         struct Script : Block
         {
-            explicit Script(const PlaceInCode& place) : Block{ place }
+            explicit Script(const Location& place) : Block{ place }
             {
             }
-            virtual void execute(ExecutionContext& ctx) const;
+            virtual Value execute(ExecutionContext& ctx) const;
         };
 
         struct Expression : Statement
         {
-            explicit Expression(const PlaceInCode& place) : Statement{ place }
+            explicit Expression(const Location& place) : Statement{ place }
             {
             }
 
@@ -993,30 +1043,32 @@ namespace MSL
                 MINSL_EXECUTION_CHECK(false, getPlace(), "expected lvalue");
             }
 
-            virtual void execute(ExecutionContext& ctx) const
+            virtual Value execute(ExecutionContext& ctx) const
             {
-                evaluate(ctx, nullptr);
+                return evaluate(ctx, nullptr);
             }
         };
 
         struct ConstantExpression : Expression
         {
-            explicit ConstantExpression(const PlaceInCode& place) : Expression{ place }
+            explicit ConstantExpression(const Location& place) : Expression{ place }
             {
             }
-            virtual void execute(ExecutionContext&) const
-            { /* Nothing - just ignore its value. */
+            virtual Value execute(ExecutionContext&) const
+            {
+                /* Nothing - just ignore its value. */
+                return {};
             }
         };
 
         struct ConstantValue : ConstantExpression
         {
             Value m_val;
-            ConstantValue(const PlaceInCode& place, Value&& val) : ConstantExpression{ place }, m_val{ std::move(val) }
+            ConstantValue(const Location& place, Value&& val) : ConstantExpression{ place }, m_val{ std::move(val) }
             {
                 assert(m_val.type() == Value::Type::Null || m_val.isNumber() || m_val.isString());
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
             virtual Value evaluate(ExecutionContext&, ThisType*) const
             {
                 return Value{ m_val };
@@ -1036,26 +1088,26 @@ namespace MSL
             Scope m_scope = Scope::Count;
             std::string m_ident;
 
-            Identifier(const PlaceInCode& place, Scope scope, std::string&& s): ConstantExpression{ place }, m_scope(scope), m_ident(std::move(s))
+            Identifier(const Location& place, Scope scope, std::string&& s): ConstantExpression{ place }, m_scope(scope), m_ident(std::move(s))
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
             virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
             virtual LValue getLeftValue(ExecutionContext& ctx) const;
         };
 
         struct ThisExpression : ConstantExpression
         {
-            ThisExpression(const PlaceInCode& place) : ConstantExpression{ place }
+            ThisExpression(const Location& place) : ConstantExpression{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
             virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
         };
 
         struct Operator : Expression
         {
-            explicit Operator(const PlaceInCode& place) : Expression{ place }
+            explicit Operator(const Location& place) : Expression{ place }
             {
             }
         };
@@ -1084,10 +1136,10 @@ namespace MSL
                 std::unique_ptr<Expression> m_operand;
 
             public:
-                UnaryOperator(const PlaceInCode& place, Type type) : Operator{ place }, m_type(type)
+                UnaryOperator(const Location& place, Type type) : Operator{ place }, m_type(type)
                 {
                 }
-                virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+                virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
                 virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
                 virtual LValue getLeftValue(ExecutionContext& ctx) const;
         };
@@ -1097,10 +1149,10 @@ namespace MSL
             std::unique_ptr<Expression> m_operand;
             std::string m_membername;
 
-            MemberAccessOperator(const PlaceInCode& place) : Operator{ place }
+            MemberAccessOperator(const Location& place) : Operator{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
             virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
             virtual LValue getLeftValue(ExecutionContext& ctx) const;
         };
@@ -1154,10 +1206,10 @@ namespace MSL
                 Value Assignment(LValue&& lhs, Value&& rhs) const;
 
             public:
-                BinaryOperator(const PlaceInCode& place, Type type) : Operator{ place }, m_type(type)
+                BinaryOperator(const Location& place, Type type) : Operator{ place }, m_type(type)
                 {
                 }
-                virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+                virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
                 virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
                 virtual LValue getLeftValue(ExecutionContext& ctx) const;
         };
@@ -1165,20 +1217,20 @@ namespace MSL
         struct TernaryOperator : Operator
         {
             std::unique_ptr<Expression> m_oplist[3];
-            explicit TernaryOperator(const PlaceInCode& place) : Operator{ place }
+            explicit TernaryOperator(const Location& place) : Operator{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
             virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
         };
 
         struct CallOperator : Operator
         {
             std::vector<std::unique_ptr<Expression>> m_oplist;
-            CallOperator(const PlaceInCode& place) : Operator{ place }
+            CallOperator(const Location& place) : Operator{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
             virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
         };
 
@@ -1186,10 +1238,10 @@ namespace MSL
         {
             std::vector<std::string> m_paramlist;
             Block m_body;
-            FunctionDefinition(const PlaceInCode& place) : Expression{ place }, m_body{ place }
+            FunctionDefinition(const Location& place) : Expression{ place }, m_body{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
             virtual Value evaluate(ExecutionContext&, ThisType*) const
             {
                 return Value{ this };
@@ -1203,20 +1255,20 @@ namespace MSL
 
             std::unique_ptr<Expression> m_baseexpr;
             ItemMap m_items;
-            ObjectExpression(const PlaceInCode& place) : Expression{ place }
+            ObjectExpression(const Location& place) : Expression{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
             virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
         };
 
         struct ArrayExpression : public Expression
         {
             std::vector<std::unique_ptr<Expression>> m_items;
-            ArrayExpression(const PlaceInCode& place) : Expression{ place }
+            ArrayExpression(const Location& place) : Expression{ place }
             {
             }
-            virtual void debugPrint(uint32_t indentLevel, const std::string_view& prefix) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
             virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
         };
 
@@ -1265,7 +1317,7 @@ namespace MSL
             std::unique_ptr<AST::Expression> TryParseExpr17();
             bool tryParseSymbol(Token::Type symbol);
             std::string tryParseIdentifier();// If failed, returns empty string.
-            const PlaceInCode& getCurrentTokenPlace() const
+            const Location& getCurrentTokenPlace() const
             {
                 return m_toklist[m_tokidx].m_place;
             }
@@ -1299,11 +1351,11 @@ namespace MSL
                 return m_owner;
             }
 
-            Value execute(const std::string_view& code);
+            Value execute(std::string_view code);
 
             std::string_view getTypeName(Value::Type type) const;
 
-            void Print(const std::string_view& s)
+            void Print(std::string_view s)
             {
                 //m_Output.append(s);
                 std::cout << s;

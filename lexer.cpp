@@ -33,7 +33,7 @@ namespace MSL
         );
     }
 
-    CodeReader::CodeReader(const std::string_view& code) : m_code{ code }, m_place{ 0, 1, 1 }
+    CodeReader::CodeReader(std::string_view code) : m_code{ code }, m_place{ 0, 1, 1 }
     {
     }
 
@@ -42,7 +42,7 @@ namespace MSL
         return m_place.textindex >= m_code.length();
     }
 
-    const PlaceInCode& CodeReader::getCurrentPlace() const
+    const Location& CodeReader::getCurrentPlace() const
     {
         return m_place;
     }
@@ -76,7 +76,7 @@ namespace MSL
     {
         if(m_code[m_place.textindex++] == '\n')
         {
-            m_place.textrow++;
+            m_place.textline++;
             m_place.textcolumn = 1;
         }
         else
@@ -104,7 +104,7 @@ namespace MSL
         return true;
     }
 
-    bool Tokenizer::parseHexLiteral(uint32_t& out, const std::string_view& chars)
+    bool Tokenizer::parseHexLiteral(uint32_t& out, std::string_view chars)
     {
         size_t i;
         size_t count;

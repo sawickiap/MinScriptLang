@@ -361,7 +361,7 @@ catch (ex)
 {
     print("try-catch runtime: type=", ex.type, "\n");
     print("try-catch runtime: index=", ex.index, "\n");
-    print("try-catch runtime: row=", ex.row, "\n");
+    print("try-catch runtime: line=", ex.line, "\n");
     print("try-catch runtime: column=", ex.column, "\n");
     print("try-catch runtime: message=(", typeOf(ex.message), ") ", ex.message, "\n");
 }

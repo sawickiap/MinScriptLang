@@ -7,6 +7,13 @@
 #include <cassert>
 #include <cstdint>
 #include <cmath>
+#if __has_include(<readline/readline.h>)
+#include <readline/readline.h>
+#include <readline/history.h>
+#else
+    #define NO_READLINE
+#endif
+
 #include "msl.h"
 
 void WriteDataToFile(const char* filePath, const char* data, size_t byteCount)
@@ -39,8 +46,75 @@ bool readfile(const std::string& fname, std::string& destbuf)
 
 void printException(const MSL::Error::Exception& e)
 {
-    std::cerr << "uncaught error line " << e.getPlace().textrow << ": (" << e.prettyMessage() << std::endl;
+    std::cerr << "uncaught error line " << e.getPlace().textline << ": (" << e.prettyMessage() << std::endl;
 }
+
+#if !defined(NO_READLINE)
+static bool notjustspace(const char* line)
+{
+    int c;
+    size_t i;
+    for(i=0; (c = line[i]) != 0; i++)
+    {
+        if(!isspace(c))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+
+int repl(MSL::Environment& env)
+{
+    size_t varid;
+    size_t nowid;
+    size_t len;
+    char* line;
+    std::string exeme;
+    varid = 0;
+    while(true)
+    {
+        line = readline ("> ");
+        fflush(stdout);
+        if(line == NULL)
+        {
+            fprintf(stderr, "readline() returned NULL\n");
+        }
+        if((line != NULL) && (line[0] != '\0') && notjustspace(line))
+        {
+            exeme = line;
+            /*
+            * this appends a semicolon to the code line.
+            * this is a dumb hack, until the parser recognized linefeeds as line terminators.
+            */
+            len = exeme.size();
+            if(*(exeme.end()-1) != ';')
+            {
+                exeme.push_back(';');
+            }
+            add_history(line);
+            try
+            {
+                auto val = env.execute(exeme);
+                nowid = varid;
+                varid++;
+                if(!val.isNull())
+                {
+                    std::cout << "$" << nowid << " = ";
+                    val.toStream(std::cout);
+                    std::cout << std::endl;
+                }
+            }
+            catch(MSL::Error::Exception& e)
+            {
+                printException(e);
+            }
+        }
+    }
+}
+#endif
 
 int main(int argc, char* argv[])
 {
@@ -69,7 +143,11 @@ int main(int argc, char* argv[])
     }
     else
     {
+        #if defined(NO_READLINE)
         fprintf(stderr, "need a filename\n");
+        #else
+            return repl(env);
+        #endif
     }
     return 1;
 }

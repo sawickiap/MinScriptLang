@@ -4,31 +4,39 @@
 
 #define DEBUG_PRINT_FORMAT_STR_BEG "(%u,%u) %s%.*s"
 #define DEBUG_PRINT_ARGS_BEG \
-    getPlace().textrow, getPlace().textcolumn, GetDebugPrintIndent(indentLevel), (int)prefix.length(), prefix.data()
+    getPlace().textline, getPlace().textcolumn, GetDebugPrintIndent(indentLevel), (int)prefix.length(), prefix.data()
 
 
 namespace MSL
 {
     namespace Builtins
     {
-        Value ctor_null(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value ctor_number(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value ctor_string(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value ctor_object(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value ctor_array(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value ctor_function(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
-        Value ctor_type(AST::ExecutionContext& ctx, const PlaceInCode& place, std::vector<Value>&& args);
+        Value ctor_null(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
+        Value ctor_number(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
+        Value ctor_string(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
+        Value ctor_object(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
+        Value ctor_array(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
+        Value ctor_function(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
+        Value ctor_type(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
 
 
-        Value protofn_object_count(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
+        Value protofn_object_count(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
 
-        Value protofn_string_length(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
-        Value memberfn_string_resize(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
+        Value protofn_string_length(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
+        Value protofn_string_chars(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
+        Value memberfn_string_resize(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
+        Value memberfn_string_startswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
+        Value memberfn_string_endswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
+        Value memberfn_string_includes(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
+        Value memberfn_string_leftstrip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
+        Value memberfn_string_rightstrip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
+        Value memberfn_string_strip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
+        Value memberfn_string_split(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
 
-        Value protofn_array_length(AST::ExecutionContext& ctx, const PlaceInCode& place, Value&& objVal);
-        Value memberfn_array_add(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_array_insert(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_array_remove(AST::ExecutionContext& ctx, const PlaceInCode& place, const AST::ThisType& th, std::vector<Value>&& args);
+        Value protofn_array_length(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
+        Value memberfn_array_add(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
+        Value memberfn_array_insert(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
+        Value memberfn_array_remove(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
     }
 
     struct StandardObjectMemberFunc
@@ -48,11 +56,22 @@ namespace MSL
         {"count", Builtins::protofn_string_length},
         {"length", Builtins::protofn_string_length},
         {"size", Builtins::protofn_string_length},
+        {"chars", Builtins::protofn_string_chars},
     });
 
     static constexpr auto stdobjmethods_string = std::to_array<StandardObjectMemberFunc>(
     {
         {"resize", Builtins::memberfn_string_resize},
+        {"startsWith", Builtins::memberfn_string_startswith},
+        /*
+        {"endsWith", Builtins::memberfn_string_endswith},
+        {"includes", Builtins::memberfn_string_includes},
+        {"contains", Builtins::memberfn_string_includes},
+        {"lstrip", Builtins::memberfn_string_leftstrip},
+        {"rstrip", Builtins::memberfn_string_rightstrip},
+        {"strip", Builtins::memberfn_string_leftstrip},
+        {"split", Builtins::memberfn_string_leftstrip},
+        */
     });
 
     static constexpr auto stdobjproperties_object = std::to_array<StandardObjectPropertyFunc>(
@@ -115,7 +134,7 @@ namespace MSL
         auto obj = std::make_shared<Object>();
         obj->entry("type") = Value{ std::string(err.name()) };
         obj->entry("index") = Value{ (double)err.getPlace().textindex };
-        obj->entry("row") = Value{ (double)err.getPlace().textrow };
+        obj->entry("line") = Value{ (double)err.getPlace().textline };
         obj->entry("column") = Value{ (double)err.getPlace().textcolumn };
         obj->entry("message") = Value{ std::string{ err.getMessage() } };
         return obj;
@@ -132,7 +151,7 @@ namespace MSL
         return silly + (256 - std::min<uint32_t>(indentLevel, 128) * 2);
     }
 
-    Value* LValue::getValueRef(const PlaceInCode& place) const
+    Value* LValue::getValueRef(const Location& place) const
     {
         Value* val;
         const ObjectMemberLValue* leftmemberval;
@@ -155,7 +174,7 @@ namespace MSL
         throw Error::ExecutionError(place, "lvalue required");
     }
 
-    Value LValue::getValue(const PlaceInCode& place) const
+    Value LValue::getValue(const Location& place) const
     {
         char ch;
         const Value* val;
@@ -216,12 +235,12 @@ namespace MSL
                 assert(0);
         }
 
-        void EmptyStatement::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void EmptyStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "Empty\n", DEBUG_PRINT_ARGS_BEG);
         }
 
-        void Condition::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void Condition::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "If\n", DEBUG_PRINT_ARGS_BEG);
             ++indentLevel;
@@ -231,15 +250,20 @@ namespace MSL
                 m_statements[1]->debugPrint(indentLevel, "FalseStatement: ");
         }
 
-        void Condition::execute(ExecutionContext& ctx) const
+        Value Condition::execute(ExecutionContext& ctx) const
         {
             if(m_condexpr->evaluate(ctx, nullptr).isTrue())
-                m_statements[0]->execute(ctx);
+            {
+                return m_statements[0]->execute(ctx);
+            }
             else if(m_statements[1])
-                m_statements[1]->execute(ctx);
+            {
+                return m_statements[1]->execute(ctx);
+            }
+            return {};
         }
 
-        void WhileLoop::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void WhileLoop::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             const char* name = nullptr;
             switch(m_type)
@@ -259,50 +283,58 @@ namespace MSL
             m_body->debugPrint(indentLevel, "Body: ");
         }
 
-        void WhileLoop::execute(ExecutionContext& ctx) const
+        Value WhileLoop::execute(ExecutionContext& ctx) const
         {
             switch(m_type)
             {
                 case WhileLoop::Type::While:
-                    while(m_condexpr->evaluate(ctx, nullptr).isTrue())
                     {
-                        try
+                        while(m_condexpr->evaluate(ctx, nullptr).isTrue())
                         {
-                            m_body->execute(ctx);
-                        }
-                        catch(const BreakException&)
-                        {
-                            break;
-                        }
-                        catch(const ContinueException&)
-                        {
-                            continue;
+                            try
+                            {
+                                m_body->execute(ctx);
+                            }
+                            catch(const BreakException&)
+                            {
+                                break;
+                            }
+                            catch(const ContinueException&)
+                            {
+                                continue;
+                            }
                         }
                     }
                     break;
                 case WhileLoop::Type::DoWhile:
-                    do
                     {
-                        try
+                        do
                         {
-                            m_body->execute(ctx);
-                        }
-                        catch(const BreakException&)
-                        {
-                            break;
-                        }
-                        catch(const ContinueException&)
-                        {
-                            continue;
-                        }
-                    } while(m_condexpr->evaluate(ctx, nullptr).isTrue());
+                            try
+                            {
+                                m_body->execute(ctx);
+                            }
+                            catch(const BreakException&)
+                            {
+                                break;
+                            }
+                            catch(const ContinueException&)
+                            {
+                                continue;
+                            }
+                        } while(m_condexpr->evaluate(ctx, nullptr).isTrue());
+                    }
                     break;
                 default:
-                    assert(0);
+                    {
+                        assert(0);
+                    }
+                    break;
             }
+            return {};
         }
 
-        void ForLoop::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void ForLoop::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "For\n", DEBUG_PRINT_ARGS_BEG);
             ++indentLevel;
@@ -321,10 +353,12 @@ namespace MSL
             m_body->debugPrint(indentLevel, "Body: ");
         }
 
-        void ForLoop::execute(ExecutionContext& ctx) const
+        Value ForLoop::execute(ExecutionContext& ctx) const
         {
             if(m_initexpr)
+            {
                 m_initexpr->execute(ctx);
+            }
             while(m_condexpr ? m_condexpr->evaluate(ctx, nullptr).isTrue() : true)
             {
                 try
@@ -339,11 +373,14 @@ namespace MSL
                 {
                 }
                 if(m_iterexpr)
+                {
                     m_iterexpr->execute(ctx);
+                }
             }
+            return {};
         }
 
-        void RangeBasedForLoop::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void RangeBasedForLoop::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             if(!m_keyvar.empty())
                 printf(DEBUG_PRINT_FORMAT_STR_BEG "Range-based for: %s, %s\n", DEBUG_PRINT_ARGS_BEG, m_keyvar.c_str(),
@@ -355,7 +392,7 @@ namespace MSL
             m_body->debugPrint(indentLevel, "Body: ");
         }
 
-        void RangeBasedForLoop::execute(ExecutionContext& ctx) const
+        Value RangeBasedForLoop::execute(ExecutionContext& ctx) const
         {
             int ch;
             size_t i;
@@ -366,7 +403,6 @@ namespace MSL
             rangeval = m_rangeexpr->evaluate(ctx, nullptr);
             Object& innermostctx = ctx.getInnermostScope();
             usekey = !m_keyvar.empty();
-
             if(rangeval.isString())
             {
                 const auto& rangeStr = rangeval.getString();
@@ -374,7 +410,9 @@ namespace MSL
                 for(i = 0; i < count; ++i)
                 {
                     if(usekey)
+                    {
                         assign(LValue{ ObjectMemberLValue{ &innermostctx, m_keyvar } }, Value{ (double)i });
+                    }
                     ch = rangeStr[i];
                     assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{ std::string{ &ch, &ch + 1 } });
                     try
@@ -395,7 +433,9 @@ namespace MSL
                 for(const auto& [key, value] : rangeval.getObject()->m_items)
                 {
                     if(usekey)
+                    {
                         assign(LValue{ ObjectMemberLValue{ &innermostctx, m_keyvar } }, Value{ std::string{ key } });
+                    }
                     assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{ value });
                     try
                     {
@@ -416,7 +456,9 @@ namespace MSL
                 for(i = 0, count = arr->m_items.size(); i < count; ++i)
                 {
                     if(usekey)
+                    {
                         assign(LValue{ ObjectMemberLValue{ &innermostctx, m_keyvar } }, Value{ (double)i });
+                    }
                     assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{ arr->m_items[i] });
                     try
                     {
@@ -432,63 +474,90 @@ namespace MSL
                 }
             }
             else
+            {
                 throw Error::ExecutionError(getPlace(), "range-based loop can not be used with this object");
-
+            }
             if(usekey)
+            {
                 assign(LValue{ ObjectMemberLValue{ &innermostctx, m_keyvar } }, Value{});
+            }
             assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{});
+            return {};
         }
 
-        void LoopBreakStatement::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void LoopBreakStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             static const char* LOOP_BREAK_TYPE_NAMES[] = { "Break", "Continue" };
             printf(DEBUG_PRINT_FORMAT_STR_BEG "%s\n", DEBUG_PRINT_ARGS_BEG, LOOP_BREAK_TYPE_NAMES[(size_t)m_type]);
         }
 
-        void LoopBreakStatement::execute(ExecutionContext& ctx) const
+        Value LoopBreakStatement::execute(ExecutionContext& ctx) const
         {
             (void)ctx;
             switch(m_type)
             {
                 case LoopBreakStatement::Type::Break:
-                    throw BreakException{};
+                    {
+                        throw BreakException{};
+                    }
+                    break;
                 case LoopBreakStatement::Type::Continue:
-                    throw ContinueException{};
+                    {
+                        throw ContinueException{};
+                    }
+                    break;
                 default:
-                    assert(0);
+                    {
+                        assert(0);
+                    }
+                    break;
             }
+            return {};
         }
 
-        void ReturnStatement::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void ReturnStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "return\n", DEBUG_PRINT_ARGS_BEG);
             if(m_retvalue)
+            {
                 m_retvalue->debugPrint(indentLevel + 1, "ReturnedValue: ");
+            }
         }
 
-        void ReturnStatement::execute(ExecutionContext& ctx) const
+        Value ReturnStatement::execute(ExecutionContext& ctx) const
         {
             if(m_retvalue)
+            {
                 throw ReturnException{ getPlace(), m_retvalue->evaluate(ctx, nullptr) };
+            }
             else
+            {
                 throw ReturnException{ getPlace(), Value{} };
+            }
+            return {};
         }
 
-        void Block::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void Block::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "Block\n", DEBUG_PRINT_ARGS_BEG);
             ++indentLevel;
             for(const auto& stmtPtr : m_statements)
+            {
                 stmtPtr->debugPrint(indentLevel, std::string_view{});
+            }
         }
 
-        void Block::execute(ExecutionContext& ctx) const
+        Value Block::execute(ExecutionContext& ctx) const
         {
+            Value rv;
             for(const auto& stmtPtr : m_statements)
-                stmtPtr->execute(ctx);
+            {
+                rv = stmtPtr->execute(ctx);
+            }
+            return rv;
         }
 
-        void SwitchStatement::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void SwitchStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             size_t i;
             printf(DEBUG_PRINT_FORMAT_STR_BEG "switch\n", DEBUG_PRINT_ARGS_BEG);
@@ -507,7 +576,7 @@ namespace MSL
             }
         }
 
-        void SwitchStatement::execute(ExecutionContext& ctx) const
+        Value SwitchStatement::execute(ExecutionContext& ctx) const
         {
             Value condVal;
             size_t itemidx;
@@ -515,21 +584,25 @@ namespace MSL
             size_t itemcnt;
             defitemidx = SIZE_MAX;
             condVal = m_cond->evaluate(ctx, nullptr);
-
             itemcnt = m_itemvals.size();
-
             for(itemidx = 0; itemidx < itemcnt; ++itemidx)
             {
                 if(m_itemvals[itemidx])
                 {
                     if(m_itemvals[itemidx]->m_val.isEqual(condVal))
+                    {
                         break;
+                    }
                 }
                 else
+                {
                     defitemidx = itemidx;
+                }
             }
             if(itemidx == itemcnt && defitemidx != SIZE_MAX)
+            {
                 itemidx = defitemidx;
+            }
             if(itemidx != itemcnt)
             {
                 for(; itemidx < itemcnt; ++itemidx)
@@ -544,31 +617,37 @@ namespace MSL
                     }
                 }
             }
+            return {};
         }
 
-        void ThrowStatement::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void ThrowStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "throw\n", DEBUG_PRINT_ARGS_BEG);
             m_thrownexpr->debugPrint(indentLevel + 1, "ThrownExpression: ");
         }
 
-        void ThrowStatement::execute(ExecutionContext& ctx) const
+        Value ThrowStatement::execute(ExecutionContext& ctx) const
         {
             throw m_thrownexpr->evaluate(ctx, nullptr);
+            return {};
         }
 
-        void TryStatement::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void TryStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "try\n", DEBUG_PRINT_ARGS_BEG);
             ++indentLevel;
             m_tryblock->debugPrint(indentLevel, "TryBlock: ");
             if(m_catchblock)
+            {
                 m_catchblock->debugPrint(indentLevel, "CatchBlock: ");
+            }
             if(m_finallyblock)
+            {
                 m_finallyblock->debugPrint(indentLevel, "FinallyBlock: ");
+            }
         }
 
-        void TryStatement::execute(ExecutionContext& ctx) const
+        Value TryStatement::execute(ExecutionContext& ctx) const
         {
             // Careful with this function! It contains logic that was difficult to get right.
             try
@@ -584,7 +663,9 @@ namespace MSL
                     m_catchblock->execute(ctx);
                     assign(LValue{ ObjectMemberLValue{ &innermostctx, m_exvarname } }, Value{});
                     if(m_finallyblock)
+                    {
                         m_finallyblock->execute(ctx);
+                    }
                 }
                 else
                 {
@@ -604,7 +685,7 @@ namespace MSL
                     }
                     throw val;
                 }
-                return;
+                return {};
             }
             catch(const Error::ExecutionError& err)
             {
@@ -636,24 +717,30 @@ namespace MSL
                     }
                     throw err;
                 }
-                return;
+                return {};
             }
             catch(const BreakException&)
             {
                 if(m_finallyblock)
+                {
                     m_finallyblock->execute(ctx);
+                }
                 throw;
             }
             catch(const ContinueException&)
             {
                 if(m_finallyblock)
+                {
                     m_finallyblock->execute(ctx);
+                }
                 throw;
             }
             catch(ReturnException&)
             {
                 if(m_finallyblock)
+                {
                     m_finallyblock->execute(ctx);
+                }
                 throw;
             }
             catch(const Error::ParsingError&)
@@ -661,14 +748,17 @@ namespace MSL
                 assert(0 && "ParsingError not expected during execution.");
             }
             if(m_finallyblock)
+            {
                 m_finallyblock->execute(ctx);
+            }
+            return {};
         }
 
-        void Script::execute(ExecutionContext& ctx) const
+        Value Script::execute(ExecutionContext& ctx) const
         {
             try
             {
-                Block::execute(ctx);
+                return Block::execute(ctx);
             }
             catch(BreakException)
             {
@@ -678,9 +768,10 @@ namespace MSL
             {
                 throw Error::ExecutionError{ getPlace(), "use of 'continue' outside of a loop" };
             }
+            return {};
         }
 
-        void ConstantValue::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void ConstantValue::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             switch(m_val.type())
             {
@@ -698,7 +789,7 @@ namespace MSL
             }
         }
 
-        void Identifier::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void Identifier::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             static const char* PREFIX[] = { "", "local.", "global." };
             printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier: %s%s\n", DEBUG_PRINT_ARGS_BEG, PREFIX[(size_t)m_scope], m_ident.c_str());
@@ -716,8 +807,12 @@ namespace MSL
             {
                 // Local variable
                 if((m_scope == Identifier::Scope::None || m_scope == Identifier::Scope::Local))
+                {
                     if(val = ctx.getCurrentLocalScope()->tryGet(m_ident); val)
+                    {
                         return *val;
+                    }
+                }
                 // This
                 if(m_scope == Identifier::Scope::None)
                 {
@@ -734,7 +829,6 @@ namespace MSL
                     }
                 }
             }
-
             if(m_scope == Identifier::Scope::None || m_scope == Identifier::Scope::Global)
             {
                 // Global variable
@@ -752,18 +846,7 @@ namespace MSL
                         return Value{ (Value::Type)i };
                     }
                 }
-                // System function
-                /*
-                for(i = 0, count = (size_t)SystemFunction::FuncCount; i < count; ++i)
-                {
-                    if(m_ident == SYSTEM_FUNCTION_NAMES[i])
-                    {
-                        return Value{ (SystemFunction)i };
-                    }
-                }
-                */
             }
-
             // Not found - null
             return {};
         }
@@ -779,27 +862,34 @@ namespace MSL
             {
                 // Local variable
                 if((m_scope == Identifier::Scope::None || m_scope == Identifier::Scope::Local) && ctx.getCurrentLocalScope()->hasKey(m_ident))
+                {
                     return LValue{ ObjectMemberLValue{ &*ctx.getCurrentLocalScope(), m_ident } };
+                }
                 // This
                 if(m_scope == Identifier::Scope::None)
                 {
-                    if((thisObj = std::get_if<std::shared_ptr<Object>>(&ctx.getThis()));
-                       thisObj && (*thisObj)->hasKey(m_ident))
+                    thisObj = std::get_if<std::shared_ptr<Object>>(&ctx.getThis());
+                    if(thisObj && (*thisObj)->hasKey(m_ident))
+                    {
                         return LValue{ ObjectMemberLValue{ (*thisObj).get(), m_ident } };
+                    }
                 }
             }
 
             // Global variable
             if((m_scope == Identifier::Scope::None || m_scope == Identifier::Scope::Global) && ctx.m_globalscope.hasKey(m_ident))
+            {
                 return LValue{ ObjectMemberLValue{ &ctx.m_globalscope, m_ident } };
-
+            }
             // Not found: return reference to smallest scope.
             if((m_scope == Identifier::Scope::None || m_scope == Identifier::Scope::Local) && islocal)
+            {
                 return LValue{ ObjectMemberLValue{ ctx.getCurrentLocalScope(), m_ident } };
+            }
             return LValue{ ObjectMemberLValue{ &ctx.m_globalscope, m_ident } };
         }
 
-        void ThisExpression::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void ThisExpression::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "This\n", DEBUG_PRINT_ARGS_BEG);
         }
@@ -811,14 +901,13 @@ namespace MSL
             return Value{ std::shared_ptr<Object>{ *std::get_if<std::shared_ptr<Object>>(&ctx.getThis()) } };
         }
 
-        void UnaryOperator::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void UnaryOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             static const char* UNARY_OPERATOR_TYPE_NAMES[]
             = { "Preincrementation", "Predecrementation", "Postincrementation", "Postdecrementation", "Plus", "Minus",
                 "Logical NOT",       "Bitwise NOT" };
 
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "UnaryOperator %s\n", DEBUG_PRINT_ARGS_BEG,
-                   UNARY_OPERATOR_TYPE_NAMES[(uint32_t)m_type]);
+            printf(DEBUG_PRINT_FORMAT_STR_BEG "UnaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, UNARY_OPERATOR_TYPE_NAMES[(uint32_t)m_type]);
             ++indentLevel;
             m_operand->debugPrint(indentLevel, "Operand: ");
         }
@@ -913,7 +1002,7 @@ namespace MSL
             throw Error::ExecutionError(getPlace(), "lvalue required");
         }
 
-        void MemberAccessOperator::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void MemberAccessOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "MemberAccessOperator Member=%s\n", DEBUG_PRINT_ARGS_BEG, m_membername.c_str());
             m_operand->debugPrint(indentLevel + 1, "Operand: ");
@@ -999,7 +1088,7 @@ namespace MSL
             return Value{ (double)resval };
         }
 
-        void BinaryOperator::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void BinaryOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             static const char* BINARY_OPERATOR_TYPE_NAMES[] = {
                 "Mul",
@@ -1367,7 +1456,7 @@ namespace MSL
             return *leftvalptr;
         }
 
-        void TernaryOperator::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void TernaryOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "TernaryOperator\n", DEBUG_PRINT_ARGS_BEG);
             ++indentLevel;
@@ -1382,7 +1471,7 @@ namespace MSL
                                                                   m_oplist[2]->evaluate(ctx, othis);
         }
 
-        void CallOperator::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void CallOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             size_t i;
             size_t count;
@@ -1523,8 +1612,8 @@ namespace MSL
                         }
                         break;
 /*
-    using MemberMethodFunction = Value(AST::ExecutionContext&, const PlaceInCode&, const AST::ThisType&, std::vector<Value>&&);
-    using MemberPropertyFunction = Value(AST::ExecutionContext&, const PlaceInCode&, Value&&);
+    using MemberMethodFunction = Value(AST::ExecutionContext&, const Location&, const AST::ThisType&, std::vector<Value>&&);
+    using MemberPropertyFunction = Value(AST::ExecutionContext&, const Location&, Value&&);
 */
                     #if 1
                     case Value::Type::MemberMethod:
@@ -1556,7 +1645,7 @@ namespace MSL
             throw Error::ExecutionError(getPlace(), "invalid function call");
         }
 
-        void FunctionDefinition::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void FunctionDefinition::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             size_t i;
             size_t count;
@@ -1592,7 +1681,7 @@ namespace MSL
             return true;
         }
 
-        void ObjectExpression::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void ObjectExpression::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "Object\n", DEBUG_PRINT_ARGS_BEG);
             ++indentLevel;
@@ -1634,7 +1723,7 @@ namespace MSL
             return Value{ std::move(obj) };
         }
 
-        void ArrayExpression::debugPrint(uint32_t indentLevel, const std::string_view& prefix) const
+        void ArrayExpression::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             size_t i;
             size_t count;

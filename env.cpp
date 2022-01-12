@@ -5,7 +5,7 @@ namespace MSL
 {
     namespace Builtins
     {
-        Value func_typeof(Environment& env, const PlaceInCode& place, std::vector<Value>&& args)
+        Value func_typeof(Environment& env, const Location& place, std::vector<Value>&& args)
         {
             (void)env;
             if(args.size() == 0)
@@ -15,7 +15,7 @@ namespace MSL
             return Value{ args[0].type() };
         }
 
-        Value func_print(Environment& env, const PlaceInCode& place, std::vector<Value>&& args)
+        Value func_print(Environment& env, const Location& place, std::vector<Value>&& args)
         {
             std::string s;
             (void)place;
@@ -49,8 +49,8 @@ namespace MSL
                     case Value::Type::Type:
                     {
                         //const size_t typeIndex = (size_t)val.getTypeValue();
-                        //const std::string_view& typeName = VALUE_TYPE_NAMES[typeIndex];
-                        const std::string_view& typeName = Value::getTypeName(val.getTypeValue());
+                        //std::string_view typeName = VALUE_TYPE_NAMES[typeIndex];
+                        std::string_view typeName = Value::getTypeName(val.getTypeValue());
                         s = Format("%.*s", (int)typeName.length(), typeName.data());
                         env.Print(s);
                     }
@@ -61,7 +61,7 @@ namespace MSL
             }
             return {};
         }
-        Value func_min(Environment& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+        Value func_min(Environment& ctx, const Location& place, std::vector<Value>&& args)
         {
             size_t i;
             size_t argCount;
@@ -88,7 +88,7 @@ namespace MSL
             }
             return Value{ result };
         }
-        Value func_max(Environment& ctx, const PlaceInCode& place, std::vector<Value>&& args)
+        Value func_max(Environment& ctx, const Location& place, std::vector<Value>&& args)
         {
             size_t i;
             size_t argCount;
@@ -117,18 +117,16 @@ namespace MSL
         }
     }
 
-    Value EnvironmentPimpl::execute(const std::string_view& code)
+    Value EnvironmentPimpl::execute(std::string_view code)
     {
-        AST::Script script{ PlaceInCode{ 0, 1, 1 } };
-        {
-            Tokenizer tokenizer{ code };
-            Parser parser{ tokenizer };
-            parser.ParseScript(script);
-        }
+        AST::Script script{ Location{ 0, 1, 1 } };
+        Tokenizer tokenizer{ code };
+        Parser parser{ tokenizer };
+        parser.ParseScript(script);
         try
         {
             AST::ExecutionContext executeContext{ *this, m_globalscope };
-            script.execute(executeContext);
+            return script.execute(executeContext);
         }
         catch(ReturnException& returnEx)
         {
@@ -160,7 +158,7 @@ namespace MSL
         delete m_implenv;
     }
 
-    Value Environment::execute(const std::string_view& code)
+    Value Environment::execute(std::string_view code)
     {
         return m_implenv->execute(code);
     }
@@ -170,7 +168,7 @@ namespace MSL
         return m_implenv->getTypeName(type);
     }
 
-    void Environment::Print(const std::string_view& s)
+    void Environment::Print(std::string_view s)
     {
         m_implenv->Print(s);
     }

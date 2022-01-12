@@ -1,8 +1,98 @@
 
+#include <sstream>
 #include "msl.h"
 
 namespace MSL
 {
+    namespace
+    {
+        template<typename CharT>
+        void cppquote_char(std::basic_ostream<CharT>& os, int c)
+        {
+            switch(c)
+            {
+                case '\'':
+                    os << "\\\'";
+                    break;
+                case '\"':
+                    os << "\\\"";
+                    break;
+                case '\\':
+                    os << "\\\\";
+                    break;
+                case '\b':
+                    os << "\\b";
+                    break;
+                case '\f':
+                    os << "\\f";
+                    break;
+                case '\n':
+                    os << "\\n";
+                    break;
+                case '\r':
+                    os << "\\r";
+                    break;
+                case '\t':
+                    os << "\\t";
+                    break;
+                default:
+                    constexpr const char* const hexchars = "0123456789ABCDEF";
+                    os << '\\';
+                    if(c <= 255)
+                    {
+                        os << 'x';
+                        os << hexchars[(c >> 4) & 0xf];
+                        os << hexchars[c & 0xf];
+                    }
+                    else
+                    {
+                        os << 'u';
+                        os << hexchars[(c >> 12) & 0xf];
+                        os << hexchars[(c >> 8) & 0xf];
+                        os << hexchars[(c >> 4) & 0xf];
+                        os << hexchars[c & 0xf];
+                    }
+            }
+        }
+
+        template<typename CharT>        
+        void cppquote_string(std::basic_ostream<CharT>& os, std::string_view str)
+        {
+            os << '"';
+            for(auto ch: str)
+            {
+                cppquote_char(os, ch);
+            }
+            os << '"';
+        }
+
+        template<typename CharT>
+        void dump_array(std::basic_ostream<CharT>& os, Array* arr, bool repr)
+        {
+            size_t i;
+            size_t sz;
+            sz = arr->m_items.size();
+            os << "[";
+            for(i=0; i<sz; i++)
+            {
+                auto val = arr->m_items[i];
+                if(val.isArray() && (val.getArray() == arr))
+                {
+                    os << "<recursion>";
+                }
+                else
+                {
+                    val.toStream(os, repr);
+                }
+                if((i+1) != sz)
+                {
+                    os << ", ";
+                }
+            }
+            os << "]";
+        }
+    }
+
     bool Value::isEqual(const Value& rhs) const
     {
         if(m_type != rhs.m_type)
@@ -90,4 +180,93 @@ namespace MSL
         }
         return false;
     }
+
+    void Value::actualToStream(std::ostream& os, bool repr) const
+    {
+        switch(m_type)
+        {
+            case Value::Type::Null:
+                {
+                    os << "null";
+                }
+                break;
+            case Value::Type::Number:
+                {
+                    os << getNumber();
+                }
+                break;
+            case Value::Type::String:
+                {
+                    if(repr)
+                    {
+                        cppquote_string(os, getString());
+                    }
+                    else
+                    {
+                        os << getString();
+                    }
+                }
+                break;
+            case Value::Type::Function:
+                {
+                    auto p = getFunction();
+                    os << "<astfunction @" << &p << ">";
+                }
+                break;
+            case Value::Type::HostFunction:
+                {
+                    auto p = getHostFunction();
+                    os << "<hostfunction @" << &p << ">";
+                }
+                break;
+            case Value::Type::Object:
+                {
+                    auto obj = getObject();
+                    os << "<object @" << &obj << ">";
+                }
+                break;
+            case Value::Type::Array:
+                {
+                    dump_array(os, getArray(), repr);
+                }
+                break;
+            case Value::Type::Type:
+                {
+                    os << "<type '"<< Value::getTypeName(getTypeValue()) << "'>";
+                }
+                break;
+            case Value::Type::MemberMethod:
+                {
+                    auto p = getMemberFunction();
+                    os << "<member @" << &p << ">";
+                }
+                break;
+            case Value::Type::MemberProperty:
+                {
+                    auto p = getPropertyFunction();
+                    os << "<property @" << &p << ">";
+                }
+                break;
+            default:
+                {
+                    os << "<value '" << Value::getTypeName(m_type) << "'>";
+                }
+                break;
+        }
+    }
+
+    std::string Value::toString() const
+    {
+        std::stringstream ss;
+        toStream(ss);
+        return ss.str();
+    }
+
+    std::string Value::toRepr() const
+    {
+        std::stringstream ss;
+        reprToStream(ss);
+        return ss.str();
+    }
+
 }

@@ -45,7 +45,7 @@ namespace MSL
 
     bool Parser::tryParseSwitchItem(AST::SwitchStatement& switchStatement)
     {
-        const PlaceInCode place = getCurrentTokenPlace();
+        const Location place = getCurrentTokenPlace();
         // 'default' ':' Block
         if(tryParseSymbol(Token::Type::Default))
         {
@@ -100,7 +100,7 @@ namespace MSL
 
     std::unique_ptr<AST::Statement> Parser::tryParseStatement()
     {
-        const PlaceInCode place = getCurrentTokenPlace();
+        const Location place = getCurrentTokenPlace();
 
         // Empty statement: ';'
         if(tryParseSymbol(Token::Type::Semicolon))
@@ -372,7 +372,7 @@ namespace MSL
             return r;
         if(auto r = tryParseIdentVal())
             return r;
-        const PlaceInCode place = m_toklist[m_tokidx].m_place;
+        const Location place = m_toklist[m_tokidx].m_place;
         if(tryParseSymbol(Token::Type::This))
             return std::make_unique<AST::ThisExpression>(place);
         return {};
@@ -405,7 +405,7 @@ namespace MSL
 
     std::unique_ptr<AST::Expression> Parser::tryParseClassSynSugar()
     {
-        const PlaceInCode beginPlace = getCurrentTokenPlace();
+        const Location beginPlace = getCurrentTokenPlace();
         if(tryParseSymbol(Token::Type::Class))
         {
             std::string className = tryParseIdentifier();
@@ -490,7 +490,7 @@ namespace MSL
 
     std::unique_ptr<AST::Expression> Parser::tryParseParentheses()
     {
-        const PlaceInCode place = getCurrentTokenPlace();
+        const Location place = getCurrentTokenPlace();
 
         // '(' Expr17 ')'
         if(tryParseSymbol(Token::Type::RoundBracketOpen))
@@ -530,7 +530,7 @@ namespace MSL
             return {};
         for(;;)
         {
-            const PlaceInCode place = getCurrentTokenPlace();
+            const Location place = getCurrentTokenPlace();
             // Postincrementation: Expr0 '++'
             if(tryParseSymbol(Token::Type::DoublePlus))
             {
@@ -593,7 +593,7 @@ namespace MSL
 
     std::unique_ptr<AST::Expression> Parser::tryParseOperator()
     {
-        const PlaceInCode place = getCurrentTokenPlace();
+        const Location place = getCurrentTokenPlace();
     #define PARSE_UNARY_OPERATOR(symbol, unaryOperatorType)                               \
         if(tryParseSymbol(symbol))                                                        \
         {                                                                                 \
@@ -628,7 +628,7 @@ namespace MSL
 
         for(;;)
         {
-            const PlaceInCode place = getCurrentTokenPlace();
+            const Location place = getCurrentTokenPlace();
             if(tryParseSymbol(Token::Type::Asterisk))
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::Mul, tryParseOperator)
             else if(tryParseSymbol(Token::Type::Slash))
@@ -649,7 +649,7 @@ namespace MSL
 
         for(;;)
         {
-            const PlaceInCode place = getCurrentTokenPlace();
+            const Location place = getCurrentTokenPlace();
             if(tryParseSymbol(Token::Type::Plus))
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::Add, tryParseBinary)
             else if(tryParseSymbol(Token::Type::Dash))
@@ -668,7 +668,7 @@ namespace MSL
 
         for(;;)
         {
-            const PlaceInCode place = getCurrentTokenPlace();
+            const Location place = getCurrentTokenPlace();
             if(tryParseSymbol(Token::Type::DoubleLess))
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::ShiftLeft, tryParseAddSub)
             else if(tryParseSymbol(Token::Type::DoubleGreater))
@@ -687,7 +687,7 @@ namespace MSL
 
         for(;;)
         {
-            const PlaceInCode place = getCurrentTokenPlace();
+            const Location place = getCurrentTokenPlace();
             if(tryParseSymbol(Token::Type::Less))
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::Less, tryParseAngleSign)
             else if(tryParseSymbol(Token::Type::LessEquals))
@@ -710,7 +710,7 @@ namespace MSL
 
         for(;;)
         {
-            const PlaceInCode place = getCurrentTokenPlace();
+            const Location place = getCurrentTokenPlace();
             if(tryParseSymbol(Token::Type::DoubleEquals))
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::Equal, tryParseAngleCompare)
             else if(tryParseSymbol(Token::Type::ExclamationEquals))
@@ -729,7 +729,7 @@ namespace MSL
 
         for(;;)
         {
-            const PlaceInCode place = getCurrentTokenPlace();
+            const Location place = getCurrentTokenPlace();
             if(tryParseSymbol(Token::Type::Amperstand))
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::BitwiseAnd, tryParseEquals)
             else
@@ -746,7 +746,7 @@ namespace MSL
 
         for(;;)
         {
-            const PlaceInCode place = getCurrentTokenPlace();
+            const Location place = getCurrentTokenPlace();
             if(tryParseSymbol(Token::Type::Caret))
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::BitwiseXor, TryParseExpr11)
             else
@@ -763,7 +763,7 @@ namespace MSL
 
         for(;;)
         {
-            const PlaceInCode place = getCurrentTokenPlace();
+            const Location place = getCurrentTokenPlace();
             if(tryParseSymbol(Token::Type::Pipe))
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::BitwiseOr, TryParseExpr12)
             else
@@ -779,7 +779,7 @@ namespace MSL
             return {};
         for(;;)
         {
-            const PlaceInCode place = getCurrentTokenPlace();
+            const Location place = getCurrentTokenPlace();
             if(tryParseSymbol(Token::Type::DoubleAmperstand))
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::LogicalAnd, TryParseExpr13)
             else
@@ -795,7 +795,7 @@ namespace MSL
             return {};
         for(;;)
         {
-            const PlaceInCode place = getCurrentTokenPlace();
+            const Location place = getCurrentTokenPlace();
             if(tryParseSymbol(Token::Type::DoublePipe))
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::LogicalOr, TryParseExpr14)
             else
@@ -852,7 +852,7 @@ namespace MSL
             return {};
         for(;;)
         {
-            const PlaceInCode place = getCurrentTokenPlace();
+            const Location place = getCurrentTokenPlace();
             if(tryParseSymbol(Token::Type::Comma))
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::Comma, TryParseExpr16)
             else
