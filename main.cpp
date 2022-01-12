@@ -15,6 +15,7 @@
 #endif
 
 #include "msl.h"
+#include "optionparser.h"
 
 void WriteDataToFile(const char* filePath, const char* data, size_t byteCount)
 {
@@ -47,6 +48,16 @@ bool readfile(const std::string& fname, std::string& destbuf)
 void printException(const MSL::Error::Exception& e)
 {
     std::cerr << "uncaught error line " << e.getPlace().textline << ": (" << e.prettyMessage() << std::endl;
+}
+
+void setARGV(MSL::Environment& env, const std::vector<std::string>& va)
+{
+    auto a = std::make_shared<MSL::Array>();
+    for(auto s: va)
+    {
+        a->m_items.push_back(MSL::Value{std::string(s)});
+    }
+    env.global("ARGV") = MSL::Value{std::move(a)};
 }
 
 #if !defined(NO_READLINE)
@@ -119,10 +130,50 @@ int repl(MSL::Environment& env)
 
 int main(int argc, char* argv[])
 {
+    bool havecodechunk;
+    bool forcerepl;
     std::string filename;
     std::string filedata;
+    std::string codechunk;
+    std::vector<std::string> rest;
     MSL::Environment env;
-    if(argc > 1)
+    OptionParser prs;
+    forcerepl = false;
+    havecodechunk = false;
+    prs.on({"-i", "--repl"}, "force run REPL", [&]
+    {
+        forcerepl = true; 
+    });
+    prs.on({"-e?", "--eval=?"}, "evaluate <arg>, then exit", [&](const auto& v)
+    {
+        codechunk = v.str();
+        havecodechunk = true;
+        prs.stopParsing();
+    });
+    try
+    {
+        prs.parse(argc, argv);
+    }
+    catch(OptionParser::Error& e)
+    {
+        std::cerr << "failed to process options: " << e.what() << std::endl;
+        return 0;
+    }
+    rest = prs.positional();
+    setARGV(env, rest);
+    if(havecodechunk)
+    {
+        try
+        {
+            auto v = env.execute(codechunk);
+        }
+        catch(MSL::Error::Exception& e)
+        {
+            printException(e);
+        }
+        return 0;
+    }
+    if(rest.size() > 0 && !forcerepl)
     {
         filename = argv[1];
         if(readfile(filename, filedata))
@@ -145,7 +196,14 @@ int main(int argc, char* argv[])
     else
     {
         #if defined(NO_READLINE)
-        fprintf(stderr, "need a filename\n");
+            if(forcerepl)
+            {
+                std::cerr << "no support for readline compiled, so no REPL. sorry" << std::endl;
+            }
+            else
+            {
+                std::cerr << "need a filename" << std::endl;
+            }
         #else
             return repl(env);
         #endif

@@ -72,7 +72,7 @@ namespace MSL
 {
     namespace AST
     {
-        class /**/FunctionDefinition;
+        struct /**/FunctionDefinition;
         class /**/ExecutionContext;
         class /**/ThisType;
     }
@@ -1097,18 +1097,19 @@ namespace MSL
                 assert(m_val.type() == Value::Type::Null || m_val.isNumber() || m_val.isString());
             }
 
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const override;
 
-            virtual Value evaluate(ExecutionContext&, ThisType*) const
+            virtual Value evaluate(ExecutionContext&, ThisType*) const override
             {
                 return Value{ m_val };
             }
 
-            
+            /*
             virtual Value execute(ExecutionContext&)
             {
                 return m_val;
             }
+            */
             
         };
 

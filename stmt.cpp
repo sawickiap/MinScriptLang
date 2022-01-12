@@ -1384,7 +1384,7 @@ namespace MSL
             if(m_type == BinaryOperator::Type::Assignment)
             {
                 assign(lhs, Value{ rhs });
-                return rhs;
+                return std::move(rhs);
             }
             // Others require existing value.
             leftvalptr = lhs.getValueRef(getPlace());

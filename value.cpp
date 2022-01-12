@@ -58,10 +58,20 @@ namespace MSL
         template<typename CharT>        
         void cppquote_string(std::basic_ostream<CharT>& os, std::string_view str)
         {
+            int ch;
+            size_t i;
             os << '"';
-            for(auto ch: str)
+            for(i=0; i<str.size(); i++)
             {
-                cppquote_char(os, ch);
+                ch = str[i];
+                if((ch < 32) || (ch > 127) || (ch == '\"') || (ch == '\\'))
+                {
+                    cppquote_char(os, ch);
+                }
+                else
+                {
+                    os.put(char(ch));
+                }
             }
             os << '"';
         }

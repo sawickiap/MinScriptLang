@@ -1,10 +1,4 @@
 
-function n2c(n)
-{
-    alphabet = "0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz";
-    return alphabet[n];
-}
-
 /*
 * This is an integer ascii Mandelbrot generator
 */
@@ -48,7 +42,7 @@ while(y0 > bottom_edge)
             x = x_x - y_y + x0;
             i = i + 1;
         }
-        print(n2c(the_char));
+        printf("%c", the_char);
         x0 = x0 + x_step;
     }
     print("\n");
