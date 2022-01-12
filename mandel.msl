@@ -1,11 +1,4 @@
 
-
-function n2c(n)
-{
-    alphabet = "0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz";
-    return alphabet[n];
-}
-
 xmin = -8601;
 xmax = 2867;
 ymin = -4915;
@@ -37,7 +30,7 @@ while(cy <= ymax)
             y2 = ((y * y) >> 12);
             iter +=1;
         }
-        print(n2c(32+iter));
+        printf("%c", (32+iter));
         cx += dx;
     }
     print("\n");

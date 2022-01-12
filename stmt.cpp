@@ -42,16 +42,16 @@ namespace MSL
     struct StandardObjectMemberFunc
     {
         const char* name;
-        MemberMethodFunction* func;
+        MemberMethodFunction func;
     };
 
     struct StandardObjectPropertyFunc
     {
         const char* name;
-        MemberPropertyFunction* func;
+        MemberPropertyFunction func;
     };
 
-    static constexpr auto stdobjproperties_string = std::to_array<StandardObjectPropertyFunc>(
+    static auto stdobjproperties_string = std::to_array<StandardObjectPropertyFunc>(
     {
         {"count", Builtins::protofn_string_length},
         {"length", Builtins::protofn_string_length},
@@ -59,7 +59,7 @@ namespace MSL
         {"chars", Builtins::protofn_string_chars},
     });
 
-    static constexpr auto stdobjmethods_string = std::to_array<StandardObjectMemberFunc>(
+    static auto stdobjmethods_string = std::to_array<StandardObjectMemberFunc>(
     {
         {"resize", Builtins::memberfn_string_resize},
         {"startsWith", Builtins::memberfn_string_startswith},
@@ -74,24 +74,24 @@ namespace MSL
         */
     });
 
-    static constexpr auto stdobjproperties_object = std::to_array<StandardObjectPropertyFunc>(
+    static auto stdobjproperties_object = std::to_array<StandardObjectPropertyFunc>(
     {
         {"count", Builtins::protofn_object_count},
     });
 
-    static constexpr auto stdobjmethods_object = std::to_array<StandardObjectMemberFunc>(
+    static auto stdobjmethods_object = std::to_array<StandardObjectMemberFunc>(
     {
         {nullptr, nullptr},
     });
 
-    static constexpr auto stdobjproperties_array = std::to_array<StandardObjectPropertyFunc>(
+    static auto stdobjproperties_array = std::to_array<StandardObjectPropertyFunc>(
     {
         {"count", Builtins::protofn_array_length},
         {"length", Builtins::protofn_array_length},
 
     });
 
-    static constexpr auto stdobjmethods_array = std::to_array<StandardObjectMemberFunc>(
+    static auto stdobjmethods_array = std::to_array<StandardObjectMemberFunc>(
     {
         {"add", Builtins::memberfn_array_add},
         {"insert", Builtins::memberfn_array_insert},

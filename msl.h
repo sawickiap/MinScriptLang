@@ -121,9 +121,9 @@ namespace MSL
 
     struct Location
     {
-        uint32_t textindex;
-        uint32_t textline;
-        uint32_t textcolumn;
+        uint32_t textindex = 0;
+        uint32_t textline = 1;
+        uint32_t textcolumn = 0;
         std::string_view filename = "none";
     };
 
@@ -219,9 +219,9 @@ namespace MSL
         };
     }
 
-    using HostFunction           = Value(Environment&, const Location&, std::vector<Value>&&);
-    using MemberMethodFunction   = Value(AST::ExecutionContext&, const Location&, AST::ThisType&, std::vector<Value>&&);
-    using MemberPropertyFunction = Value(AST::ExecutionContext&, const Location&, Value&&);
+    using HostFunction           = std::function<Value(Environment&, const Location&, std::vector<Value>&&)>;
+    using MemberMethodFunction   = std::function<Value(AST::ExecutionContext&, const Location&, AST::ThisType&, std::vector<Value>&&)>;
+    using MemberPropertyFunction = std::function<Value(AST::ExecutionContext&, const Location&, Value&&)>;
 
     class Value
     {
@@ -244,9 +244,9 @@ namespace MSL
             using NumberValType = double;
             using StringValType = std::string;
             using AstFuncValType = const AST::FunctionDefinition*;
-            using HostFuncValType = HostFunction*;
-            using MemberFuncValType = MemberMethodFunction*;
-            using MemberPropValType = MemberPropertyFunction*;
+            using HostFuncValType = HostFunction;
+            using MemberFuncValType = MemberMethodFunction;
+            using MemberPropValType = MemberPropertyFunction;
             using ObjectValType = std::shared_ptr<Object>;
             using ArrayValType = std::shared_ptr<Array>;
             // redundant use of redundant names cause redundancy, claim redundancy students of a study about redundancy
@@ -561,18 +561,6 @@ namespace MSL
     // native "stack overflow" in Debug configuration.
     static const size_t LOCAL_SCOPE_STACK_MAX_SIZE = 100;
 
-    static constexpr std::string_view SYMBOL_STR[] = {
-        // Token types
-        "", "", "", "", "",
-        // Symbols
-        ",", "?", ":", ";", "(", ")", "[", "]", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", "&", "^", "|", ".",
-        // Multiple character symbols
-        "++", "--", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
-        // Keywords
-        "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue", "switch", "case", "default",
-        "function", "return", "local", "this", "global", "class", "throw", "try", "catch", "finally"
-    };
-
     struct Token
     {
         enum class Type
@@ -839,6 +827,16 @@ namespace MSL
                 {
                 }
 
+                EnvironmentPimpl& env()
+                {
+                    return m_env;
+                }
+
+                EnvironmentPimpl& env() const
+                {
+                    return m_env;
+                }
+
                 bool isLocal() const
                 {
                     return !m_localscopes.empty();
@@ -852,7 +850,7 @@ namespace MSL
 
                 const ThisType& getThis()
                 {
-                    assert(isLocal());
+                    //assert(isLocal());
                     return m_thislist.back();
                 }
 

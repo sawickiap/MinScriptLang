@@ -3,6 +3,18 @@
 
 namespace MSL
 {
+    static constexpr std::string_view SYMBOL_STR[] = {
+        // Token types
+        "", "", "", "", "",
+        // Symbols
+        ",", "?", ":", ";", "(", ")", "[", "]", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", "&", "^", "|", ".",
+        // Multiple character symbols
+        "++", "--", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
+        // Keywords
+        "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue", "switch", "case", "default",
+        "function", "return", "local", "this", "global", "class", "throw", "try", "catch", "finally"
+    };
+
     static inline bool IsDecimalNumber(char ch)
     {
         return ((ch >= '0') && (ch <= '9'));

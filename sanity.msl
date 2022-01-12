@@ -120,13 +120,13 @@ while (true)
         throw "fail";
     }
 }
-print("unary ops (i=", i, "): ");
-print("i++ = ", i++, "\n");
-print("i now = ", i, "\n");
-print("i-- = ", i--, "\n");
-print("i now = ", i, "\n");
+printf("unary ops (i=%v):\n", i);
+printf("i++ = %v\n", i++);
+printf("i now = %v\n", i);
+printf("i-- = ", i--, "\n");
+printf("i now = %v\n", i);
 a = 1;
-print("other ops (+, -, /, *, %, etc) (a=", a, "):\n");
+printf("other ops (+, -, /, *, %%, etc) (a=%v):\n", a);
 a += 3;
 print("a after '+=' = ", a, "\n");
 a -= 10;
@@ -142,56 +142,56 @@ print("a after '<<=' = ", a, "\n");
 a >>= 1;
 print("a after '>>=' = ", a, "\n");
 a = 6;
-print("binary ops (a=", a, "):\n");
+printf("binary ops (a=%v):\n", a);
 a |= 8;
-print("a after '|=' = ", a, "\n");
+printf("a after '|=' = %v\n", a);
 a &= 3;
-print("a after '&=' = ", a, "\n");
+printf("a after '&=' = %v\n", a);
 a ^= 3;
-print("a after '^=' = ", a, "\n");
+printf("a after '^=' = %v\n", a);
 a = 1;
 b = 2;
 print("multiple assignment:\n");
 b *= a += 7;
-print("b *= a += 7 = a=", a, ", b=", b, "\n");
+printf("b *= a += 7 = a=%v, b=%v\n", a, b);
 a = b = c = 2;
-print("a=b=c=2 = a=", a, ", b=", b, ", c=", c, "\n");
+printf("a=b=c=2 = a=%v, b=%v, c=%v\n", a, b, c);
 b = 3;
 a = 1;
 ++----++++a;
-print("a=1; ++----++++a = ", a, "\n");
+printf("a=1; ++----++++a = %v\n", a);
 a = 1;
 b = 2;
 c = a + b + b - 2 + b * 3;
-print("operator precedence: a+b+b-2+b*3 = ", c, "\n");
+printf("operator precedence: a+b+b-2+b*3 = %v\n", c);
 a = false;
 b = true;
 c = a && b && a && b || a || a && a;
-print("operator precedence: a&&b&&a&&b||a||a&&a = ", c, "\n");
+printf("operator precedence: a&&b&&a&&b||a||a&&a = %v\n", c);
 
 print("syntax testing ....\n");
 a = "aaa";
 b = 'bbb
     ccc';
-print("a = ", a, ", ?: = ", a ? 1 : 0, "\n");
+printf("a = %v, ?: = %v\n", a, a ? 1 : 0);
 empty = '';
-print("empty = ", empty ? 1 : 0, "\n");
+printf("empty = %v\n", empty ? 1 : 0);
 tmp = ('aa' 'bb' /* comment */ "cc");
-print("string literal concat = ", tmp, "\n");
+printf("string literal concat = %v\n", tmp);
 //print('\\ \" \' \b \f \n \r \t \? \a \v \/ \0a');
-print("hexadecimal escapes in sq string =", '\xA5 \xa5', "\n");
-print("unicode escapes in sq string=", '\u0104 \U00000104', "\n");
+printf("hexadecimal escapes in sq string = %p\n", '\xA5 \xa5');
+printf("unicode escapes in sq string=%p\n", '\u0104 \U00000104');
 s = 'aa' + 'bb';
 s += 'cc';
 s += s;
-print("string concat = ", s, "\n");
+printf("string concat = %p\n", s);
 b = true;
 v = b ? 123 : 'aaa';
-print("ternary: v=", v, "\n");
+printf("ternary: v=%v\n", v);
 n1 = 1;
 n2 = n1;
 n3 = 3;
-print("eq comparison: ", n1 == n1, n1 == n2, n1 == n3, n1 != n1, n1 != n2, n1 != n3, "\n");
+printf("eq comparison: 1=%v, 2=%v, 3=%v, 4=%v, 5=%v, 6=%v\n", n1 == n1, n1 == n2, n1 == n3, n1 != n1, n1 != n2, n1 != n3);
 
 s1 = 'A';
 s2 = s1;
@@ -211,9 +211,9 @@ print("eq comparison (copied native funcs): ", sf1 == sf1, sf1 == sf2, sf1 == sf
 
 s = 'ABCD';
 for (ch: s)
-    print("for-range: ch=", ch, "\n");
+    printf("for-range: ch=%p\n", ch);
 for (i, ch: s)
-    print("for-range with index: i=",i, ", ch=", ch, "\n");
+    printf("for-range with index: i=%v, ch=%p\n", i, ch);
 print("after loop: i=", i, "ch=", ch, "\n");
 
 print("switch statements:\n");
