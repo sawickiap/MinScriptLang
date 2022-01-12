@@ -802,7 +802,6 @@ namespace MSL
             Value* val;
             const std::shared_ptr<Object>* thisObj;
             MINSL_EXECUTION_CHECK(m_scope != Identifier::Scope::Local || ctx.isLocal(), getPlace(), "no local scope");
-
             if(ctx.isLocal())
             {
                 // Local variable
@@ -823,7 +822,9 @@ namespace MSL
                         if(val)
                         {
                             if(othis)
+                            {
                                 *othis = ThisType{ *thisObj };
+                            }
                             return *val;
                         }
                     }
@@ -1025,7 +1026,9 @@ namespace MSL
                 if(memberval)
                 {
                     if(othis)
+                    {
                         *othis = ThisType{ vobj.getObjectRef() };
+                    }
                     return *memberval;
                 }
                 if(get_property(stdobjproperties_object, m_membername, prop))
@@ -1040,6 +1043,10 @@ namespace MSL
             }
             if(vobj.isString())
             {
+                if(othis)
+                {
+                    *othis = ThisType{ vobj.getString() };
+                }
                 if(get_property(stdobjproperties_string, m_membername, prop))
                 {
                     return prop.func(ctx, getPlace(), std::move(vobj));
@@ -1066,7 +1073,6 @@ namespace MSL
                 }
                 throw Error::TypeError(getPlace(), "no such Array member");
             }
-            fprintf(stderr, "vobj.type()=%d\n", vobj.type());
             throw Error::TypeError(getPlace(), "member access in something not an object");
         }
 
@@ -1264,7 +1270,7 @@ namespace MSL
                 {
                     MINSL_EXECUTION_CHECK(typright == Value::Type::Number, getPlace(), "expected numeric value");
                     index = 0;
-                    MINSL_EXECUTION_CHECK(NumberToIndex(index, right.getNumber()), getPlace(), "string index out of bounds");
+                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(index, right.getNumber()), getPlace(), "string index out of bounds");
                     MINSL_EXECUTION_CHECK(index < left.getString().length(), getPlace(), "string index out of bounds");
                     return Value{ std::string(1, left.getString()[index]) };
                 }
@@ -1285,7 +1291,7 @@ namespace MSL
                 if(typleft == Value::Type::Array)
                 {
                     MINSL_EXECUTION_CHECK(typright == Value::Type::Number, getPlace(), "expected numeric value");
-                    MINSL_EXECUTION_CHECK(NumberToIndex(index, right.getNumber()) && index < left.getArray()->m_items.size(),
+                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(index, right.getNumber()) && index < left.getArray()->m_items.size(),
                                           getPlace(), "array index out of bounds");
                     return left.getArray()->m_items[index];
                 }
@@ -1337,7 +1343,7 @@ namespace MSL
                 if(leftref->type() == Value::Type::String)
                 {
                     MINSL_EXECUTION_CHECK(idxval.isNumber(), getPlace(), "expected numeric value");
-                    MINSL_EXECUTION_CHECK(NumberToIndex(charidx, idxval.getNumber()), getPlace(), "string index out of bounds");
+                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(charidx, idxval.getNumber()), getPlace(), "string index out of bounds");
                     return LValue{ StringCharacterLValue{ &leftref->getString(), charidx } };
                 }
                 if(leftref->type() == Value::Type::Object)
@@ -1348,7 +1354,7 @@ namespace MSL
                 if(leftref->type() == Value::Type::Array)
                 {
                     MINSL_EXECUTION_CHECK(idxval.isNumber(), getPlace(), "expected numeric value");
-                    MINSL_EXECUTION_CHECK(NumberToIndex(itemidx, idxval.getNumber()), getPlace(), "array index out of bounds");
+                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(itemidx, idxval.getNumber()), getPlace(), "array index out of bounds");
                     return LValue{ ArrayItemLValue{ leftref->getArray(), itemidx } };
                 }
             }
@@ -1545,32 +1551,6 @@ namespace MSL
             {
                 return callee.getHostFunction()(ctx.m_env.getOwner(), getPlace(), std::move(arguments));
             }
-            /*if(callee.type() == Value::Type::SystemFunction)
-            {
-                switch(callee.getSysFunction())
-                {
-                    case SystemFunction::StringResizeFunc:
-                        {
-                        return Builtins::memberfn_string_resize(ctx, getPlace(), th, std::move(arguments));
-                        }
-                    case SystemFunction::ArrayAddFunc:
-                        {
-                            return Builtins::memberfn_array_add(ctx, getPlace(), th, std::move(arguments));
-                        }
-                    case SystemFunction::ArrayInsertFunc:
-                        {
-                            return Builtins::memberfn_array_insert(ctx, getPlace(), th, std::move(arguments));
-                        }
-                    case SystemFunction::ArrayRemoveFunc:
-                        {
-                            return Builtins::memberfn_array_remove(ctx, getPlace(), th, std::move(arguments));
-                        }
-                    default:
-                        assert(0);
-                        return {};
-                }
-            }
-            */
             if(callee.type() == Value::Type::Type)
             {
                 switch(callee.getTypeValue())
@@ -1702,7 +1682,7 @@ namespace MSL
                 {
                     throw Error::TypeError{ getPlace(), "base must be object" };
                 }
-                obj = CopyObject(*baseObj.getObject());
+                obj = Util::CopyObject(*baseObj.getObject());
             }
             else
             {
@@ -1732,7 +1712,7 @@ namespace MSL
             ++indentLevel;
             for(i = 0, count = m_items.size(); i < count; ++i)
             {
-                itemPrefix = Format("%zu: ", i);
+                itemPrefix = Util::Format("%zu: ", i);
                 m_items[i]->debugPrint(indentLevel, itemPrefix);
             }
         }

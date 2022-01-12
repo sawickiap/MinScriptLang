@@ -32,6 +32,7 @@ SOFTWARE.
 */
 
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <exception>
@@ -69,6 +70,55 @@ SOFTWARE.
 
 namespace MSL
 {
+    namespace AST
+    {
+        class /**/FunctionDefinition;
+        class /**/ExecutionContext;
+        class /**/ThisType;
+    }
+    class /**/Value;
+    class /**/Object;
+    class /**/Array;
+    class /**/Environment;
+
+    namespace Util
+    {
+        std::shared_ptr<Object> CopyObject(const Object& src);
+        std::shared_ptr<Array> CopyArray(const Array& src);
+
+        bool NumberToIndex(size_t& outIndex, double number);
+        std::string VFormat(const char* format, va_list argList);
+        std::string Format(const char* format, ...);
+
+        template<typename CharT, typename Type>
+        void joinArgsNext(std::basic_ostream<CharT>& os, Type&& thing)
+        {
+            os << thing;
+        }
+
+        template<typename CharT, typename Type, typename... ArgsT>
+        void joinArgsNext(std::basic_ostream<CharT>& os, std::basic_string_view<CharT> sep, Type&& thing, ArgsT&&... args)
+        {
+            joinArgsNext(os, thing);
+            os << sep;
+            joinArgsNext(os, args...);
+        }
+
+        template<typename... ArgsT>
+        std::string joinArgsWith(std::string_view sep, ArgsT&&... args)
+        {
+            std::stringstream buf;
+            joinArgsNext(buf, sep, args...);
+            return buf.str();
+        }
+
+        template<typename... ArgsT>
+        std::string joinArgs(ArgsT&&... args)
+        {
+            return joinArgsWith("", args...);
+        }
+    }
+
     struct Location
     {
         uint32_t textindex;
@@ -169,17 +219,6 @@ namespace MSL
         };
     }
 
-    namespace AST
-    {
-        class /**/FunctionDefinition;
-        class /**/ExecutionContext;
-        class /**/ThisType;
-    }
-    class /**/Value;
-    class /**/Object;
-    class /**/Array;
-    class /**/Environment;
-
     using HostFunction           = Value(Environment&, const Location&, std::vector<Value>&&);
     using MemberMethodFunction   = Value(AST::ExecutionContext&, const Location&, AST::ThisType&, std::vector<Value>&&);
     using MemberPropertyFunction = Value(AST::ExecutionContext&, const Location&, Value&&);
@@ -270,11 +309,6 @@ namespace MSL
 
         private:
             void actualToStream(std::ostream& os, bool repr) const;
-
-            inline void reprToStream(std::ostream& os) const
-            {
-                actualToStream(os, true);
-            }
 
         public:
             inline Value()
@@ -440,15 +474,13 @@ namespace MSL
             template<typename CharT, typename TraitsT>
             std::basic_ostream<CharT, TraitsT>& toStream(std::basic_ostream<CharT,TraitsT>& os) const
             {
-                actualToStream(os, false);
-                return os;
+                return toStream(os, false);
             }
 
             template<typename CharT, typename TraitsT>
             std::basic_ostream<CharT, TraitsT>& reprToStream(std::basic_ostream<CharT,TraitsT>& os) const
             {
-                actualToStream(os, true);
-                return os;
+                return toStream(os, true);
             }
 
             std::string toString() const;
@@ -492,9 +524,6 @@ namespace MSL
         public:
             std::vector<Value> m_items;
     };
-
-    std::string VFormat(const char* format, va_list argList);
-    std::string Format(const char* format, ...);
 
     class /**/EnvironmentPimpl;
     class Environment
@@ -659,8 +688,8 @@ namespace MSL
             bool peekNext(char ch) const;
             bool peekNext(const char* s, size_t sLen) const;
 
-            void moveOneChar();
-            void MoveChars(size_t n);
+            void moveForward();
+            void moveForward(size_t n);
     };
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -735,39 +764,40 @@ namespace MSL
             std::shared_ptr<Array>,
             Value::StringValType
         >;
-        struct ThisType : public ThisVariant
+        class ThisType : public ThisVariant
         {
-            inline bool isEmpty() const
-            {
-                return std::get_if<std::monostate>(this) != nullptr;
-            }
+            public:
+                inline bool isEmpty() const
+                {
+                    return std::get_if<std::monostate>(this) != nullptr;
+                }
 
-            inline Object* getObject() const
-            {
-                auto objectPtr = std::get_if<std::shared_ptr<Object>>(this);
-                return objectPtr ? objectPtr->get() : nullptr;
-            }
+                inline Object* getObject() const
+                {
+                    auto objectPtr = std::get_if<std::shared_ptr<Object>>(this);
+                    return objectPtr ? objectPtr->get() : nullptr;
+                }
 
-            inline Array* getArray() const
-            {
-                auto arrayPtr = std::get_if<std::shared_ptr<Array>>(this);
-                return arrayPtr ? arrayPtr->get() : nullptr;
-            }
+                inline Array* getArray() const
+                {
+                    auto arrayPtr = std::get_if<std::shared_ptr<Array>>(this);
+                    return arrayPtr ? arrayPtr->get() : nullptr;
+                }
 
-            inline Value::StringValType& getString()
-            {
-                return std::get<Value::StringValType>(*this);
-            }
+                inline Value::StringValType& getString()
+                {
+                    return std::get<Value::StringValType>(*this);
+                }
 
-            inline Value::StringValType getString() const
-            {
-                return std::get<Value::StringValType>(*this);
-            }
+                inline Value::StringValType getString() const
+                {
+                    return std::get<Value::StringValType>(*this);
+                }
 
-            inline void clear()
-            {
-                *this = ThisType{};
-            }
+                inline void clear()
+                {
+                    *this = ThisType{};
+                }
         };
 
         class ExecutionContext
@@ -1054,25 +1084,32 @@ namespace MSL
             explicit ConstantExpression(const Location& place) : Expression{ place }
             {
             }
-            virtual Value execute(ExecutionContext&) const
-            {
-                /* Nothing - just ignore its value. */
-                return {};
-            }
+
+            virtual Value execute(ExecutionContext& ctx) const;
         };
 
         struct ConstantValue : ConstantExpression
         {
             Value m_val;
+
             ConstantValue(const Location& place, Value&& val) : ConstantExpression{ place }, m_val{ std::move(val) }
             {
                 assert(m_val.type() == Value::Type::Null || m_val.isNumber() || m_val.isString());
             }
+
             virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+
             virtual Value evaluate(ExecutionContext&, ThisType*) const
             {
                 return Value{ m_val };
             }
+
+            
+            virtual Value execute(ExecutionContext&)
+            {
+                return m_val;
+            }
+            
         };
 
         struct Identifier : ConstantExpression
@@ -1361,8 +1398,4 @@ namespace MSL
                 std::cout << s;
             }
     };
-
-    std::shared_ptr<Object> CopyObject(const Object& src);
-    bool NumberToIndex(size_t& outIndex, double number);
-
 }

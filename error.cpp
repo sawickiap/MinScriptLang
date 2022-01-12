@@ -13,10 +13,8 @@ namespace MSL
             {
                 m_what = name();
             }
-            return Format("(%u,%u): (%s) %.*s", m_place.textline, m_place.textcolumn, name().data(), (int)getMessage().length(), getMessage().data());
-
+            return Util::Format("(%u,%u): (%s) %.*s", m_place.textline, m_place.textcolumn, name().data(), (int)getMessage().length(), getMessage().data());
         }
     }
-
 }
 

@@ -70,9 +70,9 @@ int repl(MSL::Environment& env)
 {
     size_t varid;
     size_t nowid;
-    size_t len;
     char* line;
     std::string exeme;
+    std::string varname;
     varid = 0;
     while(true)
     {
@@ -89,7 +89,6 @@ int repl(MSL::Environment& env)
             * this appends a semicolon to the code line.
             * this is a dumb hack, until the parser recognized linefeeds as line terminators.
             */
-            len = exeme.size();
             if(*(exeme.end()-1) != ';')
             {
                 exeme.push_back(';');
@@ -100,10 +99,12 @@ int repl(MSL::Environment& env)
                 auto val = env.execute(exeme);
                 nowid = varid;
                 varid++;
-                if(!val.isNull())
+                //if(!val.isNull())
                 {
-                    std::cout << "$" << nowid << " = ";
-                    val.toStream(std::cout);
+                    varname = MSL::Util::joinArgs("$", nowid);
+                    env.global(varname) = val;
+                    std::cout << varname << " = ";
+                    val.reprToStream(std::cout);
                     std::cout << std::endl;
                 }
             }

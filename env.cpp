@@ -3,6 +3,27 @@
 
 namespace MSL
 {
+    namespace AST
+    {
+
+        Value ConstantExpression::execute(ExecutionContext& ctx) const
+        {
+            /* Nothing - just ignore its value. */
+
+            #if 0
+            const auto& th = ctx.getThis();
+            if(!th.isEmpty())
+            {
+                return th.getObject();
+            }
+            #endif
+
+            return {};
+        }
+
+    }
+
+    
     namespace Builtins
     {
         Value func_typeof(Environment& env, const Location& place, std::vector<Value>&& args)
@@ -17,50 +38,29 @@ namespace MSL
 
         Value func_print(Environment& env, const Location& place, std::vector<Value>&& args)
         {
-            std::string s;
+            (void)env;
             (void)place;
             for(const auto& val : args)
             {
-                switch(val.type())
-                {
-                    case Value::Type::Null:
-                        env.Print("null");
-                        break;
-                    case Value::Type::Number:
-                        s = Format("%g", val.getNumber());
-                        env.Print(s);
-                        break;
-                    case Value::Type::String:
-                        if(!val.getString().empty())
-                        {
-                            env.Print(val.getString());
-                        }
-                        break;
-                    case Value::Type::Function:
-                    case Value::Type::HostFunction:
-                        env.Print("function");
-                        break;
-                    case Value::Type::Object:
-                        env.Print("object");
-                        break;
-                    case Value::Type::Array:
-                        env.Print("array");
-                        break;
-                    case Value::Type::Type:
-                    {
-                        //const size_t typeIndex = (size_t)val.getTypeValue();
-                        //std::string_view typeName = VALUE_TYPE_NAMES[typeIndex];
-                        std::string_view typeName = Value::getTypeName(val.getTypeValue());
-                        s = Format("%.*s", (int)typeName.length(), typeName.data());
-                        env.Print(s);
-                    }
-                    break;
-                    default:
-                        fprintf(stderr, "unhandled type %d\n", val.type());
-                }
+                val.toStream(std::cout);
+                std::cout << std::flush;
             }
             return {};
         }
+
+        Value func_println(Environment& env, const Location& place, std::vector<Value>&& args)
+        {
+            (void)env;
+            (void)place;
+            for(const auto& val : args)
+            {
+                val.toStream(std::cout);
+                std::cout << std::flush;
+            }
+            std::cout << std::endl;
+            return {};
+        }
+
         Value func_min(Environment& ctx, const Location& place, std::vector<Value>&& args)
         {
             size_t i;
@@ -88,6 +88,7 @@ namespace MSL
             }
             return Value{ result };
         }
+
         Value func_max(Environment& ctx, const Location& place, std::vector<Value>&& args)
         {
             size_t i;
@@ -151,6 +152,7 @@ namespace MSL
         global("typeOf") = Value{Builtins::func_typeof};
         global("max") = Value{Builtins::func_max};
         global("print") = Value{Builtins::func_print};
+        global("println") = Value{Builtins::func_println};
     }
 
     Environment::~Environment()

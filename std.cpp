@@ -10,28 +10,28 @@
     Value::Type minsl_argType;
 #define MINSL_LOAD_ARG_NUMBER(dstVarName)                                                                          \
     MINSL_EXECUTION_CHECK(minsl_argIndex < minsl_argCount, place,                                                  \
-                          Format("Function %s received too few arguments. Number expected as argument %zu.",       \
+                          Util::Format("Function %s received too few arguments. Number expected as argument %zu.",       \
                                  minsl_functionName, minsl_argIndex));                                             \
     minsl_argType = args[minsl_argIndex].type();                                                                \
     MINSL_EXECUTION_CHECK(minsl_argType == Value::Type::Number, place,                                               \
-                          Format("Function %s received incorrect argument %zu. Expected: Number, actual: %.*s.",   \
+                          Util::Format("Function %s received incorrect argument %zu. Expected: Number, actual: %.*s.",   \
                                  minsl_functionName, minsl_argIndex, (int)env.getTypeName(minsl_argType).length(), \
                                  env.getTypeName(minsl_argType).data()));                                          \
     double dstVarName = args[minsl_argIndex++].getNumber();
 #define MINSL_LOAD_ARG_STRING(dstVarName)                                                                          \
     MINSL_EXECUTION_CHECK(minsl_argIndex < minsl_argCount, place,                                                  \
-                          Format("Function %s received too few arguments. String expected as argument %zu.",       \
+                          Util::Format("Function %s received too few arguments. String expected as argument %zu.",       \
                                  minsl_functionName, minsl_argIndex));                                             \
     minsl_argType = args[minsl_argIndex].type();                                                                \
     MINSL_EXECUTION_CHECK(minsl_argType == Value::Type::String, place,                                               \
-                          Format("Function %s received incorrect argument %zu. Expected: String, actual: %.*s.",   \
+                          Util::Format("Function %s received incorrect argument %zu. Expected: String, actual: %.*s.",   \
                                  minsl_functionName, minsl_argIndex, (int)env.getTypeName(minsl_argType).length(), \
                                  env.getTypeName(minsl_argType).data()));                                          \
     std::string dstVarName = std::move(args[minsl_argIndex++].getString());
 #define MINSL_LOAD_ARG_END()                 \
     MINSL_EXECUTION_CHECK(                   \
     minsl_argIndex == minsl_argCount, place, \
-    Format("Function %s requires %zu arguments, %zu provided.", minsl_functionName, minsl_argIndex, minsl_argCount));
+    Util::Format("Function %s requires %zu arguments, %zu provided.", minsl_functionName, minsl_argIndex, minsl_argCount));
 
 #define MINSL_LOAD_ARGS_0(functionNameStr) \
     MINSL_LOAD_ARG_BEGIN(functionNameStr); \
@@ -52,16 +52,6 @@
 
 namespace MSL
 {
-    static std::shared_ptr<Array> CopyArray(const Array& src)
-    {
-        auto dst = std::make_shared<Array>();
-        const size_t count = src.m_items.size();
-        dst->m_items.resize(count);
-        for(size_t i = 0; i < count; ++i)
-            dst->m_items[i] = Value{ src.m_items[i] };
-        return dst;
-    }
-
     namespace Builtins
     {
         Value ctor_null(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
@@ -101,7 +91,7 @@ namespace MSL
             {
                 throw Error::ArgumentError(place, "Object can be constructed only from no arguments or from another object value.");
             }
-            return Value{ CopyObject(*args[0].getObject()) };
+            return Value{ Util::CopyObject(*args[0].getObject()) };
         }
 
         Value ctor_array(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
@@ -115,7 +105,7 @@ namespace MSL
             {
                 throw Error::ArgumentError(place, "Array can be constructed only from no arguments or from another array value.");
             }
-            return Value{ CopyArray(*args[0].getArray()) };
+            return Value{ Util::CopyArray(*args[0].getArray()) };
         }
 
         Value ctor_function(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
@@ -131,12 +121,6 @@ namespace MSL
         Value ctor_type(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
         {
             (void)ctx;
-            {
-                if(args.size() > 0)
-                {
-                    fprintf(stderr, "ctor_type: args[0].type()=%d\n", args[0].type());
-                }
-            }
             if((args.size() == 0) || (args[0].type() != Value::Type::Type))
             {
                 
@@ -205,7 +189,7 @@ namespace MSL
             }
             size_t index;
             index= 0;
-            if(!args[0].isNumber() || !NumberToIndex(index, args[0].getNumber()))
+            if(!args[0].isNumber() || !Util::NumberToIndex(index, args[0].getNumber()))
             {
                 throw Error::ExecutionError(place, "cannot insert out-of-bounds");
             }
@@ -227,7 +211,7 @@ namespace MSL
                 throw Error::TypeError(place, "too few arguments");
             }
             size_t index = 0;
-            if(!args[0].isNumber() || !NumberToIndex(index, args[0].getNumber()))
+            if(!args[0].isNumber() || !Util::NumberToIndex(index, args[0].getNumber()))
             {
                 throw Error::ExecutionError(place, "cannot remove out-of-bounds");
             }
@@ -256,7 +240,7 @@ namespace MSL
             auto res = std::make_shared<Array>();
             for(auto ch: objVal.getString())
             {
-                res->m_items.push_back(Value{ch});
+                res->m_items.push_back(Value{double(ch)});
             }
             return Value{ std::move(res) };
         }
@@ -274,6 +258,7 @@ namespace MSL
         Value memberfn_string_startswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args)
         {
             double res;
+            (void)ctx;
             if(args.size() == 0)
             {
                 throw Error::ArgumentError(place, "String.startsWith() needs exactly 1 argument");

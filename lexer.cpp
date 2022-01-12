@@ -29,7 +29,8 @@ namespace MSL
             ((ch >= 'a') && (ch <= 'z')) ||
             ((ch >= 'A') && (ch <= 'Z')) ||
             ((ch >= '0') && (ch <= '9')) ||
-            (ch == '_')
+            (ch == '_') ||
+            (ch == '$')
         );
     }
 
@@ -64,15 +65,21 @@ namespace MSL
 
     bool CodeReader::peekNext(char ch) const
     {
-        return m_place.textindex < m_code.length() && m_code[m_place.textindex] == ch;
+        return (
+            (m_place.textindex < m_code.length()) &&
+            (m_code[m_place.textindex] == ch)
+        );
     }
 
-    bool CodeReader::peekNext(const char* s, size_t sLen) const
+    bool CodeReader::peekNext(const char* s, size_t slen) const
     {
-        return m_place.textindex + sLen <= m_code.length() && memcmp(m_code.data() + m_place.textindex, s, sLen) == 0;
+        return (
+            (m_place.textindex + slen <= m_code.length()) &&
+            (memcmp(m_code.data() + m_place.textindex, s, slen) == 0)
+        );
     }
 
-    void CodeReader::moveOneChar()
+    void CodeReader::moveForward()
     {
         if(m_code[m_place.textindex++] == '\n')
         {
@@ -85,22 +92,33 @@ namespace MSL
         }
     }
 
-    void CodeReader::MoveChars(size_t n)
+    void CodeReader::moveForward(size_t n)
     {
-        for(size_t i = 0; i < n; ++i)
-            moveOneChar();
+        size_t i;
+        for(i = 0; i < n; ++i)
+        {
+            moveForward();
+        }
     }
 
     bool Tokenizer::parseHexChar(uint8_t& out, char ch)
     {
-        if(ch >= '0' && ch <= '9')
+        if((ch >= '0') && (ch <= '9'))
+        {
             out = (uint8_t)(ch - '0');
-        else if(ch >= 'a' && ch <= 'f')
+        }
+        else if((ch >= 'a') && (ch <= 'f'))
+        {
             out = (uint8_t)(ch - 'a' + 10);
-        else if(ch >= 'A' && ch <= 'F')
+        }
+        else if((ch >= 'A') && (ch <= 'F'))
+        {
             out = (uint8_t)(ch - 'A' + 10);
+        }
         else
+        {
             return false;
+        }
         return true;
     }
 
@@ -108,41 +126,48 @@ namespace MSL
     {
         size_t i;
         size_t count;
+        uint8_t chv;
         out = 0;
         for(i = 0, count = chars.length(); i < count; ++i)
         {
-            uint8_t charVal = 0;
-            if(!parseHexChar(charVal, chars[i]))
+            chv = 0;
+            if(!parseHexChar(chv, chars[i]))
+            {
                 return false;
-            out = (out << 4) | charVal;
+            }
+            out = (out << 4) | chv;
         }
         return true;
     }
 
-    bool Tokenizer::appendUTF8Char(std::string& inout, uint32_t charVal)
+    bool Tokenizer::appendUTF8Char(std::string& inout, uint32_t chv)
     {
-        if(charVal <= 0x7F)
-            inout += (char)(uint8_t)charVal;
-        else if(charVal <= 0x7FF)
+        if(chv <= 0x7F)
         {
-            inout += (char)(uint8_t)(0b11000000 | (charVal >> 6));
-            inout += (char)(uint8_t)(0b10000000 | (charVal & 0b111111));
+            inout += (char)(uint8_t)chv;
         }
-        else if(charVal <= 0xFFFF)
+        else if(chv <= 0x7FF)
         {
-            inout += (char)(uint8_t)(0b11100000 | (charVal >> 12));
-            inout += (char)(uint8_t)(0b10000000 | ((charVal >> 6) & 0b111111));
-            inout += (char)(uint8_t)(0b10000000 | (charVal & 0b111111));
+            inout += (char)(uint8_t)(0b11000000 | (chv >> 6));
+            inout += (char)(uint8_t)(0b10000000 | (chv & 0b111111));
         }
-        else if(charVal <= 0x10FFFF)
+        else if(chv <= 0xFFFF)
         {
-            inout += (char)(uint8_t)(0b11110000 | (charVal >> 18));
-            inout += (char)(uint8_t)(0b10000000 | ((charVal >> 12) & 0b111111));
-            inout += (char)(uint8_t)(0b10000000 | ((charVal >> 6) & 0b111111));
-            inout += (char)(uint8_t)(0b10000000 | (charVal & 0b111111));
+            inout += (char)(uint8_t)(0b11100000 | (chv >> 12));
+            inout += (char)(uint8_t)(0b10000000 | ((chv >> 6) & 0b111111));
+            inout += (char)(uint8_t)(0b10000000 | (chv & 0b111111));
+        }
+        else if(chv <= 0x10FFFF)
+        {
+            inout += (char)(uint8_t)(0b11110000 | (chv >> 18));
+            inout += (char)(uint8_t)(0b10000000 | ((chv >> 12) & 0b111111));
+            inout += (char)(uint8_t)(0b10000000 | ((chv >> 6) & 0b111111));
+            inout += (char)(uint8_t)(0b10000000 | (chv & 0b111111));
         }
         else
+        {
             return false;
+        }
         return true;
     }
 
@@ -152,30 +177,38 @@ namespace MSL
         {
             // Whitespace
             if(isspace(m_code.getCurrentChar()))
-                m_code.moveOneChar();
+            {
+                m_code.moveForward();
+            }
             // Single line comment
             else if(m_code.peekNext("//", 2))
             {
-                m_code.MoveChars(2);
+                m_code.moveForward(2);
                 while(!m_code.isAtEnd() && m_code.getCurrentChar() != '\n')
-                    m_code.moveOneChar();
+                {
+                    m_code.moveForward();
+                }
             }
             // Multi line comment
             else if(m_code.peekNext("/*", 2))
             {
-                for(m_code.MoveChars(2);; m_code.moveOneChar())
+                for(m_code.moveForward(2);; m_code.moveForward())
                 {
                     if(m_code.isAtEnd())
+                    {
                         throw Error::ParsingError(m_code.getCurrentPlace(), "unexpected EOF while looking for end of comment block");
+                    }
                     else if(m_code.peekNext("*/", 2))
                     {
-                        m_code.MoveChars(2);
+                        m_code.moveForward(2);
                         break;
                     }
                 }
             }
             else
+            {
                 break;
+            }
         }
     }
 
@@ -185,269 +218,346 @@ namespace MSL
         uint64_t n;
         uint64_t i;
         uint8_t val;
-        size_t tokenLen;
-        size_t currentCodeLen;
-        const char* currentCode;
+        size_t tklen;
+        size_t currlen;
+        size_t digitsbeforepoint;
+        size_t tklenbeforeexp;
+        size_t digitsafterpoint;
+        const char* currcode;
         char sz[kBufSize + 1];
-
-        currentCode = m_code.getCurrentCode();
-        currentCodeLen = m_code.getCurrentLength();
-        if(!IsDecimalNumber(currentCode[0]) && currentCode[0] != '.')
+        currcode = m_code.getCurrentCode();
+        currlen = m_code.getCurrentLength();
+        if(!IsDecimalNumber(currcode[0]) && currcode[0] != '.')
         {
             return false;
         }
-        tokenLen = 0;
+        tklen = 0;
         // Hexadecimal: 0xHHHH...
-        if(currentCode[0] == '0' && currentCodeLen >= 2 && (currentCode[1] == 'x' || currentCode[1] == 'X'))
+        if(currcode[0] == '0' && currlen >= 2 && (currcode[1] == 'x' || currcode[1] == 'X'))
         {
-            tokenLen = 2;
-            while(tokenLen < currentCodeLen && IsHexadecimalNumber(currentCode[tokenLen]))
-                ++tokenLen;
-            if(tokenLen < 3)
+            tklen = 2;
+            while(tklen < currlen && IsHexadecimalNumber(currcode[tklen]))
+            {
+                ++tklen;
+            }
+            if(tklen < 3)
+            {
                 throw Error::ParsingError(out.m_place, "invalid number");
+            }
             n = 0;
-            for(i = 2; i < tokenLen; ++i)
+            for(i = 2; i < tklen; ++i)
             {
                 val = 0;
-                parseHexChar(val, currentCode[i]);
+                parseHexChar(val, currcode[i]);
                 n = (n << 4) | val;
             }
             out.numberval = (double)n;
         }
         else
         {
-            while(tokenLen < currentCodeLen && IsDecimalNumber(currentCode[tokenLen]))
-                ++tokenLen;
-            const size_t digitsBeforeDecimalPoint = tokenLen;
-            size_t digitsAfterDecimalPoint = 0;
-            if(tokenLen < currentCodeLen && currentCode[tokenLen] == '.')
+            while(tklen < currlen && IsDecimalNumber(currcode[tklen]))
             {
-                ++tokenLen;
-                while(tokenLen < currentCodeLen && IsDecimalNumber(currentCode[tokenLen]))
-                    ++tokenLen;
-                digitsAfterDecimalPoint = tokenLen - digitsBeforeDecimalPoint - 1;
+                ++tklen;
+            }
+            digitsbeforepoint = tklen;
+            digitsafterpoint = 0;
+            if(tklen < currlen && currcode[tklen] == '.')
+            {
+                ++tklen;
+                while(tklen < currlen && IsDecimalNumber(currcode[tklen]))
+                {
+                    ++tklen;
+                }
+                digitsafterpoint = tklen - digitsbeforepoint - 1;
             }
             // Only dot '.' with no digits around: not a number token.
-            if(digitsBeforeDecimalPoint + digitsAfterDecimalPoint == 0)
-                return false;
-            if(tokenLen < currentCodeLen && (currentCode[tokenLen] == 'e' || currentCode[tokenLen] == 'E'))
+            if(digitsbeforepoint + digitsafterpoint == 0)
             {
-                ++tokenLen;
-                if(tokenLen < currentCodeLen && (currentCode[tokenLen] == '+' || currentCode[tokenLen] == '-'))
-                    ++tokenLen;
-                const size_t tokenLenBeforeExponent = tokenLen;
-                while(tokenLen < currentCodeLen && IsDecimalNumber(currentCode[tokenLen]))
-                    ++tokenLen;
-                if(tokenLen - tokenLenBeforeExponent == 0)
-                    throw Error::ParsingError(out.m_place, "invalid number: bad exponent");
+                return false;
             }
-            if(tokenLen >= kBufSize)
+            if(tklen < currlen && (currcode[tklen] == 'e' || currcode[tklen] == 'E'))
+            {
+                ++tklen;
+                if(tklen < currlen && (currcode[tklen] == '+' || currcode[tklen] == '-'))
+                {
+                    ++tklen;
+                }
+                tklenbeforeexp = tklen;
+                while(tklen < currlen && IsDecimalNumber(currcode[tklen]))
+                {
+                    ++tklen;
+                }
+                if(tklen - tklenbeforeexp == 0)
+                {
+                    throw Error::ParsingError(out.m_place, "invalid number: bad exponent");
+                }
+            }
+            if(tklen >= kBufSize)
             {
                 throw Error::ParsingError(out.m_place, "invalid number");
             }
-            memcpy(sz, currentCode, tokenLen);
-            sz[tokenLen] = 0;
+            memcpy(sz, currcode, tklen);
+            sz[tklen] = 0;
             out.numberval = atof(sz);
         }
         // Letters straight after number are invalid.
-        if(tokenLen < currentCodeLen && IsAlpha(currentCode[tokenLen]))
+        if(tklen < currlen && IsAlpha(currcode[tklen]))
+        {
             throw Error::ParsingError(out.m_place, "invalid number followed by alpha letters");
+        }
         out.symtype = Token::Type::Number;
-        m_code.MoveChars(tokenLen);
+        m_code.moveForward(tklen);
         return true;
     }
 
     bool Tokenizer::parseString(Token& out)
     {
-        size_t tokenLen;
-        size_t currCodeLen;
-        char delimiterCh;
-        const char* currCode;
-        currCode = m_code.getCurrentCode();
-        currCodeLen = m_code.getCurrentLength();
-        delimiterCh = currCode[0];
-        if(delimiterCh != '"' && delimiterCh != '\'')
+        size_t tklen;
+        size_t currlen;
+        uint32_t val;
+        char chdelim;
+        const char* currcode;
+        currcode = m_code.getCurrentCode();
+        currlen = m_code.getCurrentLength();
+        chdelim = currcode[0];
+        if(chdelim != '"' && chdelim != '\'')
         {
             return false;
         }
         out.symtype = Token::Type::String;
         out.stringval.clear();
-        tokenLen = 1;
+        tklen = 1;
         for(;;)
         {
-            if(tokenLen == currCodeLen)
-                throw Error::ParsingError(out.m_place, "unexpected EOF while parsing string");
-            if(currCode[tokenLen] == delimiterCh)
-                break;
-            if(currCode[tokenLen] == '\\')
+            if(tklen == currlen)
             {
-                ++tokenLen;
-                if(tokenLen == currCodeLen)
+                throw Error::ParsingError(out.m_place, "unexpected EOF while parsing string");
+            }
+            if(currcode[tklen] == chdelim)
+            {
+                break;
+            }
+            if(currcode[tklen] == '\\')
+            {
+                ++tklen;
+                if(tklen == currlen)
+                {
                     throw Error::ParsingError(out.m_place, "unexpected EOF while parsing string");
-                switch(currCode[tokenLen])
+                }
+                switch(currcode[tklen])
                 {
                     case '\\':
-                        out.stringval += '\\';
-                        ++tokenLen;
+                        {
+                            out.stringval += '\\';
+                            ++tklen;
+                        }
                         break;
                     case '/':
-                        out.stringval += '/';
-                        ++tokenLen;
+                        {
+                            out.stringval += '/';
+                            ++tklen;
+                        }
                         break;
                     case '"':
-                        out.stringval += '"';
-                        ++tokenLen;
+                        {
+                            out.stringval += '"';
+                            ++tklen;
+                        }
                         break;
                     case '\'':
-                        out.stringval += '\'';
-                        ++tokenLen;
+                        {
+                            out.stringval += '\'';
+                            ++tklen;
+                        }
                         break;
                     case '?':
-                        out.stringval += '?';
-                        ++tokenLen;
+                        {
+                            out.stringval += '?';
+                            ++tklen;
+                        }
                         break;
                     case 'a':
-                        out.stringval += '\a';
-                        ++tokenLen;
+                        {
+                            out.stringval += '\a';
+                            ++tklen;
+                        }
                         break;
                     case 'b':
-                        out.stringval += '\b';
-                        ++tokenLen;
+                        {
+                            out.stringval += '\b';
+                            ++tklen;
+                        }
                         break;
                     case 'f':
-                        out.stringval += '\f';
-                        ++tokenLen;
+                        {
+                            out.stringval += '\f';
+                            ++tklen;
+                        }
                         break;
                     case 'n':
-                        out.stringval += '\n';
-                        ++tokenLen;
+                        {
+                            out.stringval += '\n';
+                            ++tklen;
+                        }
                         break;
                     case 'r':
-                        out.stringval += '\r';
-                        ++tokenLen;
+                        {
+                            out.stringval += '\r';
+                            ++tklen;
+                        }
                         break;
                     case 't':
-                        out.stringval += '\t';
-                        ++tokenLen;
+                        {
+                            out.stringval += '\t';
+                            ++tklen;
+                        }
                         break;
                     case 'v':
-                        out.stringval += '\v';
-                        ++tokenLen;
+                        {
+                            out.stringval += '\v';
+                            ++tklen;
+                        }
                         break;
                     case '0':
-                        out.stringval += '\0';
-                        ++tokenLen;
+                        {
+                            out.stringval += '\0';
+                            ++tklen;
+                        }
                         break;
                     case 'x':
-                    {
-                        uint32_t val = 0;
-                        if(tokenLen + 2 >= currCodeLen || !parseHexLiteral(val, std::string_view{ currCode + tokenLen + 1, 2 }))
-                            throw Error::ParsingError(out.m_place, "invalid string escape sequence: '\\x' too short");
-                        out.stringval += (char)(uint8_t)val;
-                        tokenLen += 3;
+                        {
+                            val = 0;
+                            if(tklen + 2 >= currlen || !parseHexLiteral(val, std::string_view{ currcode + tklen + 1, 2 }))
+                            {
+                                throw Error::ParsingError(out.m_place, "invalid string escape sequence: '\\x' too short");
+                            }
+                            out.stringval += (char)(uint8_t)val;
+                            tklen += 3;
+                        }
                         break;
-                    }
                     case 'u':
-                    {
-                        uint32_t val = 0;
-                        if(tokenLen + 4 >= currCodeLen || !parseHexLiteral(val, std::string_view{ currCode + tokenLen + 1, 4 }))
-                            throw Error::ParsingError(out.m_place, "invalid string escape sequence: unicode too short");
-                        if(!appendUTF8Char(out.stringval, val))
-                            throw Error::ParsingError(out.m_place, "invalid string escape sequence: invalid unicode");
-                        tokenLen += 5;
+                        {
+                            val = 0;
+                            if(tklen + 4 >= currlen || !parseHexLiteral(val, std::string_view{ currcode + tklen + 1, 4 }))
+                            {
+                                throw Error::ParsingError(out.m_place, "invalid string escape sequence: unicode too short");
+                            }
+                            if(!appendUTF8Char(out.stringval, val))
+                            {
+                                throw Error::ParsingError(out.m_place, "invalid string escape sequence: invalid unicode");
+                            }
+                            tklen += 5;
+                        }
                         break;
-                    }
                     case 'U':
-                    {
-                        uint32_t val = 0;
-                        if(tokenLen + 8 >= currCodeLen || !parseHexLiteral(val, std::string_view{ currCode + tokenLen + 1, 8 }))
-                            throw Error::ParsingError(out.m_place, "invalid string escape sequence: bad hexadecimal");
-                        if(!appendUTF8Char(out.stringval, val))
-                            throw Error::ParsingError(out.m_place,"invalid string escape sequence: bad unicode");
-                        tokenLen += 9;
+                        {
+                            val = 0;
+                            if(tklen + 8 >= currlen || !parseHexLiteral(val, std::string_view{ currcode + tklen + 1, 8 }))
+                            {
+                                throw Error::ParsingError(out.m_place, "invalid string escape sequence: bad hexadecimal");
+                            }
+                            if(!appendUTF8Char(out.stringval, val))
+                            {
+                                throw Error::ParsingError(out.m_place,"invalid string escape sequence: bad unicode");
+                            }
+                            tklen += 9;
+                        }
                         break;
-                    }
                     default:
-                        throw Error::ParsingError(out.m_place, "invalid string escape sequence: unknown escape sequence");
+                        {
+                            throw Error::ParsingError(out.m_place, "invalid string escape sequence: unknown escape sequence");
+                        }
+                        break;
                 }
             }
             else
-                out.stringval += currCode[tokenLen++];
+            {
+                out.stringval += currcode[tklen++];
+            }
         }
-        ++tokenLen;
+        ++tklen;
         // Letters straight after string are invalid.
-        if(tokenLen < currCodeLen && IsAlpha(currCode[tokenLen]))
+        if(tklen < currlen && IsAlpha(currcode[tklen]))
+        {
             throw Error::ParsingError(out.m_place, "invalid string followed by letters");
-        m_code.MoveChars(tokenLen);
+        }
+        m_code.moveForward(tklen);
         return true;
     }
 
     void Tokenizer::getNextToken(Token& out)
     {
+        size_t i;
+        size_t tklen;
+        size_t kwlen;
+        size_t symlen;
+        size_t currlen;
+        const char*  currcode;
+        constexpr Token::Type firstSingleCharSymbol = Token::Type::Comma;
+        constexpr Token::Type firstMultiCharSymbol = Token::Type::DoublePlus;
+        constexpr Token::Type firstKeywordSymbol = Token::Type::Null;
         skipSpacesAndComments();
-
         out.m_place = m_code.getCurrentPlace();
-
         // End of input
         if(m_code.isAtEnd())
         {
             out.symtype = Token::Type::End;
             return;
         }
-
-        constexpr Token::Type firstSingleCharSymbol = Token::Type::Comma;
-        constexpr Token::Type firstMultiCharSymbol = Token::Type::DoublePlus;
-        constexpr Token::Type firstKeywordSymbol = Token::Type::Null;
-
-        const char* const currentCode = m_code.getCurrentCode();
-        const size_t currentCodeLen = m_code.getCurrentLength();
-
+        currcode = m_code.getCurrentCode();
+        currlen = m_code.getCurrentLength();
         if(parseString(out))
-            return;
-        if(parseNumber(out))
-            return;
-        // Multi char symbol
-        for(size_t i = (size_t)firstMultiCharSymbol; i < (size_t)firstKeywordSymbol; ++i)
         {
-            const size_t symbolLen = SYMBOL_STR[i].length();
-            if(currentCodeLen >= symbolLen && memcmp(SYMBOL_STR[i].data(), currentCode, symbolLen) == 0)
+            return;
+        }
+        if(parseNumber(out))
+        {
+            return;
+        }
+        // Multi char symbol
+        for(i = (size_t)firstMultiCharSymbol; i < (size_t)firstKeywordSymbol; ++i)
+        {
+            symlen = SYMBOL_STR[i].length();
+            if(currlen >= symlen && memcmp(SYMBOL_STR[i].data(), currcode, symlen) == 0)
             {
                 out.symtype = (Token::Type)i;
-                m_code.MoveChars(symbolLen);
+                m_code.moveForward(symlen);
                 return;
             }
         }
         // symtype
-        for(size_t i = (size_t)firstSingleCharSymbol; i < (size_t)firstMultiCharSymbol; ++i)
+        for(i = (size_t)firstSingleCharSymbol; i < (size_t)firstMultiCharSymbol; ++i)
         {
-            if(currentCode[0] == SYMBOL_STR[i][0])
+            if(currcode[0] == SYMBOL_STR[i][0])
             {
                 out.symtype = (Token::Type)i;
-                m_code.moveOneChar();
+                m_code.moveForward();
                 return;
             }
         }
         // Identifier or keyword
-        if(IsAlpha(currentCode[0]))
+        if(IsAlpha(currcode[0]) || (currcode[0] == '$'))
         {
-            size_t tokenLen = 1;
-            while(tokenLen < currentCodeLen && IsAlphaNumeric(currentCode[tokenLen]))
-                ++tokenLen;
-            // Keyword
-            for(size_t i = (size_t)firstKeywordSymbol; i < (size_t)Token::Type::Count; ++i)
+            tklen = 1;
+            while(tklen < currlen && IsAlphaNumeric(currcode[tklen]))
             {
-                const size_t keywordLen = SYMBOL_STR[i].length();
-                if(keywordLen == tokenLen && memcmp(SYMBOL_STR[i].data(), currentCode, tokenLen) == 0)
+                ++tklen;
+            }
+            // Keyword
+            for(i = (size_t)firstKeywordSymbol; i < (size_t)Token::Type::Count; ++i)
+            {
+                kwlen = SYMBOL_STR[i].length();
+                if(kwlen == tklen && memcmp(SYMBOL_STR[i].data(), currcode, tklen) == 0)
                 {
                     out.symtype = (Token::Type)i;
-                    m_code.MoveChars(keywordLen);
+                    m_code.moveForward(kwlen);
                     return;
                 }
             }
             // Identifier
             out.symtype = Token::Type::Identifier;
-            out.stringval = std::string{ currentCode, currentCode + tokenLen };
-            m_code.MoveChars(tokenLen);
+            out.stringval = std::string{ currcode, currcode + tklen };
+            m_code.moveForward(tklen);
             return;
         }
         throw Error::ParsingError(out.m_place, "unexpected token");
