@@ -42,6 +42,7 @@ SOFTWARE.
 #include <variant>
 #include <map>
 #include <algorithm>
+#include <type_traits>
 #include <initializer_list>
 #include <cstdarg>
 #include <cstdint>
@@ -530,6 +531,7 @@ namespace MSL
     {
         private:
             EnvironmentPimpl* m_implenv;
+            std::vector<std::weak_ptr<Object>> m_globalobjects;
 
         public:
             Object m_globalscope;
@@ -554,6 +556,17 @@ namespace MSL
             inline Value& global(const std::string& key)
             {
                 return m_globalscope.entry(key);
+            }
+
+            void makeStdHandle(const Location& upplace, const std::string& name, FILE* strm);
+
+            template<typename Type, typename... ArgsT>
+            std::shared_ptr<Type> makeObject(ArgsT&&... args)
+            {
+                static_assert(std::is_base_of<Object, Type>::value, "Type must derive from Object");
+                auto o = std::make_shared<Type>(std::forward<ArgsT>(args)...);
+                m_globalobjects.push_back(o);
+                return o;
             }
     };
 
