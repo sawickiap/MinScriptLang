@@ -59,10 +59,10 @@ if (true)
 
 print("loops:\n");
 for (i = 0; i < 5; ++i)
-    print("for-loop: i=", i, "\n");
+    printf("for-loop: i=%v\n", i);
 for (i = 0; ; ++i)
 {
-    print("for-without-cond: i=", i, "\n");
+    printf("for-without-cond: i=%v\n", i);
     if (i >= 5)
     {
         break;
@@ -72,13 +72,13 @@ for (i = 0; ; ++i)
 i = 5;
 while (true)
 {
-    print("while(true): i=", i, "\n");
+    printf("while(true): i=%v\n", i);
     break;
     throw "fail";
 }
 do
 {
-    print("do-while: i=", i, "\n");
+    printf("do-while: i=%v\n", i);
     if (--i == 0)
     {
         break;
@@ -88,7 +88,7 @@ do
 i = 0;
 for(;;)
 {
-    print("empty-for: i=", i, "\n");
+    printf("empty-for: i=%v\n", i);
     if (++i == 4)
     {
         break;
@@ -102,7 +102,7 @@ for (i = 0; i < 10; ++i)
         continue;
         throw "fail";
     }
-    print("for-with-continue: i=", i, "\n");
+    printf("for-with-continue: i=%v\n", i);
 }
 i = -10;
 while (true)
@@ -113,7 +113,7 @@ while (true)
         continue;
         throw "fail";
     }
-    print("while-true-with-continue: i=", i, "\n");
+    printf("while-true-with-continue: i=%v\n", i);
     if (i > 0)
     {
         break;
@@ -214,7 +214,7 @@ for (ch: s)
     printf("for-range: ch=%p\n", ch);
 for (i, ch: s)
     printf("for-range with index: i=%v, ch=%p\n", i, ch);
-print("after loop: i=", i, "ch=", ch, "\n");
+printf("after loop: i=%v, ch=%v\n", i, ch);
 
 print("switch statements:\n");
 switch (123)
@@ -363,7 +363,7 @@ catch (ex)
     print("try-catch runtime: index=", ex.index, "\n");
     print("try-catch runtime: line=", ex.line, "\n");
     print("try-catch runtime: column=", ex.column, "\n");
-    print("try-catch runtime: message=(", typeOf(ex.message), ") ", ex.message, "\n");
+    print("try-catch runtime: message=(%v) %s\n", typeOf(ex.message), ex.message);
 }
 
 
@@ -611,7 +611,7 @@ a.remove(1); /* 2, 4, 5 */
 a.insert(3, 100);
 a.insert(2, 101);
 a.insert(0, 102); /* 102, 2, 4, 101, 5, 100 */
-print("array: count=", a.count, ", 0=", a[0], ", 1=", a[1], "2=", a[2], ", 3=", a[3], ", 4=", a[4], ", 5=", a[5], "\n");
+printf("array: a(%v) = %v\n", a.count, a);
 
 for (i: [1, 2, 3, 4, 5, 6])
 {

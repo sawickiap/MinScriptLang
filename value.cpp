@@ -244,7 +244,7 @@ namespace MSL
                 break;
             case Value::Type::Type:
                 {
-                    os << "<type '"<< Value::getTypeName(getTypeValue()) << "'>";
+                    os << "<type '"<< Value::getTypename(getTypeValue()) << "'>";
                 }
                 break;
             case Value::Type::MemberMethod:
@@ -261,7 +261,7 @@ namespace MSL
                 break;
             default:
                 {
-                    os << "<value '" << Value::getTypeName(m_type) << "'>";
+                    os << "<value '" << Value::getTypename(m_type) << "'>";
                 }
                 break;
         }

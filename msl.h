@@ -218,6 +218,17 @@ namespace MSL
                     return "ArgumentError";
                 }
         };
+
+        class IOError: public ExecutionError
+        {
+            public:
+                using ExecutionError::ExecutionError;
+
+                inline virtual std::string_view name() const override
+                {
+                    return "IOError";
+                }
+        };
     }
 
     using HostFunction           = std::function<Value(Environment&, const Location&, std::vector<Value>&&)>;
@@ -254,7 +265,7 @@ namespace MSL
             using TypeValType = Type;
 
         public:
-            inline static std::string_view getTypeName(Type t)
+            inline static std::string_view getTypename(Type t)
             {
                 switch(t)
                 {
@@ -488,6 +499,12 @@ namespace MSL
             std::string toRepr() const;
     };
 
+    namespace Util
+    {
+        void checkArgumentCount(Environment& env, const Location& place, std::string_view fname, size_t argcnt, size_t expect);
+        Value checkArgument(Environment& env, const Location& place, std::string_view fname, const std::vector<Value>& args, size_t idx, Value::Type type);
+    }
+
     class Object
     {
         public:
@@ -537,6 +554,9 @@ namespace MSL
             Object m_globalscope;
             void* m_userdata = nullptr;
 
+        private:
+            void makeStdHandle(const Location& upplace, const std::string& name, FILE* strm);
+
         public:
             Environment();
 
@@ -544,7 +564,7 @@ namespace MSL
 
             Value execute(std::string_view code);
 
-            std::string_view getTypeName(Value::Type type) const;
+            std::string_view getTypename(Value::Type type) const;
 
             void Print(std::string_view s);
 
@@ -558,16 +578,6 @@ namespace MSL
                 return m_globalscope.entry(key);
             }
 
-            void makeStdHandle(const Location& upplace, const std::string& name, FILE* strm);
-
-            template<typename Type, typename... ArgsT>
-            std::shared_ptr<Type> makeObject(ArgsT&&... args)
-            {
-                static_assert(std::is_base_of<Object, Type>::value, "Type must derive from Object");
-                auto o = std::make_shared<Type>(std::forward<ArgsT>(args)...);
-                m_globalobjects.push_back(o);
-                return o;
-            }
     };
 
     // I would like it to be higher, but above that, even at 128, it crashes with
@@ -1402,7 +1412,7 @@ namespace MSL
 
             Value execute(std::string_view code);
 
-            std::string_view getTypeName(Value::Type type) const;
+            std::string_view getTypename(Value::Type type) const;
 
             void Print(std::string_view s)
             {

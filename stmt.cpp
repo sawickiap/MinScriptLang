@@ -1,6 +1,6 @@
 
 #include <array>
-#include "msl.h"
+#include "priv.h"
 
 #define DEBUG_PRINT_FORMAT_STR_BEG "(%u,%u) %s%.*s"
 #define DEBUG_PRINT_ARGS_BEG \
@@ -9,47 +9,7 @@
 
 namespace MSL
 {
-    namespace Builtins
-    {
-        Value ctor_null(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
-        Value ctor_number(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
-        Value ctor_string(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
-        Value ctor_object(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
-        Value ctor_array(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
-        Value ctor_function(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
-        Value ctor_type(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
 
-
-        Value protofn_object_count(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
-
-        Value protofn_string_length(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
-        Value protofn_string_chars(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
-        Value memberfn_string_resize(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_startswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_endswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_includes(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_leftstrip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_rightstrip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_strip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_split(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-
-        Value protofn_array_length(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
-        Value memberfn_array_add(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_array_insert(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_array_remove(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-    }
-
-    struct StandardObjectMemberFunc
-    {
-        const char* name;
-        MemberMethodFunction func;
-    };
-
-    struct StandardObjectPropertyFunc
-    {
-        const char* name;
-        MemberPropertyFunction func;
-    };
 
     static auto stdobjproperties_string = std::to_array<StandardObjectPropertyFunc>(
     {
@@ -842,7 +802,7 @@ namespace MSL
                 for(i = 0, count = (size_t)Value::Type::Count; i < count; ++i)
                 {
                     //if(m_ident == VALUE_TYPE_NAMES[i])
-                    if(m_ident == Value::getTypeName((Value::Type)i))
+                    if(m_ident == Value::getTypename((Value::Type)i))
                     {
                         return Value{ (Value::Type)i };
                     }

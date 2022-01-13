@@ -50,6 +50,32 @@ namespace MSL
             return result;
         }
 
+        void checkArgumentCount(Environment& env, const Location& place, std::string_view fname, size_t argcnt, size_t expect)
+        {
+            (void)env;
+            //if((!(expect > argcnt)) || ((expect > 0) && (argcnt == 0)))
+            if((expect > 0) && ((argcnt == 0) || (argcnt < expect)))
+            {
+                throw Error::ArgumentError(place, Util::joinArgs("function '", fname, "' expects at least ", expect, " arguments"));
+            }
+        }
+
+        Value checkArgument(Environment& env, const Location& place, std::string_view name, const std::vector<Value>& args, size_t idx, Value::Type type)
+        {
+            Value r;
+            (void)env;
+            checkArgumentCount(env, place, name, args.size(), idx);
+            r = args[idx];
+            if(r.type() != type)
+            {
+                auto etype = Value::getTypename(type);
+                auto gtype = Value::getTypename(r.type());
+                throw Error::TypeError(place,
+                    Util::joinArgs("expected argument #", idx, " to be a ", etype, ", but got ", gtype, " instead"));
+            }
+            return r;
+        }
+
     }
 }
 
