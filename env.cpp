@@ -5,27 +5,59 @@ namespace MSL
 {
     namespace
     {
-
         class IOHandle: public Object
         {
             public:
+                Environment& m_env;
                 FILE* m_stream;
 
             public:
-                IOHandle(FILE* s): m_stream(s)
+                IOHandle(Environment& env, FILE* s): m_env(env), m_stream(s)
                 {
                 }
 
-                Value io_write(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
+                Value io_write(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
                 {
                     (void)ctx;
-                    (void)place;
+                    size_t rs;
+                    rs = 0;
+                    Util::checkArgumentCount(m_env, place, "write", args.size(), 1);
                     for(const auto& a: args)
                     {
                         auto tmpstr = a.toString();
-                        std::fwrite(tmpstr.data(), sizeof(char), tmpstr.size(), m_stream);
+                        rs += std::fwrite(tmpstr.data(), sizeof(char), tmpstr.size(), m_stream);
+                        fflush(m_stream);
                     }
-                    return {};
+                    return Value{double(rs)};
+                }
+
+                Value io_getchar(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
+                {
+                    int ch;
+                    (void)ctx;
+                    (void)args;
+                    ch = fgetc(m_stream);
+                    if(ch == EOF)
+                    {
+                        throw Error::EOFError(place, "EOF");
+                    }
+                    fflush(m_stream);
+                    return Value{double(ch)};
+                }
+
+                Value io_putchar(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
+                {
+                    int rs;
+                    Value ch;
+                    (void)ctx;
+                    ch = Util::checkArgument(m_env, place, "putchar", args, 0, Value::Type::Number);
+                    rs = fputc(int(ch.getNumber()), m_stream);
+                    if(rs == EOF)
+                    {
+                        throw Error::EOFError(place, "EOF");
+                    }
+                    fflush(m_stream);
+                    return Value{double(rs)};
                 }
         };
     }
@@ -36,18 +68,9 @@ namespace MSL
         {
             /* Nothing - just ignore its value. */
             (void)ctx;
-            #if 0
-            const auto& th = ctx.getThis();
-            if(!th.isEmpty())
-            {
-                return th.getObject();
-            }
-            #endif
-
             return {};
         }
     }
-
 
     Environment::Environment() : m_implenv{ new EnvironmentPimpl{ *this, m_globalscope } }
     {
@@ -101,15 +124,24 @@ namespace MSL
     */
     void Environment::makeStdHandle(const Location& upplace, const std::string& name, FILE* strm)
     {
-        (void)upplace;
-        auto obj = std::make_shared<IOHandle>(strm);
-        auto weak = std::weak_ptr<IOHandle>(obj);
         /// todo: abstract this noise away? somehow?
-        obj->entry("write") = Value{[weak](AST::ExecutionContext& ctx, const Location& place, AST::ThisType&, std::vector<Value>&& args) -> Value
+        #define do_entry(expname, classmethod) \
+            {\
+                obj->entry(expname) = Value{[weak](AST::ExecutionContext& ctx, const Location& place, AST::ThisType&, Value::List&& args)\
+                {\
+                    auto hereobj = weak.lock(); \
+                    return hereobj->classmethod(ctx, place, std::move(args)); \
+                }};\
+            }
+            
+        (void)upplace;
+        auto obj = std::make_shared<IOHandle>(*this, strm);
+        auto weak = std::weak_ptr<IOHandle>(obj);
         {
-            auto hereobj = weak.lock();
-            return hereobj->io_write(ctx, place, std::move(args));
-        }};
+            do_entry("write", io_write);
+            do_entry("getChar", io_getchar);
+            do_entry("putChar", io_putchar);
+        }
         global(name) = Value{obj};
     }
 
@@ -133,7 +165,7 @@ namespace MSL
         AST::Script script{ Location{ 0, 1, 1 } };
         Tokenizer tokenizer{ code };
         Parser parser{ tokenizer };
-        parser.ParseScript(script);
+        parser.parseScript(script);
         try
         {
             AST::ExecutionContext executeContext{ *this, m_globalscope };

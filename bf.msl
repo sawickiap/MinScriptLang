@@ -1,0 +1,80 @@
+
+
+function bf(storelen, src)
+{
+    datapos = 0;
+    datastore = [];
+    for(i=0; i!=storelen; i++)
+    {
+        datastore.push(0);
+    }
+    printf("datastore populated, now running with src.length=%d...\n", src.length);
+    for(idx=0; idx<src.length; idx++)
+    {
+        switch(src[idx])
+        {
+            case '>':
+                datapos++;
+                break;
+            case '<':
+                datapos--;
+                break;
+            case '+':
+                datastore[datapos]++;
+                break;
+            case '-':
+                datastore[datapos]--;
+                break;
+            case '.':
+                $stdout.putChar(datastore[datapos]);
+                break;
+            case ',':
+                datastore[datapos] = $stdin.getChar();
+                break;
+            case '[':
+                if(datastore[datapos] == 0)
+                {
+                    for(nc=1; nc>0;)
+                    {
+                        idx++;
+                        if(src[idx] == '[')
+                        {
+                            nc++;
+                        }
+                        else if(src[idx] == ']')
+                        {
+                            nc--;
+                        }
+                    }
+                }
+                break;
+            case ']':
+                if(datastore[datapos] != 0)
+                {
+                    for(nc=1; nc > 0;)
+                    {
+                        idx--;
+                        if(src[idx] == ']')
+                        {
+                            nc++;
+                        }
+                        else if(src[idx] == '[')
+                        {
+                            nc--;
+                        }
+                    }
+                }
+                break;
+        }
+    }
+}
+
+source = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.";
+if(ARGV && ARGV.length > 1)
+{
+    source = File.readFile(ARGV[1]);
+}
+println("*now executing brainfuck ... please be patient!*");
+bf((1024*1024), source);
+
+

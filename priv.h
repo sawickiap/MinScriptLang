@@ -26,7 +26,7 @@ namespace MSL
                 const Location& m_place;
                 
                 std::string_view m_fmtstr;
-                const std::vector<Value>& m_args;
+                const Value::List& m_args;
                 int m_currch;
                 int m_nextch;
                 size_t m_curridx;
@@ -35,7 +35,7 @@ namespace MSL
                 size_t m_argi;
 
             public:
-                StringFormatter(Environment& env, const Location& place, std::string_view fmt, const std::vector<Value>& args):
+                StringFormatter(Environment& env, const Location& place, std::string_view fmt, const Value::List& args):
                 m_env(env), m_place(place), m_fmtstr(fmt), m_args(args)
                 {
                     (void)m_env;
@@ -206,43 +206,44 @@ namespace MSL
 
     namespace Builtins
     {
-        Value func_printf(Environment& env, const Location& place, std::vector<Value>&& args);
-        Value func_sprintf(Environment& env, const Location& place, std::vector<Value>&& args);
-        Value func_println(Environment& env, const Location& place, std::vector<Value>&& args);
-        Value func_print(Environment& env, const Location& place, std::vector<Value>&& args);
-        Value func_max(Environment& ctx, const Location& place, std::vector<Value>&& args);
-        Value func_min(Environment& ctx, const Location& place, std::vector<Value>&& args);
-        Value func_typeof(Environment& env, const Location& place, std::vector<Value>&& args);
+        Value func_printf(Environment& env, const Location& place, Value::List&& args);
+        Value func_sprintf(Environment& env, const Location& place, Value::List&& args);
+        Value func_println(Environment& env, const Location& place, Value::List&& args);
+        Value func_print(Environment& env, const Location& place, Value::List&& args);
+        Value func_max(Environment& ctx, const Location& place, Value::List&& args);
+        Value func_min(Environment& ctx, const Location& place, Value::List&& args);
+        Value func_typeof(Environment& env, const Location& place, Value::List&& args);
 
         void makeFileNamespace(Environment& env);
 
 
-        Value ctor_null(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
-        Value ctor_number(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
-        Value ctor_string(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
-        Value ctor_object(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
-        Value ctor_array(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
-        Value ctor_function(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
-        Value ctor_type(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args);
+        Value ctor_null(AST::ExecutionContext& ctx, const Location& place, Value::List&& args);
+        Value ctor_number(AST::ExecutionContext& ctx, const Location& place, Value::List&& args);
+        Value ctor_string(AST::ExecutionContext& ctx, const Location& place, Value::List&& args);
+        Value ctor_object(AST::ExecutionContext& ctx, const Location& place, Value::List&& args);
+        Value ctor_array(AST::ExecutionContext& ctx, const Location& place, Value::List&& args);
+        Value ctor_function(AST::ExecutionContext& ctx, const Location& place, Value::List&& args);
+        Value ctor_type(AST::ExecutionContext& ctx, const Location& place, Value::List&& args);
 
 
         Value protofn_object_count(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
 
         Value protofn_string_length(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
         Value protofn_string_chars(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
-        Value memberfn_string_resize(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_startswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_endswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_includes(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_leftstrip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_rightstrip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_strip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_string_split(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
+        Value memberfn_string_resize(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+        Value memberfn_string_startswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+        Value memberfn_string_endswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+        Value memberfn_string_includes(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+        Value memberfn_string_leftstrip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+        Value memberfn_string_rightstrip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+        Value memberfn_string_strip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+        Value memberfn_string_split(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
 
         Value protofn_array_length(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
-        Value memberfn_array_add(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_array_insert(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
-        Value memberfn_array_remove(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args);
+        Value memberfn_array_push(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+        Value memberfn_array_pop(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+        Value memberfn_array_insert(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+        Value memberfn_array_remove(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
     }
 
     struct StandardObjectMemberFunc

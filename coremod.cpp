@@ -5,7 +5,7 @@ namespace MSL
 {
     namespace Builtins
     {
-        static void fmtfunc_checkargs(std::string_view n, const Location& p, const std::vector<Value>& args)
+        static void fmtfunc_checkargs(std::string_view n, const Location& p, const Value::List& args)
         {
             if(args.size() == 0)
             {
@@ -18,7 +18,7 @@ namespace MSL
         }
 
 
-        Value func_typeof(Environment& env, const Location& place, std::vector<Value>&& args)
+        Value func_typeof(Environment& env, const Location& place, Value::List&& args)
         {
             (void)env;
             if(args.size() == 0)
@@ -28,7 +28,7 @@ namespace MSL
             return Value{ args[0].type() };
         }
 
-        Value func_min(Environment& ctx, const Location& place, std::vector<Value>&& args)
+        Value func_min(Environment& ctx, const Location& place, Value::List&& args)
         {
             size_t i;
             size_t argCount;
@@ -56,7 +56,7 @@ namespace MSL
             return Value{ result };
         }
 
-        Value func_max(Environment& ctx, const Location& place, std::vector<Value>&& args)
+        Value func_max(Environment& ctx, const Location& place, Value::List&& args)
         {
             size_t i;
             size_t argCount;
@@ -84,7 +84,7 @@ namespace MSL
             return Value{ result };
         }
 
-        Value func_print(Environment& env, const Location& place, std::vector<Value>&& args)
+        Value func_print(Environment& env, const Location& place, Value::List&& args)
         {
             (void)env;
             (void)place;
@@ -96,7 +96,7 @@ namespace MSL
             return {};
         }
 
-        Value func_println(Environment& env, const Location& place, std::vector<Value>&& args)
+        Value func_println(Environment& env, const Location& place, Value::List&& args)
         {
             (void)env;
             (void)place;
@@ -109,24 +109,23 @@ namespace MSL
             return {};
         }
 
-
-        Value func_sprintf(Environment& env, const Location& place, std::vector<Value>&& args)
+        Value func_sprintf(Environment& env, const Location& place, Value::List&& args)
         {
             std::stringstream ss;
             std::string fmtstr;
             fmtfunc_checkargs("sprintf", place, args);
             fmtstr = args[0].toString();
-            auto restargs = std::vector<Value>(args.begin() + 1, args.end());
+            auto restargs = Value::List(args.begin() + 1, args.end());
             Util::StringFormatter(env, place, fmtstr, restargs).run(ss, false);
             return Value{ss.str()};
         }
 
-        Value func_printf(Environment& env, const Location& place, std::vector<Value>&& args)
+        Value func_printf(Environment& env, const Location& place, Value::List&& args)
         {
             std::string fmtstr;
             fmtfunc_checkargs("printf", place, args);
             fmtstr = args[0].toString();
-            auto restargs = std::vector<Value>(args.begin() + 1, args.end());
+            auto restargs = Value::List(args.begin() + 1, args.end());
             Util::StringFormatter(env, place, fmtstr, restargs).run(std::cout, true);
             return {};
         }

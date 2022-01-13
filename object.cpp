@@ -5,8 +5,8 @@ namespace MSL
 {
     Value* Object::tryGet(const std::string& key)
     {
-        auto it = m_items.find(key);
-        if(it != m_items.end())
+        auto it = m_entrymap.find(key);
+        if(it != m_entrymap.end())
         {
             return &it->second;
         }
@@ -15,8 +15,8 @@ namespace MSL
 
     const Value* Object::tryGet(const std::string& key) const
     {
-        auto it = m_items.find(key);
-        if(it != m_items.end())
+        auto it = m_entrymap.find(key);
+        if(it != m_entrymap.end())
         {
             return &it->second;
         }
@@ -25,10 +25,10 @@ namespace MSL
 
     bool Object::removeEntry(const std::string& key)
     {
-        auto it = m_items.find(key);
-        if(it != m_items.end())
+        auto it = m_entrymap.find(key);
+        if(it != m_entrymap.end())
         {
-            m_items.erase(it);
+            m_entrymap.erase(it);
             return true;
         }
         return false;

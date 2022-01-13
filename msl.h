@@ -219,6 +219,17 @@ namespace MSL
                 }
         };
 
+        class IndexError: public ExecutionError
+        {
+            public:
+                using ExecutionError::ExecutionError;
+
+                inline virtual std::string_view name() const override
+                {
+                    return "IndexError";
+                }
+        };
+
         class IOError: public ExecutionError
         {
             public:
@@ -227,6 +238,17 @@ namespace MSL
                 inline virtual std::string_view name() const override
                 {
                     return "IOError";
+                }
+        };
+
+        class EOFError: public ExecutionError
+        {
+            public:
+                using ExecutionError::ExecutionError;
+
+                inline virtual std::string_view name() const override
+                {
+                    return "EOFError";
                 }
         };
     }
@@ -252,7 +274,7 @@ namespace MSL
                 MemberProperty,
                 Count
             };
-
+            using List = std::vector<Value>;
             using NumberValType = double;
             using StringValType = std::string;
             using AstFuncValType = const AST::FunctionDefinition*;
@@ -502,7 +524,7 @@ namespace MSL
     namespace Util
     {
         void checkArgumentCount(Environment& env, const Location& place, std::string_view fname, size_t argcnt, size_t expect);
-        Value checkArgument(Environment& env, const Location& place, std::string_view fname, const std::vector<Value>& args, size_t idx, Value::Type type);
+        Value checkArgument(Environment& env, const Location& place, std::string_view fname, const Value::List& args, size_t idx, Value::Type type);
     }
 
     class Object
@@ -511,23 +533,23 @@ namespace MSL
             using MapType = std::unordered_map<std::string, Value>;
 
         public:
-            MapType m_items;
+            MapType m_entrymap;
 
         public:
             size_t size() const
             {
-                return m_items.size();
+                return m_entrymap.size();
             }
 
             bool hasKey(const std::string& key) const
             {
-                return m_items.find(key) != m_items.end();
+                return m_entrymap.find(key) != m_entrymap.end();
             }
 
             // Creates new null value if doesn't exist.
             Value& entry(const std::string& key)
             {
-                return m_items[key];
+                return m_entrymap[key];
             }
 
             Value* tryGet(const std::string& key);// Returns null if doesn't exist.
@@ -540,7 +562,7 @@ namespace MSL
     class Array
     {
         public:
-            std::vector<Value> m_items;
+            Value::List m_arrayitems;
     };
 
     class /**/EnvironmentPimpl;
@@ -1068,12 +1090,13 @@ namespace MSL
             virtual Value execute(ExecutionContext& ctx) const;
         };
 
-        struct Script : Block
+        class Script: public Block
         {
-            explicit Script(const Location& place) : Block{ place }
-            {
-            }
-            virtual Value execute(ExecutionContext& ctx) const;
+            public:
+                explicit Script(const Location& place) : Block{ place }
+                {
+                }
+                virtual Value execute(ExecutionContext& ctx) const;
         };
 
         struct Expression : Statement
@@ -1313,7 +1336,7 @@ namespace MSL
             using ItemMap = std::map<std::string, std::unique_ptr<Expression>>;
 
             std::unique_ptr<Expression> m_baseexpr;
-            ItemMap m_items;
+            ItemMap m_exprmap;
             ObjectExpression(const Location& place) : Expression{ place }
             {
             }
@@ -1323,7 +1346,7 @@ namespace MSL
 
         struct ArrayExpression : public Expression
         {
-            std::vector<std::unique_ptr<Expression>> m_items;
+            std::vector<std::unique_ptr<Expression>> m_exprlist;
             ArrayExpression(const Location& place) : Expression{ place }
             {
             }
@@ -1385,7 +1408,7 @@ namespace MSL
             Parser(Tokenizer& tokenizer) : m_tokenizer(tokenizer)
             {
             }
-            void ParseScript(AST::Script& outScript);
+            void parseScript(AST::Script& outScript);
 
     };
 

@@ -9,7 +9,7 @@ namespace MSL
     {
         namespace
         {
-            Value filefunc_readfile(Environment& env, const Location& place, std::vector<Value>&& args)
+            Value filefunc_readfile(Environment& env, const Location& place, Value::List&& args)
             {
                 std::string data;
                 Value filename;
@@ -33,7 +33,7 @@ namespace MSL
         {
             auto obj = std::make_shared<Object>();
             {
-                obj->entry("read") = Value{filefunc_readfile};
+                obj->entry("readFile") = Value{filefunc_readfile};
             }
             env.global("File") = Value{std::move(obj)};
         }

@@ -55,7 +55,7 @@ void setARGV(MSL::Environment& env, const std::vector<std::string>& va)
     auto a = std::make_shared<MSL::Array>();
     for(auto s: va)
     {
-        a->m_items.push_back(MSL::Value{std::string(s)});
+        a->m_arrayitems.push_back(MSL::Value{std::string(s)});
     }
     env.global("ARGV") = MSL::Value{std::move(a)};
 }
@@ -74,8 +74,6 @@ static bool notjustspace(const char* line)
     }
     return false;
 }
-
-
 
 int repl(MSL::Environment& env)
 {
@@ -128,16 +126,50 @@ int repl(MSL::Environment& env)
 }
 #endif
 
+int dumpSyntaxTreeCode(MSL::Environment& env, std::string_view code)
+{
+    MSL::AST::Script ast(MSL::Location{});
+    try
+    {
+        MSL::Tokenizer tkz(code); 
+        MSL::Parser prs(tkz);
+        prs.parseScript(ast);
+        ast.debugPrint(0, "");
+    }
+    catch(MSL::Error::Exception& e)
+    {
+        printException(e);
+        return 1;
+    }
+    return 0;
+}
+
+int dumpSyntaxTreeFile(MSL::Environment& env, const std::string& filename)
+{
+    std::string fdata;
+    if(readfile(filename, fdata))
+    {
+        return dumpSyntaxTreeCode(env, fdata);
+    }
+    else
+    {
+        std::cerr << "dumpsyntax: cannot read file '" << filename << "'" << std::endl;
+    }
+    return 1;
+}
+
 int main(int argc, char* argv[])
 {
     bool havecodechunk;
     bool forcerepl;
+    bool dumpsyntax;
     std::string filename;
     std::string filedata;
     std::string codechunk;
     std::vector<std::string> rest;
     MSL::Environment env;
     OptionParser prs;
+    dumpsyntax = false;
     forcerepl = false;
     havecodechunk = false;
     prs.on({"-i", "--repl"}, "force run REPL", [&]
@@ -149,6 +181,10 @@ int main(int argc, char* argv[])
         codechunk = v.str();
         havecodechunk = true;
         prs.stopParsing();
+    });
+    prs.on({"-d", "--dump"}, "dump source through debugPrint()", [&]
+    {
+        dumpsyntax = true;
     });
     try
     {
@@ -163,19 +199,30 @@ int main(int argc, char* argv[])
     setARGV(env, rest);
     if(havecodechunk)
     {
-        try
+        if(dumpsyntax)
         {
-            auto v = env.execute(codechunk);
+            return dumpSyntaxTreeCode(env, codechunk);
         }
-        catch(MSL::Error::Exception& e)
+        else
         {
-            printException(e);
+            try
+            {
+                auto v = env.execute(codechunk);
+            }
+            catch(MSL::Error::Exception& e)
+            {
+                printException(e);
+            }
         }
         return 0;
     }
     if(rest.size() > 0 && !forcerepl)
     {
-        filename = argv[1];
+        filename = rest[0];
+        if(dumpsyntax)
+        {
+            return dumpSyntaxTreeFile(env, filename);
+        }
         if(readfile(filename, filedata))
         {
             try

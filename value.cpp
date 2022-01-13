@@ -36,22 +36,25 @@ namespace MSL
                     os << "\\t";
                     break;
                 default:
-                    constexpr const char* const hexchars = "0123456789ABCDEF";
-                    os << '\\';
-                    if(c <= 255)
                     {
-                        os << 'x';
-                        os << hexchars[(c >> 4) & 0xf];
-                        os << hexchars[c & 0xf];
+                        constexpr const char* const hexchars = "0123456789ABCDEF";
+                        os << '\\';
+                        if(c <= 255)
+                        {
+                            os << 'x';
+                            os << hexchars[(c >> 4) & 0xf];
+                            os << hexchars[c & 0xf];
+                        }
+                        else
+                        {
+                            os << 'u';
+                            os << hexchars[(c >> 12) & 0xf];
+                            os << hexchars[(c >> 8) & 0xf];
+                            os << hexchars[(c >> 4) & 0xf];
+                            os << hexchars[c & 0xf];
+                        }
                     }
-                    else
-                    {
-                        os << 'u';
-                        os << hexchars[(c >> 12) & 0xf];
-                        os << hexchars[(c >> 8) & 0xf];
-                        os << hexchars[(c >> 4) & 0xf];
-                        os << hexchars[c & 0xf];
-                    }
+                    break;
             }
         }
 
@@ -81,11 +84,11 @@ namespace MSL
         {
             size_t i;
             size_t sz;
-            sz = arr->m_items.size();
+            sz = arr->m_arrayitems.size();
             os << "[";
             for(i=0; i<sz; i++)
             {
-                auto val = arr->m_items[i];
+                auto val = arr->m_arrayitems[i];
                 if(val.isArray() && (val.getArray() == arr))
                 {
                     os << "<recursion>";

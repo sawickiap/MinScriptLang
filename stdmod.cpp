@@ -54,7 +54,7 @@ namespace MSL
 {
     namespace Builtins
     {
-        Value ctor_null(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
+        Value ctor_null(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
         {
             (void)ctx;
             (void)place;
@@ -62,14 +62,14 @@ namespace MSL
             return {};
         }
 
-        Value ctor_number(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
+        Value ctor_number(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
         {
             Environment& env = ctx.m_env.getOwner();
             MINSL_LOAD_ARGS_1_NUMBER("Number", val);
             return Value{ val };
         }
 
-        Value ctor_string(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
+        Value ctor_string(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
         {
             if(args.empty())
             {
@@ -80,7 +80,7 @@ namespace MSL
             return Value{ std::move(str) };
         }
 
-        Value ctor_object(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
+        Value ctor_object(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
         {
             (void)ctx;
             if(args.empty())
@@ -94,7 +94,7 @@ namespace MSL
             return Value{ Util::CopyObject(*args[0].getObject()) };
         }
 
-        Value ctor_array(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
+        Value ctor_array(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
         {
             (void)ctx;
             if(args.empty())
@@ -108,7 +108,7 @@ namespace MSL
             return Value{ Util::CopyArray(*args[0].getArray()) };
         }
 
-        Value ctor_function(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
+        Value ctor_function(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
         {
             (void)ctx;
             if((args.size() == 0) || ((args[0].type() != Value::Type::Function) && (args[0].type() != Value::Type::MemberMethod)))
@@ -118,7 +118,7 @@ namespace MSL
             return Value{ args[0] };
         }
 
-        Value ctor_type(AST::ExecutionContext& ctx, const Location& place, std::vector<Value>&& args)
+        Value ctor_type(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
         {
             (void)ctx;
             if((args.size() == 0) || (args[0].type() != Value::Type::Type))
@@ -148,11 +148,11 @@ namespace MSL
             {
                 throw Error::TypeError(place, "Array.length called on something not an Array");
             }
-            return Value{ (double)objVal.getArray()->m_items.size() };
+            return Value{ (double)objVal.getArray()->m_arrayitems.size() };
         }
 
 
-        Value memberfn_array_add(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args)
+        Value memberfn_array_push(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args)
         {
             size_t i;
             Array* arr;
@@ -169,12 +169,28 @@ namespace MSL
             }
             for(i=0; i<args.size(); i++)
             {
-                arr->m_items.push_back(std::move(args[i]));
+                arr->m_arrayitems.push_back(std::move(args[i]));
             }
             return {};
         }
 
-        Value memberfn_array_insert(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args)
+        Value memberfn_array_pop(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args)
+        {
+            Array* arr;
+            (void)ctx;
+            (void)th;
+            (void)args;
+            arr = th.getArray();
+            if(!arr)
+            {
+                throw Error::TypeError(place, "Array.pop() called on something not an Array");
+            }
+            auto popped =arr->m_arrayitems.back();
+            arr->m_arrayitems.pop_back();
+            return popped;
+        }
+
+        Value memberfn_array_insert(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args)
         {
             Array* arr;
             (void)ctx;
@@ -193,11 +209,11 @@ namespace MSL
             {
                 throw Error::ExecutionError(place, "cannot insert out-of-bounds");
             }
-            arr->m_items.insert(arr->m_items.begin() + index, std::move(args[1]));
+            arr->m_arrayitems.insert(arr->m_arrayitems.begin() + index, std::move(args[1]));
             return {};
         }
 
-        Value memberfn_array_remove(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args)
+        Value memberfn_array_remove(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args)
         {
             Array* arr;
             (void)ctx;
@@ -215,7 +231,7 @@ namespace MSL
             {
                 throw Error::ExecutionError(place, "cannot remove out-of-bounds");
             }
-            arr->m_items.erase(arr->m_items.begin() + index);
+            arr->m_arrayitems.erase(arr->m_arrayitems.begin() + index);
             return {};
         }
 
@@ -240,12 +256,12 @@ namespace MSL
             auto res = std::make_shared<Array>();
             for(auto ch: objVal.getString())
             {
-                res->m_items.push_back(Value{double(ch)});
+                res->m_arrayitems.push_back(Value{double(ch)});
             }
             return Value{ std::move(res) };
         }
 
-        Value memberfn_string_resize(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args)
+        Value memberfn_string_resize(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args)
         {
             // TODO
             (void)ctx;
@@ -255,7 +271,7 @@ namespace MSL
             return {};
         }
 
-        Value memberfn_string_startswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, std::vector<Value>&& args)
+        Value memberfn_string_startswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args)
         {
             double res;
             (void)ctx;

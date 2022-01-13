@@ -2,15 +2,9 @@
 #include <array>
 #include "priv.h"
 
-#define DEBUG_PRINT_FORMAT_STR_BEG "(%u,%u) %s%.*s"
-#define DEBUG_PRINT_ARGS_BEG \
-    getPlace().textline, getPlace().textcolumn, GetDebugPrintIndent(indentLevel), (int)prefix.length(), prefix.data()
-
 
 namespace MSL
 {
-
-
     static auto stdobjproperties_string = std::to_array<StandardObjectPropertyFunc>(
     {
         {"count", Builtins::protofn_string_length},
@@ -53,7 +47,9 @@ namespace MSL
 
     static auto stdobjmethods_array = std::to_array<StandardObjectMemberFunc>(
     {
-        {"add", Builtins::memberfn_array_add},
+        {"push", Builtins::memberfn_array_push},
+        {"add", Builtins::memberfn_array_push},
+        {"pop", Builtins::memberfn_array_pop},
         {"insert", Builtins::memberfn_array_insert},
         {"remove", Builtins::memberfn_array_remove},
     });
@@ -105,11 +101,6 @@ namespace MSL
         MINSL_EXECUTION_CHECK(value.isNumber(), operand->getPlace(), "expected numeric value");
     }
 
-    static const char* GetDebugPrintIndent(uint32_t indentLevel)
-    {
-        static const char* silly = "                                                                                                                                                                                                                                                                ";
-        return silly + (256 - std::min<uint32_t>(indentLevel, 128) * 2);
-    }
 
     Value* LValue::getValueRef(const Location& place) const
     {
@@ -128,8 +119,8 @@ namespace MSL
         leftarrayitem = std::get_if<ArrayItemLValue>(this);
         if(leftarrayitem)
         {
-            MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->m_items.size(), place, "index out of bounds");
-            return &leftarrayitem->arrayval->m_items[leftarrayitem->indexval];
+            MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->m_arrayitems.size(), place, "index out of bounds");
+            return &leftarrayitem->arrayval->m_arrayitems[leftarrayitem->indexval];
         }
         throw Error::ExecutionError(place, "lvalue required");
     }
@@ -158,8 +149,8 @@ namespace MSL
         }
         if((leftarrayitem = std::get_if<ArrayItemLValue>(this)))
         {
-            MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->m_items.size(), place, "index out of bounds");
-            return Value{ leftarrayitem->arrayval->m_items[leftarrayitem->indexval] };
+            MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->m_arrayitems.size(), place, "index out of bounds");
+            return Value{ leftarrayitem->arrayval->m_arrayitems[leftarrayitem->indexval] };
         }
         assert(0);
         return {};
@@ -181,8 +172,8 @@ namespace MSL
             }
             else if((leftarrayitem = std::get_if<ArrayItemLValue>(&lhs)))
             {
-                MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->m_items.size(), getPlace(), "index out of bounds");
-                leftarrayitem->arrayval->m_items[leftarrayitem->indexval] = std::move(rhs);
+                MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->m_arrayitems.size(), getPlace(), "index out of bounds");
+                leftarrayitem->arrayval->m_arrayitems[leftarrayitem->indexval] = std::move(rhs);
             }
             else if((leftstrchar = std::get_if<StringCharacterLValue>(&lhs)))
             {
@@ -193,21 +184,6 @@ namespace MSL
             }
             else
                 assert(0);
-        }
-
-        void EmptyStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "Empty\n", DEBUG_PRINT_ARGS_BEG);
-        }
-
-        void Condition::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "If\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            m_condexpr->debugPrint(indentLevel, "ConditionExpression: ");
-            m_statements[0]->debugPrint(indentLevel, "TrueStatement: ");
-            if(m_statements[1])
-                m_statements[1]->debugPrint(indentLevel, "FalseStatement: ");
         }
 
         Value Condition::execute(ExecutionContext& ctx) const
@@ -221,26 +197,6 @@ namespace MSL
                 return m_statements[1]->execute(ctx);
             }
             return {};
-        }
-
-        void WhileLoop::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            const char* name = nullptr;
-            switch(m_type)
-            {
-                case WhileLoop::Type::While:
-                    name = "While";
-                    break;
-                case WhileLoop::Type::DoWhile:
-                    name = "DoWhile";
-                    break;
-                default:
-                    assert(0);
-            }
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "%s\n", DEBUG_PRINT_ARGS_BEG, name);
-            ++indentLevel;
-            m_condexpr->debugPrint(indentLevel, "ConditionExpression: ");
-            m_body->debugPrint(indentLevel, "Body: ");
         }
 
         Value WhileLoop::execute(ExecutionContext& ctx) const
@@ -294,25 +250,6 @@ namespace MSL
             return {};
         }
 
-        void ForLoop::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "For\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            if(m_initexpr)
-                m_initexpr->debugPrint(indentLevel, "InitExpression: ");
-            else
-                printf(DEBUG_PRINT_FORMAT_STR_BEG "(Init expression empty)\n", DEBUG_PRINT_ARGS_BEG);
-            if(m_condexpr)
-                m_condexpr->debugPrint(indentLevel, "ConditionExpression: ");
-            else
-                printf(DEBUG_PRINT_FORMAT_STR_BEG "(Condition expression empty)\n", DEBUG_PRINT_ARGS_BEG);
-            if(m_iterexpr)
-                m_iterexpr->debugPrint(indentLevel, "IterationExpression: ");
-            else
-                printf(DEBUG_PRINT_FORMAT_STR_BEG "(Iteration expression empty)\n", DEBUG_PRINT_ARGS_BEG);
-            m_body->debugPrint(indentLevel, "Body: ");
-        }
-
         Value ForLoop::execute(ExecutionContext& ctx) const
         {
             if(m_initexpr)
@@ -340,17 +277,6 @@ namespace MSL
             return {};
         }
 
-        void RangeBasedForLoop::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            if(!m_keyvar.empty())
-                printf(DEBUG_PRINT_FORMAT_STR_BEG "Range-based for: %s, %s\n", DEBUG_PRINT_ARGS_BEG, m_keyvar.c_str(),
-                       m_valuevar.c_str());
-            else
-                printf(DEBUG_PRINT_FORMAT_STR_BEG "Range-based for: %s\n", DEBUG_PRINT_ARGS_BEG, m_valuevar.c_str());
-            ++indentLevel;
-            m_rangeexpr->debugPrint(indentLevel, "RangeExpression: ");
-            m_body->debugPrint(indentLevel, "Body: ");
-        }
 
         Value RangeBasedForLoop::execute(ExecutionContext& ctx) const
         {
@@ -390,7 +316,7 @@ namespace MSL
             }
             else if(rangeval.isObject())
             {
-                for(const auto& [key, value] : rangeval.getObject()->m_items)
+                for(const auto& [key, value] : rangeval.getObject()->m_entrymap)
                 {
                     if(usekey)
                     {
@@ -413,13 +339,13 @@ namespace MSL
             else if(rangeval.isArray())
             {
                 arr = rangeval.getArray();
-                for(i = 0, count = arr->m_items.size(); i < count; ++i)
+                for(i = 0, count = arr->m_arrayitems.size(); i < count; ++i)
                 {
                     if(usekey)
                     {
                         assign(LValue{ ObjectMemberLValue{ &innermostctx, m_keyvar } }, Value{ (double)i });
                     }
-                    assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{ arr->m_items[i] });
+                    assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{ arr->m_arrayitems[i] });
                     try
                     {
                         m_body->execute(ctx);
@@ -443,12 +369,6 @@ namespace MSL
             }
             assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{});
             return {};
-        }
-
-        void LoopBreakStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            static const char* LOOP_BREAK_TYPE_NAMES[] = { "Break", "Continue" };
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "%s\n", DEBUG_PRINT_ARGS_BEG, LOOP_BREAK_TYPE_NAMES[(size_t)m_type]);
         }
 
         Value LoopBreakStatement::execute(ExecutionContext& ctx) const
@@ -475,15 +395,6 @@ namespace MSL
             return {};
         }
 
-        void ReturnStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "return\n", DEBUG_PRINT_ARGS_BEG);
-            if(m_retvalue)
-            {
-                m_retvalue->debugPrint(indentLevel + 1, "ReturnedValue: ");
-            }
-        }
-
         Value ReturnStatement::execute(ExecutionContext& ctx) const
         {
             if(m_retvalue)
@@ -497,15 +408,6 @@ namespace MSL
             return {};
         }
 
-        void Block::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "Block\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            for(const auto& stmtPtr : m_statements)
-            {
-                stmtPtr->debugPrint(indentLevel, std::string_view{});
-            }
-        }
 
         Value Block::execute(ExecutionContext& ctx) const
         {
@@ -517,24 +419,7 @@ namespace MSL
             return rv;
         }
 
-        void SwitchStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            size_t i;
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "switch\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            m_cond->debugPrint(indentLevel, "Condition: ");
-            for(i = 0; i < m_itemvals.size(); ++i)
-            {
-                if(m_itemvals[i])
-                    m_itemvals[i]->debugPrint(indentLevel, "ItemValue: ");
-                else
-                    printf(DEBUG_PRINT_FORMAT_STR_BEG "Default\n", DEBUG_PRINT_ARGS_BEG);
-                if(m_itemblocks[i])
-                    m_itemblocks[i]->debugPrint(indentLevel, "ItemBlock: ");
-                else
-                    printf(DEBUG_PRINT_FORMAT_STR_BEG "(Empty block)\n", DEBUG_PRINT_ARGS_BEG);
-            }
-        }
+
 
         Value SwitchStatement::execute(ExecutionContext& ctx) const
         {
@@ -580,31 +465,10 @@ namespace MSL
             return {};
         }
 
-        void ThrowStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "throw\n", DEBUG_PRINT_ARGS_BEG);
-            m_thrownexpr->debugPrint(indentLevel + 1, "ThrownExpression: ");
-        }
-
         Value ThrowStatement::execute(ExecutionContext& ctx) const
         {
             throw m_thrownexpr->evaluate(ctx, nullptr);
             return {};
-        }
-
-        void TryStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "try\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            m_tryblock->debugPrint(indentLevel, "TryBlock: ");
-            if(m_catchblock)
-            {
-                m_catchblock->debugPrint(indentLevel, "CatchBlock: ");
-            }
-            if(m_finallyblock)
-            {
-                m_finallyblock->debugPrint(indentLevel, "FinallyBlock: ");
-            }
         }
 
         Value TryStatement::execute(ExecutionContext& ctx) const
@@ -731,29 +595,6 @@ namespace MSL
             return {};
         }
 
-        void ConstantValue::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            switch(m_val.type())
-            {
-                case Value::Type::Null:
-                    printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant null\n", DEBUG_PRINT_ARGS_BEG);
-                    break;
-                case Value::Type::Number:
-                    printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant number: %g\n", DEBUG_PRINT_ARGS_BEG, m_val.getNumber());
-                    break;
-                case Value::Type::String:
-                    printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant string: %s\n", DEBUG_PRINT_ARGS_BEG, m_val.getString().c_str());
-                    break;
-                default:
-                    assert(0 && "ConstantValue should not be used with this type.");
-            }
-        }
-
-        void Identifier::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            static const char* PREFIX[] = { "", "local.", "global." };
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier: %s%s\n", DEBUG_PRINT_ARGS_BEG, PREFIX[(size_t)m_scope], m_ident.c_str());
-        }
 
         Value Identifier::evaluate(ExecutionContext& ctx, ThisType* othis) const
         {
@@ -850,10 +691,7 @@ namespace MSL
             return LValue{ ObjectMemberLValue{ &ctx.m_globalscope, m_ident } };
         }
 
-        void ThisExpression::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "This\n", DEBUG_PRINT_ARGS_BEG);
-        }
+
 
         Value ThisExpression::evaluate(ExecutionContext& ctx, ThisType* othis) const
         {
@@ -862,16 +700,7 @@ namespace MSL
             return Value{ std::shared_ptr<Object>{ *std::get_if<std::shared_ptr<Object>>(&ctx.getThis()) } };
         }
 
-        void UnaryOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            static const char* UNARY_OPERATOR_TYPE_NAMES[]
-            = { "Preincrementation", "Predecrementation", "Postincrementation", "Postdecrementation", "Plus", "Minus",
-                "Logical NOT",       "Bitwise NOT" };
 
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "UnaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, UNARY_OPERATOR_TYPE_NAMES[(uint32_t)m_type]);
-            ++indentLevel;
-            m_operand->debugPrint(indentLevel, "Operand: ");
-        }
 
         Value UnaryOperator::evaluate(ExecutionContext& ctx, ThisType* othis) const
         {
@@ -963,11 +792,6 @@ namespace MSL
             throw Error::ExecutionError(getPlace(), "lvalue required");
         }
 
-        void MemberAccessOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "MemberAccessOperator Member=%s\n", DEBUG_PRINT_ARGS_BEG, m_membername.c_str());
-            m_operand->debugPrint(indentLevel + 1, "Operand: ");
-        }
 
         /**!
         // TODO:
@@ -1054,48 +878,7 @@ namespace MSL
             return Value{ (double)resval };
         }
 
-        void BinaryOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            static const char* BINARY_OPERATOR_TYPE_NAMES[] = {
-                "Mul",
-                "Div",
-                "Mod",
-                "Add",
-                "Sub",
-                "Shift left",
-                "Shift right",
-                "Assignment",
-                "AssignmentAdd",
-                "AssignmentSub",
-                "AssignmentMul",
-                "AssignmentDiv",
-                "AssignmentMod",
-                "AssignmentShiftLeft",
-                "AssignmentShiftRight",
-                "AssignmentBitwiseAnd",
-                "AssignmentBitwiseXor",
-                "AssignmentBitwiseOr",
-                "Less",
-                "Greater",
-                "LessEqual",
-                "GreaterEqual",
-                "Equal",
-                "NotEqual",
-                "BitwiseAnd",
-                "BitwiseXor",
-                "BitwiseOr",
-                "LogicalAnd",
-                "LogicalOr",
-                "Comma",
-                "Indexing",
-            };
 
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "BinaryOperator %s\n", DEBUG_PRINT_ARGS_BEG,
-                   BINARY_OPERATOR_TYPE_NAMES[(uint32_t)m_type]);
-            ++indentLevel;
-            m_oplist[0]->debugPrint(indentLevel, "LeftOperand: ");
-            m_oplist[1]->debugPrint(indentLevel, "RightOperand: ");
-        }
 
         Value BinaryOperator::evaluate(ExecutionContext& ctx, ThisType* othis) const
         {
@@ -1251,9 +1034,9 @@ namespace MSL
                 if(typleft == Value::Type::Array)
                 {
                     MINSL_EXECUTION_CHECK(typright == Value::Type::Number, getPlace(), "expected numeric value");
-                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(index, right.getNumber()) && index < left.getArray()->m_items.size(),
+                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(index, right.getNumber()) && index < left.getArray()->m_arrayitems.size(),
                                           getPlace(), "array index out of bounds");
-                    return left.getArray()->m_items[index];
+                    return left.getArray()->m_arrayitems[index];
                 }
                 throw Error::TypeError(getPlace(), "cannot index this type");
             }
@@ -1422,32 +1205,11 @@ namespace MSL
             return *leftvalptr;
         }
 
-        void TernaryOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "TernaryOperator\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            m_oplist[0]->debugPrint(indentLevel, "ConditionExpression: ");
-            m_oplist[1]->debugPrint(indentLevel, "TrueExpression: ");
-            m_oplist[2]->debugPrint(indentLevel, "FalseExpression: ");
-        }
 
         Value TernaryOperator::evaluate(ExecutionContext& ctx, ThisType* othis) const
         {
             return m_oplist[0]->evaluate(ctx, nullptr).isTrue() ? m_oplist[1]->evaluate(ctx, othis) :
                                                                   m_oplist[2]->evaluate(ctx, othis);
-        }
-
-        void CallOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            size_t i;
-            size_t count;
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "CallOperator\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            m_oplist[0]->debugPrint(indentLevel, "Callee: ");
-            for(i = 1, count = m_oplist.size(); i < count; ++i)
-            {
-                m_oplist[i]->debugPrint(indentLevel, "Argument: ");
-            }
         }
 
         Value CallOperator::evaluate(ExecutionContext& ctx, ThisType* othis) const
@@ -1461,7 +1223,7 @@ namespace MSL
             Value callee;
             callee = m_oplist[0]->evaluate(ctx, &th);
             argcnt = m_oplist.size() - 1;
-            std::vector<Value> arguments(argcnt);
+            Value::List arguments(argcnt);
             for(i = 0; i < argcnt; ++i)
             {
                 arguments[i] = m_oplist[i + 1]->evaluate(ctx, nullptr);
@@ -1552,7 +1314,7 @@ namespace MSL
                         }
                         break;
 /*
-    using MemberMethodFunction = Value(AST::ExecutionContext&, const Location&, const AST::ThisType&, std::vector<Value>&&);
+    using MemberMethodFunction = Value(AST::ExecutionContext&, const Location&, const AST::ThisType&, Value::List&&);
     using MemberPropertyFunction = Value(AST::ExecutionContext&, const Location&, Value&&);
 */
                     #if 1
@@ -1585,23 +1347,6 @@ namespace MSL
             throw Error::ExecutionError(getPlace(), "invalid function call");
         }
 
-        void FunctionDefinition::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            size_t i;
-            size_t count;
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "Function(", DEBUG_PRINT_ARGS_BEG);
-            if(!m_paramlist.empty())
-            {
-                printf("%s", m_paramlist[0].c_str());
-                for(i = 1, count = m_paramlist.size(); i < count; ++i)
-                {
-                    printf(", %s", m_paramlist[i].c_str());
-                }
-            }
-            printf(")\n");
-            m_body.debugPrint(indentLevel + 1, "Body: ");
-        }
-
         bool FunctionDefinition::areParamsUnique() const
         {
             size_t i;
@@ -1621,15 +1366,7 @@ namespace MSL
             return true;
         }
 
-        void ObjectExpression::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "Object\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            for(const auto& [name, value] : m_items)
-            {
-                value->debugPrint(indentLevel, name);
-            }
-        }
+
 
         Value ObjectExpression::evaluate(ExecutionContext& ctx, ThisType* othis) const
         {
@@ -1648,7 +1385,7 @@ namespace MSL
             {
                 obj = std::make_shared<Object>();
             }
-            for(const auto& [name, valueExpr] : m_items)
+            for(const auto& [name, valueExpr] : m_exprmap)
             {
                 auto val = valueExpr->evaluate(ctx, nullptr);
                 if(val.type() != Value::Type::Null)
@@ -1663,27 +1400,13 @@ namespace MSL
             return Value{ std::move(obj) };
         }
 
-        void ArrayExpression::debugPrint(uint32_t indentLevel, std::string_view prefix) const
-        {
-            size_t i;
-            size_t count;
-            std::string itemPrefix;
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "Array\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            for(i = 0, count = m_items.size(); i < count; ++i)
-            {
-                itemPrefix = Util::Format("%zu: ", i);
-                m_items[i]->debugPrint(indentLevel, itemPrefix);
-            }
-        }
-
         Value ArrayExpression::evaluate(ExecutionContext& ctx, ThisType* othis) const
         {
             (void)othis;
             auto result = std::make_shared<Array>();
-            for(const auto& item : m_items)
+            for(const auto& item : m_exprlist)
             {
-                result->m_items.push_back(item->evaluate(ctx, nullptr));
+                result->m_arrayitems.push_back(item->evaluate(ctx, nullptr));
             }
             return Value{ std::move(result) };
         }
