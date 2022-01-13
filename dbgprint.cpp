@@ -1,17 +1,18 @@
 
 #include "priv.h"
 
-#define DEBUG_PRINT_FORMAT_STR_BEG "(%u,%u) %s%.*s"
+#define DEBUG_PRINT_FORMAT_STR_BEG \
+    "(%4u,%4u) %s%.*s"
+
 #define DEBUG_PRINT_ARGS_BEG \
-    getPlace().textline, getPlace().textcolumn, GetDebugPrintIndent(indentLevel), (int)prefix.length(), prefix.data()
+    getPlace().textline, getPlace().textcolumn, getIndent(indentLevel), (int)prefix.length(), prefix.data()
 
 
 namespace MSL
 {
     namespace AST
     {
-
-        static void printstring(std::string_view str)
+        static void printString(std::string_view str)
         {
             int c;
             size_t i;
@@ -77,7 +78,7 @@ namespace MSL
             fputc('"', stdout);
         }
 
-        static const char* GetDebugPrintIndent(uint32_t indentLevel)
+        static const char* getIndent(uint32_t indentLevel)
         {
             static const char* silly = "                                                                                                                                                                                                                                                                ";
             return silly + (256 - std::min<uint32_t>(indentLevel, 128) * 2);
@@ -95,12 +96,15 @@ namespace MSL
             m_condexpr->debugPrint(indentLevel, "ConditionExpression: ");
             m_statements[0]->debugPrint(indentLevel, "TrueStatement: ");
             if(m_statements[1])
+            {
                 m_statements[1]->debugPrint(indentLevel, "FalseStatement: ");
+            }
         }
 
         void WhileLoop::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
-            const char* name = nullptr;
+            const char* name;
+            name = nullptr;
             switch(m_type)
             {
                 case WhileLoop::Type::While:
@@ -124,17 +128,29 @@ namespace MSL
             printf(DEBUG_PRINT_FORMAT_STR_BEG "For\n", DEBUG_PRINT_ARGS_BEG);
             ++indentLevel;
             if(m_initexpr)
+            {
                 m_initexpr->debugPrint(indentLevel, "InitExpression: ");
+            }
             else
+            {
                 printf(DEBUG_PRINT_FORMAT_STR_BEG "(Init expression empty)\n", DEBUG_PRINT_ARGS_BEG);
+            }
             if(m_condexpr)
+            {
                 m_condexpr->debugPrint(indentLevel, "ConditionExpression: ");
+            }
             else
+            {
                 printf(DEBUG_PRINT_FORMAT_STR_BEG "(Condition expression empty)\n", DEBUG_PRINT_ARGS_BEG);
+            }
             if(m_iterexpr)
+            {
                 m_iterexpr->debugPrint(indentLevel, "IterationExpression: ");
+            }
             else
+            {
                 printf(DEBUG_PRINT_FORMAT_STR_BEG "(Iteration expression empty)\n", DEBUG_PRINT_ARGS_BEG);
+            }
             m_body->debugPrint(indentLevel, "Body: ");
         }
 
@@ -142,10 +158,14 @@ namespace MSL
         void RangeBasedForLoop::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             if(!m_keyvar.empty())
+            {
                 printf(DEBUG_PRINT_FORMAT_STR_BEG "Range-based for: %s, %s\n", DEBUG_PRINT_ARGS_BEG, m_keyvar.c_str(),
                        m_valuevar.c_str());
+            }
             else
+            {
                 printf(DEBUG_PRINT_FORMAT_STR_BEG "Range-based for: %s\n", DEBUG_PRINT_ARGS_BEG, m_valuevar.c_str());
+            }
             ++indentLevel;
             m_rangeexpr->debugPrint(indentLevel, "RangeExpression: ");
             m_body->debugPrint(indentLevel, "Body: ");
@@ -186,23 +206,29 @@ namespace MSL
             for(i = 0; i < m_itemvals.size(); ++i)
             {
                 if(m_itemvals[i])
+                {
                     m_itemvals[i]->debugPrint(indentLevel, "ItemValue: ");
+                }
                 else
+                {
                     printf(DEBUG_PRINT_FORMAT_STR_BEG "Default\n", DEBUG_PRINT_ARGS_BEG);
+                }
                 if(m_itemblocks[i])
+                {
                     m_itemblocks[i]->debugPrint(indentLevel, "ItemBlock: ");
+                }
                 else
+                {
                     printf(DEBUG_PRINT_FORMAT_STR_BEG "(Empty block)\n", DEBUG_PRINT_ARGS_BEG);
+                }
             }
         }
-
 
         void ThrowStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "throw\n", DEBUG_PRINT_ARGS_BEG);
             m_thrownexpr->debugPrint(indentLevel + 1, "ThrownExpression: ");
         }
-
 
         void TryStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
@@ -219,7 +245,6 @@ namespace MSL
             }
         }
 
-
         void ConstantValue::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             switch(m_val.type())
@@ -232,11 +257,12 @@ namespace MSL
                     break;
                 case Value::Type::String:
                     printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant string: ", DEBUG_PRINT_ARGS_BEG);
-                    printstring(m_val.getString());
+                    printString(m_val.getString());
                     printf("\n");
                     break;
                 default:
                     assert(0 && "ConstantValue should not be used with this type.");
+                    break;
             }
         }
 

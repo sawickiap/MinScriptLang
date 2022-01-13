@@ -182,7 +182,7 @@ int main(int argc, char* argv[])
         havecodechunk = true;
         prs.stopParsing();
     });
-    prs.on({"-d", "--dump"}, "dump source through debugPrint()", [&]
+    prs.on({"-d", "--dump"}, "dump source through debugPrint() - can also be used with '-e'", [&]
     {
         dumpsyntax = true;
     });
