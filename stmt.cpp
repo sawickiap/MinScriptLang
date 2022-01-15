@@ -11,6 +11,9 @@ namespace MSL
         {"length", Builtins::protofn_string_length},
         {"size", Builtins::protofn_string_length},
         {"chars", Builtins::protofn_string_chars},
+        {"rstrip", Builtins::protofn_string_stripright},
+        {"lstrip", Builtins::protofn_string_stripleft},
+        {"strip", Builtins::protofn_string_strip},
     });
 
     static auto stdobjmethods_string = std::to_array<StandardObjectMemberFunc>(
@@ -85,14 +88,14 @@ namespace MSL
         return get_thing<Type, sz>(ary, name, dest);
     }
 
-    static std::shared_ptr<Object> ConvertExecutionErrorToObject(const Error::ExecutionError& err)
+    static std::shared_ptr<Object> objectFromException(const Error::RuntimeError& err)
     {
         auto obj = std::make_shared<Object>();
-        obj->entry("type") = Value{ std::string(err.name()) };
-        obj->entry("index") = Value{ (double)err.getPlace().textindex };
-        obj->entry("line") = Value{ (double)err.getPlace().textline };
-        obj->entry("column") = Value{ (double)err.getPlace().textcolumn };
-        obj->entry("message") = Value{ std::string{ err.message() } };
+        obj->put("type", Value{ std::string(err.name()) });
+        obj->put("index", Value{ (double)err.getPlace().textindex });
+        obj->put("line", Value{ (double)err.getPlace().textline });
+        obj->put("column", Value{ (double)err.getPlace().textcolumn });
+        obj->put("message", Value{ std::string{ err.message() } });
         return obj;
     }
 
@@ -114,15 +117,15 @@ namespace MSL
             {
                 return val;
             }
-            throw Error::ExecutionError(place, "cannot get reference to lvalue of non-existing members");
+            throw Error::RuntimeError(place, "cannot get reference to lvalue of non-existing members");
         }
         leftarrayitem = std::get_if<ArrayItemLValue>(this);
         if(leftarrayitem)
         {
-            MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->m_arrayitems.size(), place, "index out of bounds");
-            return &leftarrayitem->arrayval->m_arrayitems[leftarrayitem->indexval];
+            MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), place, "index out of bounds");
+            return &leftarrayitem->arrayval->at(leftarrayitem->indexval);
         }
-        throw Error::ExecutionError(place, "lvalue required");
+        throw Error::RuntimeError(place, "lvalue required");
     }
 
     Value LValue::getValue(const Location& place) const
@@ -139,7 +142,7 @@ namespace MSL
             {
                 return *val;
             }
-            throw Error::ExecutionError(place, "cannot get lvalue of non-existing member");
+            throw Error::RuntimeError(place, "cannot get lvalue of non-existing member");
         }
         if((leftstrchar = std::get_if<StringCharacterLValue>(this)))
         {
@@ -149,8 +152,8 @@ namespace MSL
         }
         if((leftarrayitem = std::get_if<ArrayItemLValue>(this)))
         {
-            MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->m_arrayitems.size(), place, "index out of bounds");
-            return Value{ leftarrayitem->arrayval->m_arrayitems[leftarrayitem->indexval] };
+            MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), place, "index out of bounds");
+            return Value{ leftarrayitem->arrayval->at(leftarrayitem->indexval) };
         }
         assert(0);
         return {};
@@ -168,12 +171,12 @@ namespace MSL
                 if(rhs.isNull())
                     leftobjmember->objectval->removeEntry(leftobjmember->keyval);
                 else
-                    leftobjmember->objectval->entry(leftobjmember->keyval) = std::move(rhs);
+                    leftobjmember->objectval->put(leftobjmember->keyval, std::move(rhs));
             }
             else if((leftarrayitem = std::get_if<ArrayItemLValue>(&lhs)))
             {
-                MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->m_arrayitems.size(), getPlace(), "index out of bounds");
-                leftarrayitem->arrayval->m_arrayitems[leftarrayitem->indexval] = std::move(rhs);
+                MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), getPlace(), "index out of bounds");
+                leftarrayitem->arrayval->at(leftarrayitem->indexval) = std::move(rhs);
             }
             else if((leftstrchar = std::get_if<StringCharacterLValue>(&lhs)))
             {
@@ -339,13 +342,13 @@ namespace MSL
             else if(rangeval.isArray())
             {
                 arr = rangeval.getArray();
-                for(i = 0, count = arr->m_arrayitems.size(); i < count; ++i)
+                for(i = 0, count = arr->size(); i < count; ++i)
                 {
                     if(usekey)
                     {
                         assign(LValue{ ObjectMemberLValue{ &innermostctx, m_keyvar } }, Value{ (double)i });
                     }
-                    assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{ arr->m_arrayitems[i] });
+                    assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{ arr->at(i) });
                     try
                     {
                         m_body->execute(ctx);
@@ -361,7 +364,7 @@ namespace MSL
             }
             else
             {
-                throw Error::ExecutionError(getPlace(), "range-based loop can not be used with this object");
+                throw Error::RuntimeError(getPlace(), "range-based loop can not be used with this object");
             }
             if(usekey)
             {
@@ -503,7 +506,7 @@ namespace MSL
                     {
                         throw val;
                     }
-                    catch(const Error::ExecutionError&)
+                    catch(const Error::RuntimeError&)
                     {
                         throw val;
                     }
@@ -511,13 +514,13 @@ namespace MSL
                 }
                 return {};
             }
-            catch(const Error::ExecutionError& err)
+            catch(const Error::RuntimeError& err)
             {
                 if(m_catchblock)
                 {
                     auto& innermostctx = ctx.getInnermostScope();
                     assign(LValue{ ObjectMemberLValue{ &innermostctx, m_exvarname } },
-                           Value{ ConvertExecutionErrorToObject(err) });
+                           Value{ objectFromException(err) });
                     m_catchblock->execute(ctx);
                     assign(LValue{ ObjectMemberLValue{ &innermostctx, m_exvarname } }, Value{});
                     if(m_finallyblock)
@@ -535,7 +538,7 @@ namespace MSL
                     {
                         throw err;
                     }
-                    catch(const Error::ExecutionError&)
+                    catch(const Error::RuntimeError&)
                     {
                         throw err;
                     }
@@ -586,11 +589,11 @@ namespace MSL
             }
             catch(BreakException)
             {
-                throw Error::ExecutionError{ getPlace(), "use of 'break' outside of a loop" };
+                throw Error::RuntimeError{ getPlace(), "use of 'break' outside of a loop" };
             }
             catch(ContinueException)
             {
-                throw Error::ExecutionError{ getPlace(), "use of 'continue' outside of a loop" };
+                throw Error::RuntimeError{ getPlace(), "use of 'continue' outside of a loop" };
             }
             return {};
         }
@@ -789,7 +792,7 @@ namespace MSL
                         assert(0);
                 }
             }
-            throw Error::ExecutionError(getPlace(), "lvalue required");
+            throw Error::RuntimeError(getPlace(), "lvalue required");
         }
 
 
@@ -1034,9 +1037,9 @@ namespace MSL
                 if(typleft == Value::Type::Array)
                 {
                     MINSL_EXECUTION_CHECK(typright == Value::Type::Number, getPlace(), "expected numeric value");
-                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(index, right.getNumber()) && index < left.getArray()->m_arrayitems.size(),
+                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(index, right.getNumber()) && index < left.getArray()->size(),
                                           getPlace(), "array index out of bounds");
-                    return left.getArray()->m_arrayitems[index];
+                    return left.getArray()->at(index);
                 }
                 throw Error::TypeError(getPlace(), "cannot index this type");
             }
@@ -1248,7 +1251,7 @@ namespace MSL
                 // Setup parameters
                 for(argidx = 0; argidx != argcnt; ++argidx)
                 {
-                    ourlocalscope.entry(funcDef->m_paramlist[argidx]) = std::move(arguments[argidx]);
+                    ourlocalscope.put(funcDef->m_paramlist[argidx], std::move(arguments[argidx]));
                 }
                 ExecutionContext::LocalScopePush ourlocalcontext{ ctx, &ourlocalscope, std::move(th), getPlace() };
                 try
@@ -1261,11 +1264,11 @@ namespace MSL
                 }
                 catch(BreakException)
                 {
-                    throw Error::ExecutionError(getPlace(), "use of 'break' outside of a loop");
+                    throw Error::RuntimeError(getPlace(), "use of 'break' outside of a loop");
                 }
                 catch(ContinueException)
                 {
-                    throw Error::ExecutionError(getPlace(), "use of 'continue' outside of a loop");
+                    throw Error::RuntimeError(getPlace(), "use of 'continue' outside of a loop");
                 }
                 return {};
             }
@@ -1344,7 +1347,7 @@ namespace MSL
                 return callee.getPropertyFunction()(ctx, getPlace(), std::move(callee));
             }
             #endif
-            throw Error::ExecutionError(getPlace(), "invalid function call");
+            throw Error::RuntimeError(getPlace(), "invalid function call");
         }
 
         bool FunctionDefinition::areParamsUnique() const
@@ -1390,7 +1393,7 @@ namespace MSL
                 auto val = valueExpr->evaluate(ctx, nullptr);
                 if(val.type() != Value::Type::Null)
                 {
-                    obj->entry(name) = std::move(val);
+                    obj->put(name, std::move(val));
                 }
                 else if(m_baseexpr)
                 {
@@ -1406,7 +1409,7 @@ namespace MSL
             auto result = std::make_shared<Array>();
             for(const auto& item : m_exprlist)
             {
-                result->m_arrayitems.push_back(item->evaluate(ctx, nullptr));
+                result->push_back(item->evaluate(ctx, nullptr));
             }
             return Value{ std::move(result) };
         }

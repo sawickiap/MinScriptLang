@@ -21,7 +21,7 @@ namespace MSL
                     (void)ctx;
                     size_t rs;
                     rs = 0;
-                    Util::checkArgumentCount(m_env, place, "write", args.size(), 1);
+                    Util::checkArgumentCount(place, "write", args.size(), 1);
                     for(const auto& a: args)
                     {
                         auto tmpstr = a.toString();
@@ -50,7 +50,7 @@ namespace MSL
                     int rs;
                     Value ch;
                     (void)ctx;
-                    ch = Util::checkArgument(m_env, place, "putchar", args, 0, Value::Type::Number);
+                    ch = Util::checkArgument(place, "putchar", args, 0, Value::Type::Number);
                     rs = fputc(int(ch.getNumber()), m_stream);
                     if(rs == EOF)
                     {
@@ -77,26 +77,18 @@ namespace MSL
         makeStdHandle({}, "$stdin", stdin);
         makeStdHandle({}, "$stdout", stdout);
         makeStdHandle({}, "$stderr", stderr);
-        global("min") = Value{Builtins::func_min};
-        global("max") = Value{Builtins::func_max};
-        global("typeOf") = Value{Builtins::func_typeof};
-        global("print") = Value{Builtins::func_print};
-        global("println") = Value{Builtins::func_println};
-        global("sprintf") = Value{Builtins::func_sprintf};
-        global("printf") = Value{Builtins::func_printf};
+        setGlobal("min", Value{Builtins::func_min});
+        setGlobal("max", Value{Builtins::func_max});
+        setGlobal("typeOf", Value{Builtins::func_typeof});
+        setGlobal("print", Value{Builtins::func_print});
+        setGlobal("println", Value{Builtins::func_println});
+        setGlobal("sprintf", Value{Builtins::func_sprintf});
+        setGlobal("printf", Value{Builtins::func_printf});
         Builtins::makeFileNamespace(*this);
     }
 
     Environment::~Environment()
     {
-        size_t i;
-        i = 0;
-        for(auto it=m_globalobjects.rbegin(); it!=m_globalobjects.rend(); it++)
-        {
-            fprintf(stderr, "resetting global object #%d ...\n", int(i));
-            (*it).reset();
-            i++;
-        }
         delete m_implenv;
     }
 
@@ -127,11 +119,11 @@ namespace MSL
         /// todo: abstract this noise away? somehow?
         #define do_entry(expname, classmethod) \
             {\
-                obj->entry(expname) = Value{[weak](AST::ExecutionContext& ctx, const Location& place, AST::ThisType&, Value::List&& args)\
+                obj->put(expname, Value{[weak](AST::ExecutionContext& ctx, const Location& place, AST::ThisType&, Value::List&& args)\
                 {\
                     auto hereobj = weak.lock(); \
                     return hereobj->classmethod(ctx, place, std::move(args)); \
-                }};\
+                }});\
             }
             
         (void)upplace;
@@ -142,7 +134,7 @@ namespace MSL
             do_entry("getChar", io_getchar);
             do_entry("putChar", io_putchar);
         }
-        global(name) = Value{obj};
+        setGlobal(name, Value{obj});
     }
 
     Value Environment::execute(std::string_view code)

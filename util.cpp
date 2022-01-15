@@ -16,10 +16,10 @@ namespace MSL
         std::shared_ptr<Array> CopyArray(const Array& src)
         {
             auto dst = std::make_shared<Array>();
-            const size_t count = src.m_arrayitems.size();
-            dst->m_arrayitems.resize(count);
+            const size_t count = src.size();
+            dst->resize(count);
             for(size_t i = 0; i < count; ++i)
-                dst->m_arrayitems[i] = Value{ src.m_arrayitems[i] };
+                dst->at(i) = Value{ src.at(i) };
             return dst;
         }
 
@@ -52,9 +52,82 @@ namespace MSL
             return result;
         }
 
-        void checkArgumentCount(Environment& env, const Location& place, std::string_view fname, size_t argcnt, size_t expect)
+        void stripInplaceLeft(std::string& str)
         {
-            (void)env;
+            str.erase(str.begin(), std::find_if(str.begin(), str.end(), [](int ch)
+            {
+                return !std::isspace(ch);
+            }));
+        }
+
+        void stripInplaceRight(std::string& str)
+        {
+            str.erase(std::find_if(str.rbegin(), str.rend(), [](int ch)
+            {
+                return !std::isspace(ch);
+            }).base(), str.end());
+        }
+
+        void stripInplace(std::string& str)
+        {
+            stripInplaceLeft(str);
+            stripInplaceRight(str);
+        }
+
+        std::string strip(std::string_view in)
+        {
+            std::string copy(in);
+            stripInplace(copy);
+            return copy;
+        }
+
+        std::string stripRight(std::string_view s)
+        {
+            std::string copy(s);
+            stripInplaceRight(copy);
+            return copy;
+        }
+
+        std::string stripLeft(std::string_view s)
+        {
+            std::string copy(s);
+            stripInplaceLeft(copy);
+            return copy;
+        }
+
+        void splitString(std::string_view str, const std::string& delim, std::function<bool(const std::string&)> cb)
+        {
+            size_t prevpos;
+            size_t herepos;
+            std::string token;
+            prevpos = 0;
+            herepos = 0;
+            while(true)
+            {
+                herepos = str.find(delim, prevpos);
+                if(herepos == std::string::npos)
+                {
+                    herepos = str.size();
+                }
+                token = str.substr(prevpos, herepos-prevpos);
+                stripInplace(token);
+                if (!token.empty())
+                {
+                    if(!cb(token))
+                    {
+                        return;
+                    }
+                }
+                prevpos = herepos + delim.size();
+                if((herepos > str.size()) || (prevpos > str.size()))
+                {
+                    break;
+                }
+            }
+        }
+
+        void checkArgumentCount(const Location& place, std::string_view fname, size_t argcnt, size_t expect)
+        {
             //if((!(expect > argcnt)) || ((expect > 0) && (argcnt == 0)))
             if((expect > 0) && ((argcnt == 0) || (argcnt < expect)))
             {
@@ -62,11 +135,10 @@ namespace MSL
             }
         }
 
-        Value checkArgument(Environment& env, const Location& place, std::string_view name, const Value::List& args, size_t idx, Value::Type type)
+        Value checkArgument(const Location& place, std::string_view name, const Value::List& args, size_t idx, Value::Type type)
         {
             Value r;
-            (void)env;
-            checkArgumentCount(env, place, name, args.size(), idx);
+            checkArgumentCount(place, name, args.size(), idx);
             r = args[idx];
             // using Value::Type::Null means any type
             if((type != Value::Type::Null) && (r.type() != type))

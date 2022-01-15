@@ -230,13 +230,14 @@ namespace MSL
 
         Value protofn_string_length(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
         Value protofn_string_chars(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
+        Value protofn_string_stripleft(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
+        Value protofn_string_stripright(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
+        Value protofn_string_strip(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);
+
         Value memberfn_string_resize(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
         Value memberfn_string_startswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
         Value memberfn_string_endswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
         Value memberfn_string_includes(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
-        Value memberfn_string_leftstrip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
-        Value memberfn_string_rightstrip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
-        Value memberfn_string_strip(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
         Value memberfn_string_split(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
 
         Value protofn_array_length(AST::ExecutionContext& ctx, const Location& place, Value&& objVal);

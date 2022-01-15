@@ -55,9 +55,9 @@ void setARGV(MSL::Environment& env, const std::vector<std::string>& va)
     auto a = std::make_shared<MSL::Array>();
     for(auto s: va)
     {
-        a->m_arrayitems.push_back(MSL::Value{std::string(s)});
+        a->push_back(MSL::Value{std::string(s)});
     }
-    env.global("ARGV") = MSL::Value{std::move(a)};
+    env.setGlobal("ARGV", MSL::Value{std::move(a)});
 }
 
 #if !defined(NO_READLINE)
@@ -111,7 +111,7 @@ int repl(MSL::Environment& env)
                 //if(!val.isNull())
                 {
                     varname = MSL::Util::joinArgs("$", nowid);
-                    env.global(varname) = val;
+                    env.setGlobal(varname, std::move(val));
                     std::cout << varname << " = ";
                     val.reprToStream(std::cout);
                     std::cout << std::endl;

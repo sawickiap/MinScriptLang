@@ -148,7 +148,7 @@ namespace MSL
             {
                 throw Error::TypeError(place, "Array.length called on something not an Array");
             }
-            return Value{ (double)objVal.getArray()->m_arrayitems.size() };
+            return Value{ (double)objVal.getArray()->size() };
         }
 
 
@@ -169,7 +169,7 @@ namespace MSL
             }
             for(i=0; i<args.size(); i++)
             {
-                arr->m_arrayitems.push_back(std::move(args[i]));
+                arr->push_back(std::move(args[i]));
             }
             return {};
         }
@@ -185,8 +185,8 @@ namespace MSL
             {
                 throw Error::TypeError(place, "Array.pop() called on something not an Array");
             }
-            auto popped =arr->m_arrayitems.back();
-            arr->m_arrayitems.pop_back();
+            auto popped =arr->back();
+            arr->pop_back();
             return popped;
         }
 
@@ -207,9 +207,9 @@ namespace MSL
             index= 0;
             if(!args[0].isNumber() || !Util::NumberToIndex(index, args[0].getNumber()))
             {
-                throw Error::ExecutionError(place, "cannot insert out-of-bounds");
+                throw Error::RuntimeError(place, "cannot insert out-of-bounds");
             }
-            arr->m_arrayitems.insert(arr->m_arrayitems.begin() + index, std::move(args[1]));
+            arr->insert(arr->begin() + index, std::move(args[1]));
             return {};
         }
 
@@ -229,9 +229,9 @@ namespace MSL
             size_t index = 0;
             if(!args[0].isNumber() || !Util::NumberToIndex(index, args[0].getNumber()))
             {
-                throw Error::ExecutionError(place, "cannot remove out-of-bounds");
+                throw Error::RuntimeError(place, "cannot remove out-of-bounds");
             }
-            arr->m_arrayitems.erase(arr->m_arrayitems.begin() + index);
+            arr->erase(arr->begin() + index);
             return {};
         }
 
@@ -256,9 +256,36 @@ namespace MSL
             auto res = std::make_shared<Array>();
             for(auto ch: objVal.getString())
             {
-                res->m_arrayitems.push_back(Value{double(ch)});
+                res->push_back(Value{double(ch)});
             }
             return Value{ std::move(res) };
+        }
+
+        Value protofn_string_stripleft(AST::ExecutionContext& ctx, const Location& place, Value&& objVal)
+        {
+            (void)ctx;
+            (void)place;
+            auto self = objVal.getString();
+            Util::stripInplaceLeft(self);
+            return Value{std::move(self)};
+        }
+
+        Value protofn_string_stripright(AST::ExecutionContext& ctx, const Location& place, Value&& objVal)
+        {
+            (void)ctx;
+            (void)place;
+            auto self = objVal.getString();
+            Util::stripInplaceRight(self);
+            return Value{std::move(self)};
+        }
+
+        Value protofn_string_strip(AST::ExecutionContext& ctx, const Location& place, Value&& objVal)
+        {
+            (void)ctx;
+            (void)place;
+            auto self = objVal.getString();
+            Util::stripInplace(self);
+            return Value{std::move(self)};
         }
 
         Value memberfn_string_resize(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args)
@@ -268,7 +295,7 @@ namespace MSL
             (void)place;
             (void)th;
             (void)args;
-            return {};
+            return Value{};
         }
 
         Value memberfn_string_startswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args)
@@ -282,6 +309,19 @@ namespace MSL
             auto findme = args[0];
             res = (th.getString().rfind(findme.getString(), 0) == 0);
             return Value{res};
+        }
+
+        Value memberfn_string_endswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args)
+        {
+            (void)ctx;
+            const auto& self = th.getString();
+            auto findme = Util::checkArgument(place, "Strings.endsWith", args, 0, Value::Type::String);
+            auto sf = findme.getString();
+            if(sf.size() > self.size())
+            {
+                return Value{double(0)};
+            }
+            return Value{double(std::equal(sf.rbegin(), sf.rend(), self.rbegin()))};
         }
     }
 }

@@ -57,13 +57,13 @@ SOFTWARE.
     do                                                        \
     {                                                         \
         if(!(condition))                                      \
-            throw Error::ExecutionError((place), (errorMessage));    \
+            throw Error::RuntimeError((place), (errorMessage));    \
     } while(false)
 
 #define MINSL_EXECUTION_FAIL(place, errorMessage)      \
     do                                                 \
     {                                                  \
-        throw Error::ExecutionError((place), (errorMessage)); \
+        throw Error::RuntimeError((place), (errorMessage)); \
     } while(false)
 
 namespace MSL
@@ -87,6 +87,27 @@ namespace MSL
         bool NumberToIndex(size_t& outIndex, double number);
         std::string VFormat(const char* format, va_list argList);
         std::string Format(const char* format, ...);
+
+        /*
+        // strip from start (in place)
+        */
+        void stripInplaceLeft(std::string& str);
+
+        /*
+        // strip from end (in place)
+        */
+        void stripInplaceRight(std::string& str);
+
+        /*
+        // strip from both ends (in place)
+        */
+        void stripInplace(std::string& str);
+
+        std::string stripRight(std::string_view s);
+        std::string stripLeft(std::string_view s);
+        std::string strip(std::string_view in);
+        void splitString(std::string_view str, const std::string& delim, std::function<bool(const std::string&)> cb);
+
 
         template<typename CharT, typename Type>
         void joinArgsNext(std::basic_ostream<CharT>& os, std::basic_string_view<CharT>, Type&& thing)
@@ -173,19 +194,20 @@ namespace MSL
                 }
         };
 
-        class ExecutionError : public Exception
+
+        class RuntimeError : public Exception
         {
             private:
                 const std::string m_message;
 
             public:
-                inline ExecutionError(const Location& place, std::string_view message) : Exception{ place }, m_message{ message }
+                inline RuntimeError(const Location& place, std::string_view message) : Exception{ place }, m_message{ message }
                 {
                 }
 
                 inline virtual std::string_view name() const override
                 {
-                    return "ExecutionError";
+                    return "RuntimeError";
                 }
 
                 inline virtual std::string_view message() const override
@@ -194,10 +216,10 @@ namespace MSL
                 }
         };
 
-        class TypeError: public ExecutionError
+        class TypeError: public RuntimeError
         {
             public:
-                using ExecutionError::ExecutionError;
+                using RuntimeError::RuntimeError;
 
                 inline virtual std::string_view name() const override
                 {
@@ -205,10 +227,10 @@ namespace MSL
                 }
         };
 
-        class ArgumentError: public ExecutionError
+        class ArgumentError: public RuntimeError
         {
             public:
-                using ExecutionError::ExecutionError;
+                using RuntimeError::RuntimeError;
 
                 inline virtual std::string_view name() const override
                 {
@@ -216,10 +238,10 @@ namespace MSL
                 }
         };
 
-        class IndexError: public ExecutionError
+        class IndexError: public RuntimeError
         {
             public:
-                using ExecutionError::ExecutionError;
+                using RuntimeError::RuntimeError;
 
                 inline virtual std::string_view name() const override
                 {
@@ -227,10 +249,10 @@ namespace MSL
                 }
         };
 
-        class IOError: public ExecutionError
+        class IOError: public RuntimeError
         {
             public:
-                using ExecutionError::ExecutionError;
+                using RuntimeError::RuntimeError;
 
                 inline virtual std::string_view name() const override
                 {
@@ -238,10 +260,21 @@ namespace MSL
                 }
         };
 
-        class EOFError: public ExecutionError
+        class OSError: public IOError
         {
             public:
-                using ExecutionError::ExecutionError;
+                using IOError::IOError;
+
+                inline virtual std::string_view name() const override
+                {
+                    return "OSError";
+                }
+        };
+
+        class EOFError: public RuntimeError
+        {
+            public:
+                using RuntimeError::RuntimeError;
 
                 inline virtual std::string_view name() const override
                 {
@@ -520,8 +553,8 @@ namespace MSL
 
     namespace Util
     {
-        void checkArgumentCount(Environment& env, const Location& place, std::string_view fname, size_t argcnt, size_t expect);
-        Value checkArgument(Environment& env, const Location& place, std::string_view fname, const Value::List& args, size_t idx, Value::Type type);
+        void checkArgumentCount(const Location& place, std::string_view fname, size_t argcnt, size_t expect);
+        Value checkArgument(const Location& place, std::string_view fname, const Value::List& args, size_t idx, Value::Type type);
     }
 
     class Object
@@ -544,9 +577,9 @@ namespace MSL
             }
 
             // Creates new null value if doesn't exist.
-            Value& entry(const std::string& key)
+            void put(const std::string& key, Value&& val)
             {
-                return m_entrymap[key];
+                m_entrymap[key] = val;
             }
 
             Value* tryGet(const std::string& key);// Returns null if doesn't exist.
@@ -558,8 +591,90 @@ namespace MSL
 
     class Array
     {
-        public:
+        private:
             Value::List m_arrayitems;
+
+        public:
+            Array()
+            {
+            }
+
+            Array(size_t cnt)
+            {
+                m_arrayitems = Value::List(cnt);
+            }
+
+            size_t size() const
+            {
+                return m_arrayitems.size();
+            }
+
+            size_t length() const
+            {
+                return m_arrayitems.size();
+            }
+
+            void resize(size_t cnt)
+            {
+                m_arrayitems.resize(cnt);
+            }
+
+            void push_back(Value&& v)
+            {
+                m_arrayitems.push_back(v);
+            }
+
+            Value& at(size_t idx)
+            {
+                return m_arrayitems[idx];
+            }
+
+            const Value& at(size_t idx) const
+            {
+                return m_arrayitems[idx];
+            }
+
+            const Value& back()
+            {
+                return m_arrayitems.back();
+            }
+
+            void pop_back()
+            {
+                m_arrayitems.pop_back();
+            }
+
+            template<typename... ArgsT>
+            auto insert(ArgsT&&... args)
+            {
+                return m_arrayitems.insert(std::forward<ArgsT>(args)...);
+            }
+
+            template<typename... ArgsT>
+            auto erase(ArgsT&&... args)
+            {
+                return m_arrayitems.erase(std::forward<ArgsT>(args)...);
+            }
+
+            auto begin()
+            {
+                return m_arrayitems.begin();
+            }
+
+            auto begin() const
+            {
+                return m_arrayitems.begin();
+            }
+
+            auto end()
+            {
+                return m_arrayitems.end();
+            }
+
+            auto end() const
+            {
+                return m_arrayitems.end();
+            }
     };
 
     class /**/EnvironmentPimpl;
@@ -567,11 +682,8 @@ namespace MSL
     {
         private:
             EnvironmentPimpl* m_implenv;
-            std::vector<std::weak_ptr<Object>> m_globalobjects;
-
         public:
             Object m_globalscope;
-            void* m_userdata = nullptr;
 
         private:
             void makeStdHandle(const Location& upplace, const std::string& name, FILE* strm);
@@ -587,14 +699,9 @@ namespace MSL
 
             void Print(std::string_view s);
 
-            inline Object& global()
+            inline void setGlobal(const std::string& key, Value&& val)
             {
-                return m_globalscope;
-            }
-
-            inline Value& global(const std::string& key)
-            {
-                return m_globalscope.entry(key);
+                return m_globalscope.put(key, std::move(val));
             }
 
     };
@@ -844,7 +951,7 @@ namespace MSL
                         {
                             if(ctx.m_localscopes.size() == LOCAL_SCOPE_STACK_MAX_SIZE)
                             {
-                                throw Error::ExecutionError{ place, "stack overflow" };
+                                throw Error::RuntimeError{ place, "stack overflow" };
                             }
                             ctx.m_localscopes.push_back(localScope);
                             ctx.m_thislist.push_back(std::move(thisObj));

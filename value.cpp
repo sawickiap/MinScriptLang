@@ -84,11 +84,11 @@ namespace MSL
         {
             size_t i;
             size_t sz;
-            sz = arr->m_arrayitems.size();
+            sz = arr->size();
             os << "[";
             for(i=0; i<sz; i++)
             {
-                auto val = arr->m_arrayitems[i];
+                auto val = arr->at(i);
                 if(val.isArray() && (val.getArray() == arr))
                 {
                     os << "<recursion>";
