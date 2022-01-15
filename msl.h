@@ -582,11 +582,14 @@ namespace MSL
                 m_entrymap[key] = val;
             }
 
-            Value* tryGet(const std::string& key);// Returns null if doesn't exist.
+            // Returns null if doesn't exist.
+            Value* tryGet(const std::string& key);
 
-            const Value* tryGet(const std::string& key) const;// Returns null if doesn't exist.
+            // Returns null if doesn't exist.
+            const Value* tryGet(const std::string& key) const;
 
-            bool removeEntry(const std::string& key);// Returns true if has been found and removed.
+            // Returns true if has been found and removed.
+            bool removeEntry(const std::string& key);
     };
 
     class Array
@@ -710,95 +713,157 @@ namespace MSL
     // native "stack overflow" in Debug configuration.
     static const size_t LOCAL_SCOPE_STACK_MAX_SIZE = 100;
 
-    struct Token
+    class Token
     {
-        enum class Type
-        {
-            // Token types
-            None,
-            Identifier,
-            Number,
-            String,
-            End,
-            // Symbols
-            Comma,// ,
-            QuestionMark,// ?
-            Colon,// :
-            Semicolon,// ;
-            RoundBracketOpen,// (
-            RoundBracketClose,// )
-            SquareBracketOpen,// [
-            SquareBracketClose,// ]
-            CurlyBracketOpen,// {
-            CurlyBracketClose,// }
-            Asterisk,// *
-            Slash,// /
-            Percent,// %
-            Plus,// +
-            Dash,// -
-            Equals,// =
-            ExclamationMark,// !
-            Tilde,// ~
-            Less,// <
-            Greater,// >
-            Amperstand,// &
-            Caret,// ^
-            Pipe,// |
-            Dot,// .
-            // Multiple character symbols
-            DoublePlus,// ++
-            DoubleDash,// --
-            PlusEquals,// +=
-            DashEquals,// -=
-            AsteriskEquals,// *=
-            SlashEquals,// /=
-            PercentEquals,// %=
-            DoubleLessEquals,// <<=
-            DoubleGreaterEquals,// >>=
-            AmperstandEquals,// &=
-            CaretEquals,// ^=
-            PipeEquals,// |=
-            DoubleLess,// <<
-            DoubleGreater,// >>
-            LessEquals,// <=
-            GreaterEquals,// >=
-            DoubleEquals,// ==
-            ExclamationEquals,// !=
-            DoubleAmperstand,// &&
-            DoublePipe,// ||
-            // Keywords
-            Null,
-            False,
-            True,
-            If,
-            Else,
-            While,
-            Do,
-            For,
-            Break,
-            Continue,
-            Switch,
-            Case,
-            Default,
-            Function,
-            Return,
-            Local,
-            This,
-            Global,
-            Class,
-            Throw,
-            Try,
-            Catch,
-            Finally,
-            Count
-        };
+        public:
+            enum class Type
+            {
+                // Token types
+                None,
+                Identifier,
+                Number,
+                String,
+                End,
+                // Symbols
+                Comma,// ,
+                QuestionMark,// ?
+                Colon,// :
+                Semicolon,// ;
+                RoundBracketOpen,// (
+                RoundBracketClose,// )
+                SquareBracketOpen,// [
+                SquareBracketClose,// ]
+                CurlyBracketOpen,// {
+                CurlyBracketClose,// }
+                Asterisk,// *
+                Slash,// /
+                Percent,// %
+                Plus,// +
+                Dash,// -
+                Equals,// =
+                ExclamationMark,// !
+                Tilde,// ~
+                Less,// <
+                Greater,// >
+                Amperstand,// &
+                Caret,// ^
+                Pipe,// |
+                Dot,// .
+                // Multiple character symbols
+                DoublePlus,// ++
+                DoubleDash,// --
+                PlusEquals,// +=
+                DashEquals,// -=
+                AsteriskEquals,// *=
+                SlashEquals,// /=
+                PercentEquals,// %=
+                DoubleLessEquals,// <<=
+                DoubleGreaterEquals,// >>=
+                AmperstandEquals,// &=
+                CaretEquals,// ^=
+                PipeEquals,// |=
+                DoubleLess,// <<
+                DoubleGreater,// >>
+                LessEquals,// <=
+                GreaterEquals,// >=
+                DoubleEquals,// ==
+                ExclamationEquals,// !=
+                DoubleAmperstand,// &&
+                DoublePipe,// ||
+                // Keywords
+                Null,
+                False,
+                True,
+                If,
+                Else,
+                While,
+                Do,
+                For,
+                Break,
+                Continue,
+                Switch,
+                Case,
+                Default,
+                Function,
+                Return,
+                Local,
+                This,
+                Global,
+                Class,
+                Throw,
+                Try,
+                Catch,
+                Finally,
+                Count
+            };
 
-        Location m_place;
-        Type symtype;
-        // Only when symtype == Type::Number
-        double numberval;
-        // Only when symtype == Type::Identifier or String
-        std::string stringval;
+        public:
+            Location m_place;
+            Type m_symtype = Type::None;
+            // Only when symtype == Type::Number
+            double m_numberval = 0;
+            // Only when symtype == Type::Identifier or String
+            std::string m_stringval = {};
+
+        private:
+            inline void copyFrom(const Token& other)
+            {
+                m_place = other.m_place;
+                m_symtype = other.m_symtype;
+                m_numberval = other.m_numberval;
+                m_stringval = other.m_stringval;
+            }
+
+        public:
+            inline Token()
+            {
+            }
+
+            inline Token(const Token& other)
+            {
+                copyFrom(other);
+            }
+
+            inline Token& operator=(const Token& other)
+            {
+                copyFrom(other);
+                return *this;
+            }
+
+            inline const Location& location() const
+            {
+                return m_place;
+            }
+
+            inline Type type() const
+            {
+                return m_symtype;
+            }
+
+            inline void type(Type t)
+            {
+                m_symtype = t;
+            }
+
+            double& number()
+            {
+                return m_numberval;
+            }
+
+            const double& number() const
+            {
+                return m_numberval;
+            }
+
+            std::string& string()
+            {
+                return m_stringval;
+            }
+
+            const std::string& string() const
+            {
+                return m_stringval;
+            }
     };
 
     struct BreakException

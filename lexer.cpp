@@ -263,7 +263,7 @@ namespace MSL
                 parseHexChar(val, currcode[i]);
                 n = (n << 4) | val;
             }
-            out.numberval = (double)n;
+            out.number() = (double)n;
         }
         else
         {
@@ -310,14 +310,14 @@ namespace MSL
             }
             memcpy(sz, currcode, tklen);
             sz[tklen] = 0;
-            out.numberval = atof(sz);
+            out.number() = atof(sz);
         }
         // Letters straight after number are invalid.
         if(tklen < currlen && IsAlpha(currcode[tklen]))
         {
             throw Error::ParsingError(out.m_place, "invalid number followed by alpha letters");
         }
-        out.symtype = Token::Type::Number;
+        out.type(Token::Type::Number);
         m_code.moveForward(tklen);
         return true;
     }
@@ -336,8 +336,8 @@ namespace MSL
         {
             return false;
         }
-        out.symtype = Token::Type::String;
-        out.stringval.clear();
+        out.type(Token::Type::String);
+        out.string().clear();
         tklen = 1;
         for(;;)
         {
@@ -360,79 +360,79 @@ namespace MSL
                 {
                     case '\\':
                         {
-                            out.stringval += '\\';
+                            out.string() += '\\';
                             ++tklen;
                         }
                         break;
                     case '/':
                         {
-                            out.stringval += '/';
+                            out.string() += '/';
                             ++tklen;
                         }
                         break;
                     case '"':
                         {
-                            out.stringval += '"';
+                            out.string() += '"';
                             ++tklen;
                         }
                         break;
                     case '\'':
                         {
-                            out.stringval += '\'';
+                            out.string() += '\'';
                             ++tklen;
                         }
                         break;
                     case '?':
                         {
-                            out.stringval += '?';
+                            out.string() += '?';
                             ++tklen;
                         }
                         break;
                     case 'a':
                         {
-                            out.stringval += '\a';
+                            out.string() += '\a';
                             ++tklen;
                         }
                         break;
                     case 'b':
                         {
-                            out.stringval += '\b';
+                            out.string() += '\b';
                             ++tklen;
                         }
                         break;
                     case 'f':
                         {
-                            out.stringval += '\f';
+                            out.string() += '\f';
                             ++tklen;
                         }
                         break;
                     case 'n':
                         {
-                            out.stringval += '\n';
+                            out.string() += '\n';
                             ++tklen;
                         }
                         break;
                     case 'r':
                         {
-                            out.stringval += '\r';
+                            out.string() += '\r';
                             ++tklen;
                         }
                         break;
                     case 't':
                         {
-                            out.stringval += '\t';
+                            out.string() += '\t';
                             ++tklen;
                         }
                         break;
                     case 'v':
                         {
-                            out.stringval += '\v';
+                            out.string() += '\v';
                             ++tklen;
                         }
                         break;
                     case '0':
                         {
-                            out.stringval += '\0';
+                            out.string() += '\0';
                             ++tklen;
                         }
                         break;
@@ -443,7 +443,7 @@ namespace MSL
                             {
                                 throw Error::ParsingError(out.m_place, "invalid string escape sequence: '\\x' too short");
                             }
-                            out.stringval += (char)(uint8_t)val;
+                            out.string() += (char)(uint8_t)val;
                             tklen += 3;
                         }
                         break;
@@ -454,7 +454,7 @@ namespace MSL
                             {
                                 throw Error::ParsingError(out.m_place, "invalid string escape sequence: unicode too short");
                             }
-                            if(!appendUTF8Char(out.stringval, val))
+                            if(!appendUTF8Char(out.string(), val))
                             {
                                 throw Error::ParsingError(out.m_place, "invalid string escape sequence: invalid unicode");
                             }
@@ -468,7 +468,7 @@ namespace MSL
                             {
                                 throw Error::ParsingError(out.m_place, "invalid string escape sequence: bad hexadecimal");
                             }
-                            if(!appendUTF8Char(out.stringval, val))
+                            if(!appendUTF8Char(out.string(), val))
                             {
                                 throw Error::ParsingError(out.m_place,"invalid string escape sequence: bad unicode");
                             }
@@ -484,7 +484,7 @@ namespace MSL
             }
             else
             {
-                out.stringval += currcode[tklen++];
+                out.string() += currcode[tklen++];
             }
         }
         ++tklen;
@@ -513,7 +513,7 @@ namespace MSL
         // End of input
         if(m_code.isAtEnd())
         {
-            out.symtype = Token::Type::End;
+            out.type(Token::Type::End);
             return;
         }
         currcode = m_code.getCurrentCode();
@@ -532,7 +532,7 @@ namespace MSL
             symlen = SYMBOL_STR[i].length();
             if(currlen >= symlen && memcmp(SYMBOL_STR[i].data(), currcode, symlen) == 0)
             {
-                out.symtype = (Token::Type)i;
+                out.type((Token::Type)i);
                 m_code.moveForward(symlen);
                 return;
             }
@@ -542,7 +542,7 @@ namespace MSL
         {
             if(currcode[0] == SYMBOL_STR[i][0])
             {
-                out.symtype = (Token::Type)i;
+                out.type((Token::Type)i);
                 m_code.moveForward();
                 return;
             }
@@ -561,14 +561,14 @@ namespace MSL
                 kwlen = SYMBOL_STR[i].length();
                 if(kwlen == tklen && memcmp(SYMBOL_STR[i].data(), currcode, tklen) == 0)
                 {
-                    out.symtype = (Token::Type)i;
+                    out.type((Token::Type)i);
                     m_code.moveForward(kwlen);
                     return;
                 }
             }
             // Identifier
-            out.symtype = Token::Type::Identifier;
-            out.stringval = std::string{ currcode, currcode + tklen };
+            out.type(Token::Type::Identifier);
+            out.string() = std::string{ currcode, currcode + tklen };
             m_code.moveForward(tklen);
             return;
         }

@@ -17,10 +17,10 @@ namespace MSL
         for(;;)
         {
             m_tokenizer.getNextToken(token);
-            isend = token.symtype == Token::Type::End;
-            if(token.symtype == Token::Type::String && !m_toklist.empty() && m_toklist.back().symtype == Token::Type::String)
+            isend = token.type() == Token::Type::End;
+            if(token.type() == Token::Type::String && !m_toklist.empty() && m_toklist.back().type() == Token::Type::String)
             {
-                m_toklist.back().stringval += token.stringval;
+                m_toklist.back().string() += token.string();
             }
             else
             {
@@ -33,7 +33,7 @@ namespace MSL
         }
 
         parseBlock(outscr);
-        if(m_toklist[m_tokidx].symtype != Token::Type::End)
+        if(m_toklist[m_tokidx].type() != Token::Type::End)
         {
             throw Error::ParsingError(getCurrentTokenPlace(), "parsing error: expected End");
         }
@@ -42,7 +42,7 @@ namespace MSL
 
     void Parser::parseBlock(AST::Block& outBlock)
     {
-        while(m_toklist[m_tokidx].symtype != Token::Type::End)
+        while(m_toklist[m_tokidx].type() != Token::Type::End)
         {
             auto stmt = tryParseStatement();
             if(!stmt)
@@ -82,13 +82,13 @@ namespace MSL
     void Parser::parseFuncDef(AST::FunctionDefinition& funcdef)
     {
         MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), "expected '(' while parsing function definition");
-        if(m_toklist[m_tokidx].symtype == Token::Type::Identifier)
+        if(m_toklist[m_tokidx].type() == Token::Type::Identifier)
         {
-            funcdef.m_paramlist.push_back(m_toklist[m_tokidx++].stringval);
+            funcdef.m_paramlist.push_back(m_toklist[m_tokidx++].string());
             while(tryParseSymbol(Token::Type::Comma))
             {
-                MUST_PARSE(m_toklist[m_tokidx].symtype == Token::Type::Identifier, "expected identifier while parsing function definition");
-                funcdef.m_paramlist.push_back(m_toklist[m_tokidx++].stringval);
+                MUST_PARSE(m_toklist[m_tokidx].type() == Token::Type::Identifier, "expected identifier while parsing function definition");
+                funcdef.m_paramlist.push_back(m_toklist[m_tokidx++].string());
             }
         }
         MUST_PARSE(funcdef.areParamsUnique(), "expected argument list of function definition to be unique");
@@ -107,7 +107,7 @@ namespace MSL
         }
         for(i = 0; i < symbols.size(); ++i)
         {
-            if(m_toklist[m_tokidx + i].symtype != symbols.begin()[i])
+            if(m_toklist[m_tokidx + i].type() != symbols.begin()[i])
             {
                 return false;
             }
@@ -329,14 +329,14 @@ namespace MSL
     std::unique_ptr<AST::ConstantValue> Parser::tryParseConstVal()
     {
         const Token& t = m_toklist[m_tokidx];
-        switch(t.symtype)
+        switch(t.type())
         {
             case Token::Type::Number:
                 ++m_tokidx;
-                return std::make_unique<AST::ConstantValue>(t.m_place, Value{ t.numberval });
+                return std::make_unique<AST::ConstantValue>(t.m_place, Value{ t.number() });
             case Token::Type::String:
                 ++m_tokidx;
-                return std::make_unique<AST::ConstantValue>(t.m_place, Value{ std::string(t.stringval) });
+                return std::make_unique<AST::ConstantValue>(t.m_place, Value{ std::string(t.string()) });
             case Token::Type::Null:
                 ++m_tokidx;
                 return std::make_unique<AST::ConstantValue>(t.m_place, Value{});
@@ -355,15 +355,15 @@ namespace MSL
     std::unique_ptr<AST::Identifier> Parser::tryParseIdentVal()
     {
         const auto& t = m_toklist[m_tokidx];
-        if(t.symtype == Token::Type::Local || t.symtype == Token::Type::Global)
+        if(t.type() == Token::Type::Local || t.type() == Token::Type::Global)
         {
             ++m_tokidx;
             MUST_PARSE(tryParseSymbol(Token::Type::Dot), "expected '.'");
             MUST_PARSE(m_tokidx < m_toklist.size(), "expected identifier after '.'");
             const auto& tident = m_toklist[m_tokidx++];
-            MUST_PARSE(tident.symtype == Token::Type::Identifier, "expected identifier after '.'");
+            MUST_PARSE(tident.type() == Token::Type::Identifier, "expected identifier after '.'");
             AST::Identifier::Scope identifierScope = AST::Identifier::Scope::Count;
-            switch(t.symtype)
+            switch(t.type())
             {
                 case Token::Type::Local:
                     identifierScope = AST::Identifier::Scope::Local;
@@ -374,12 +374,12 @@ namespace MSL
                 default:
                     break;
             }
-            return std::make_unique<AST::Identifier>(t.m_place, identifierScope, std::string(tident.stringval));
+            return std::make_unique<AST::Identifier>(t.m_place, identifierScope, std::string(tident.string()));
         }
-        if(t.symtype == Token::Type::Identifier)
+        if(t.type() == Token::Type::Identifier)
         {
             ++m_tokidx;
-            return std::make_unique<AST::Identifier>(t.m_place, AST::Identifier::Scope::None, std::string(t.stringval));
+            return std::make_unique<AST::Identifier>(t.m_place, AST::Identifier::Scope::None, std::string(t.string()));
         }
         return {};
     }
@@ -410,7 +410,7 @@ namespace MSL
         if(peekSymbols({ Token::Type::Function, Token::Type::Identifier }))
         {
             ++m_tokidx;
-            result.first = m_toklist[m_tokidx++].stringval;
+            result.first = m_toklist[m_tokidx++].string();
             result.second = std::make_unique<AST::FunctionDefinition>(getCurrentTokenPlace());
             parseFuncDef(*result.second);
             return result;
@@ -422,7 +422,7 @@ namespace MSL
     {
         if(peekSymbols({ Token::Type::String, Token::Type::Colon }) || peekSymbols({ Token::Type::Identifier, Token::Type::Colon }))
         {
-            outname = m_toklist[m_tokidx].stringval;
+            outname = m_toklist[m_tokidx].string();
             m_tokidx += 2;
             return TryParseExpr16();
         }
@@ -534,7 +534,7 @@ namespace MSL
             return arrexpr;
         }
         // 'function' '(' [ TOKEN_IDENTIFIER ( ',' TOKE_IDENTIFIER )* ] ')' '{' Block '}'
-        if(m_toklist[m_tokidx].symtype == Token::Type::Function && m_toklist[m_tokidx + 1].symtype == Token::Type::RoundBracketOpen)
+        if(m_toklist[m_tokidx].type() == Token::Type::Function && m_toklist[m_tokidx + 1].type() == Token::Type::RoundBracketOpen)
         {
             ++m_tokidx;
             auto func = std::make_unique<AST::FunctionDefinition>(place);
@@ -967,7 +967,7 @@ namespace MSL
 
     bool Parser::tryParseSymbol(Token::Type symbol)
     {
-        if(m_tokidx < m_toklist.size() && m_toklist[m_tokidx].symtype == symbol)
+        if(m_tokidx < m_toklist.size() && m_toklist[m_tokidx].type() == symbol)
         {
             ++m_tokidx;
             return true;
@@ -977,9 +977,9 @@ namespace MSL
 
     std::string Parser::tryParseIdentifier()
     {
-        if(m_tokidx < m_toklist.size() && m_toklist[m_tokidx].symtype == Token::Type::Identifier)
+        if(m_tokidx < m_toklist.size() && m_toklist[m_tokidx].type() == Token::Type::Identifier)
         {
-            return m_toklist[m_tokidx++].stringval;
+            return m_toklist[m_tokidx++].string();
         }
         return {};
     }
