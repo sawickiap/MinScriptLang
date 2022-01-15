@@ -94,10 +94,10 @@ namespace MSL
             printf(DEBUG_PRINT_FORMAT_STR_BEG "If\n", DEBUG_PRINT_ARGS_BEG);
             ++indentLevel;
             m_condexpr->debugPrint(indentLevel, "ConditionExpression: ");
-            m_statements[0]->debugPrint(indentLevel, "TrueStatement: ");
-            if(m_statements[1])
+            m_truestmt->debugPrint(indentLevel, "TrueStatement: ");
+            if(m_falsestmt)
             {
-                m_statements[1]->debugPrint(indentLevel, "FalseStatement: ");
+                m_falsestmt->debugPrint(indentLevel, "FalseStatement: ");
             }
         }
 
@@ -333,17 +333,17 @@ namespace MSL
             printf(DEBUG_PRINT_FORMAT_STR_BEG "BinaryOperator %s\n", DEBUG_PRINT_ARGS_BEG,
                    BINARY_OPERATOR_TYPE_NAMES[(uint32_t)m_type]);
             ++indentLevel;
-            m_oplist[0]->debugPrint(indentLevel, "LeftOperand: ");
-            m_oplist[1]->debugPrint(indentLevel, "RightOperand: ");
+            m_leftoper->debugPrint(indentLevel, "LeftOperand: ");
+            m_rightoper->debugPrint(indentLevel, "RightOperand: ");
         }
 
         void TernaryOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
         {
             printf(DEBUG_PRINT_FORMAT_STR_BEG "TernaryOperator\n", DEBUG_PRINT_ARGS_BEG);
             ++indentLevel;
-            m_oplist[0]->debugPrint(indentLevel, "ConditionExpression: ");
-            m_oplist[1]->debugPrint(indentLevel, "TrueExpression: ");
-            m_oplist[2]->debugPrint(indentLevel, "FalseExpression: ");
+            m_condexpr->debugPrint(indentLevel, "ConditionExpression: ");
+            m_trueexpr->debugPrint(indentLevel, "TrueExpression: ");
+            m_falseexpr->debugPrint(indentLevel, "FalseExpression: ");
         }
 
 

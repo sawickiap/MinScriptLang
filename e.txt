@@ -1,0 +1,265 @@
+clang++ -std=c++20 -Og -g3 -Wall -Wextra -Wshadow -Wdeprecated-copy -Wstrict-aliasing -Wall -Wextra -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo  -Wstrict-overflow=5 -Wswitch-default -Wundef -Wno-unused -c  -o util.o util.cpp
+In file included from util.cpp:2:
+In file included from ./msl.h:54:
+./tgc.h:132:78: warning: use of old-style cast [-Wold-style-cast]
+            ObjMeta(ClassMeta* c, char* o, size_t n) : klass(c), arrayLength((LengthType)n)
+                                                                             ^           ~
+./tgc.h:239:24: warning: use of old-style cast [-Wold-style-cast]
+                return (IPtrEnumerator*)memHandler(this, MemRequest::NewPtrEnumerator, m);
+                       ^                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./tgc.h:256:40: warning: use of old-style cast [-Wold-style-cast]
+                            auto cnt = (size_t)param;
+                                       ^       ~~~~~
+./tgc.h:262:41: warning: use of old-style cast [-Wold-style-cast]
+                            auto meta = (ObjMeta*)param;
+                                        ^         ~~~~~
+./tgc.h:263:37: warning: use of old-style cast [-Wold-style-cast]
+                            delete[](char*) meta;
+                                    ^       ~~~~
+./tgc.h:268:41: warning: use of old-style cast [-Wold-style-cast]
+                            auto meta = (ObjMeta*)param;
+                                        ^         ~~~~~
+./tgc.h:269:38: warning: use of old-style cast [-Wold-style-cast]
+                            auto p = (T*)meta->objPtr();
+                                     ^   ~~~~~~~~~~~~~~
+./tgc.h:278:41: warning: use of old-style cast [-Wold-style-cast]
+                            auto meta = (ObjMeta*)param;
+                                        ^         ~~~~~
+./tgc.h:337:23: warning: use of old-style cast [-Wold-style-cast]
+                reset((T*)meta->objPtr(), meta);
+                      ^   ~~~~~~~~~~~~~~
+./tgc.h:532:23: warning: use of old-style cast [-Wold-style-cast]
+            auto* p = (T*)meta->objPtr();
+                      ^   ~~~~~~~~~~~~~~
+./tgc.h:620:24: warning: use of old-style cast [-Wold-style-cast]
+                return (bool)callable;
+                       ^     ~~~~~~~~
+./tgc.h:664:52: warning: use of old-style cast [-Wold-style-cast]
+            ContainerPtrEnumerator(ObjMeta* m) : o((C*)m->objPtr()), it(o->begin())
+                                                   ^   ~~~~~~~~~~~
+util.cpp:42:24: warning: use of old-style cast [-Wold-style-cast]
+            outIndex = (size_t)number;
+                       ^       ~~~~~~
+util.cpp:43:21: warning: use of old-style cast [-Wold-style-cast]
+            return ((double)outIndex == number);
+                    ^       ~~~~~~~~
+util.cpp:52:52: warning: format string is not a string literal [-Wformat-nonliteral]
+            rtlen = vsnprintf(&buf[0], dstlen + 1, format, argList);
+                                                   ^~~~~~
+util.cpp:52:21: warning: implicit conversion changes signedness: 'int' to 'size_t' (aka 'unsigned long') [-Wsign-conversion]
+            rtlen = vsnprintf(&buf[0], dstlen + 1, format, argList);
+                  ~ ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+16 warnings generated.
+clang++ -std=c++20 -Og -g3 -Wall -Wextra -Wshadow -Wdeprecated-copy -Wstrict-aliasing -Wall -Wextra -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo  -Wstrict-overflow=5 -Wswitch-default -Wundef -Wno-unused -c  -o main.o main.cpp
+In file included from main.cpp:17:
+In file included from ./msl.h:54:
+./tgc.h:132:78: warning: use of old-style cast [-Wold-style-cast]
+            ObjMeta(ClassMeta* c, char* o, size_t n) : klass(c), arrayLength((LengthType)n)
+                                                                             ^           ~
+./tgc.h:239:24: warning: use of old-style cast [-Wold-style-cast]
+                return (IPtrEnumerator*)memHandler(this, MemRequest::NewPtrEnumerator, m);
+                       ^                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./tgc.h:256:40: warning: use of old-style cast [-Wold-style-cast]
+                            auto cnt = (size_t)param;
+                                       ^       ~~~~~
+./tgc.h:262:41: warning: use of old-style cast [-Wold-style-cast]
+                            auto meta = (ObjMeta*)param;
+                                        ^         ~~~~~
+./tgc.h:263:37: warning: use of old-style cast [-Wold-style-cast]
+                            delete[](char*) meta;
+                                    ^       ~~~~
+./tgc.h:268:41: warning: use of old-style cast [-Wold-style-cast]
+                            auto meta = (ObjMeta*)param;
+                                        ^         ~~~~~
+./tgc.h:269:38: warning: use of old-style cast [-Wold-style-cast]
+                            auto p = (T*)meta->objPtr();
+                                     ^   ~~~~~~~~~~~~~~
+./tgc.h:278:41: warning: use of old-style cast [-Wold-style-cast]
+                            auto meta = (ObjMeta*)param;
+                                        ^         ~~~~~
+./tgc.h:337:23: warning: use of old-style cast [-Wold-style-cast]
+                reset((T*)meta->objPtr(), meta);
+                      ^   ~~~~~~~~~~~~~~
+./tgc.h:532:23: warning: use of old-style cast [-Wold-style-cast]
+            auto* p = (T*)meta->objPtr();
+                      ^   ~~~~~~~~~~~~~~
+./tgc.h:620:24: warning: use of old-style cast [-Wold-style-cast]
+                return (bool)callable;
+                       ^     ~~~~~~~~
+./tgc.h:664:52: warning: use of old-style cast [-Wold-style-cast]
+            ContainerPtrEnumerator(ObjMeta* m) : o((C*)m->objPtr()), it(o->begin())
+                                                   ^   ~~~~~~~~~~~
+In file included from main.cpp:18:
+./optionparser.h:596:64: warning: implicit conversion changes signedness: 'unsigned long' to '__gnu_cxx::__normal_iterator<const char *, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >::difference_type' (aka 'long') [-Wsign-conversion]
+                    dest = std::string(optpat.begin() + (ibegin+1), optpat.end() - 1);
+                                                      ~  ~~~~~~^~
+./optionparser.h:385:26: warning: implicit conversion changes signedness: 'std::streamoff' (aka 'long') to 'size_t' (aka 'unsigned long') [-Wsign-conversion]
+                tmplen = tmp.tellp();
+                       ~ ^~~~~~~~~~~
+./optionparser.h:1116:43: note: in instantiation of member function 'BasicOptionParser<char>::Declaration::to_long_str' requested here
+                buf << m_declarations[i]->to_long_str() << std::endl;
+                                          ^
+./optionparser.h:1263:13: note: in instantiation of function template specialization 'BasicOptionParser<char>::help_declarations_long<std::basic_ostream<char> >' requested here
+            help_declarations_long(buf);
+            ^
+./optionparser.h:1127:27: note: in instantiation of function template specialization 'BasicOptionParser<char>::help<std::basic_ostream<char> >' requested here
+                    this->help(std::cout);
+                          ^
+./optionparser.h:1158:13: note: in instantiation of member function 'BasicOptionParser<char>::init' requested here
+            init(declhelp);
+            ^
+main.cpp:172:18: note: in instantiation of member function 'BasicOptionParser<char>::BasicOptionParser' requested here
+    OptionParser prs;
+                 ^
+In file included from main.cpp:18:
+./optionparser.h:596:64: warning: implicit conversion changes signedness: 'unsigned long' to '__gnu_cxx::__normal_iterator<const char *, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >::difference_type' (aka 'long') [-Wsign-conversion]
+                    dest = std::string(optpat.begin() + (ibegin+1), optpat.end() - 1);
+                                                      ~  ~~~~~~^~
+./optionparser.h:701:36: note: in instantiation of member function 'BasicOptionParser<char>::hasplaceholder' requested here
+                            (hph = hasplaceholder(longstr, placeholder, subend, true))
+                                   ^
+./optionparser.h:1204:20: note: in instantiation of member function 'BasicOptionParser<char>::addDeclaration' requested here
+            return addDeclaration(strs, desc, Callback(fn));
+                   ^
+main.cpp:176:9: note: in instantiation of member function 'BasicOptionParser<char>::on' requested here
+    prs.on({"-i", "--repl"}, "force run REPL", [&]
+        ^
+In file included from main.cpp:18:
+./optionparser.h:1358:34: warning: implicit conversion changes signedness: 'int' to 'std::vector::size_type' (aka 'unsigned long') [-Wsign-conversion]
+            m_vargs.reserve(argc + 1);
+                    ~~~~~~~ ~~~~~^~~
+main.cpp:192:13: note: in instantiation of member function 'BasicOptionParser<char>::parse' requested here
+        prs.parse(argc, argv);
+            ^
+16 warnings generated.
+clang++ -std=c++20 -Og -g3 -Wall -Wextra -Wshadow -Wdeprecated-copy -Wstrict-aliasing -Wall -Wextra -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo  -Wstrict-overflow=5 -Wswitch-default -Wundef -Wno-unused -c  -o parser.o parser.cpp
+In file included from parser.cpp:2:
+In file included from ./msl.h:54:
+./tgc.h:132:78: warning: use of old-style cast [-Wold-style-cast]
+            ObjMeta(ClassMeta* c, char* o, size_t n) : klass(c), arrayLength((LengthType)n)
+                                                                             ^           ~
+./tgc.h:239:24: warning: use of old-style cast [-Wold-style-cast]
+                return (IPtrEnumerator*)memHandler(this, MemRequest::NewPtrEnumerator, m);
+                       ^                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./tgc.h:256:40: warning: use of old-style cast [-Wold-style-cast]
+                            auto cnt = (size_t)param;
+                                       ^       ~~~~~
+./tgc.h:262:41: warning: use of old-style cast [-Wold-style-cast]
+                            auto meta = (ObjMeta*)param;
+                                        ^         ~~~~~
+./tgc.h:263:37: warning: use of old-style cast [-Wold-style-cast]
+                            delete[](char*) meta;
+                                    ^       ~~~~
+./tgc.h:268:41: warning: use of old-style cast [-Wold-style-cast]
+                            auto meta = (ObjMeta*)param;
+                                        ^         ~~~~~
+./tgc.h:269:38: warning: use of old-style cast [-Wold-style-cast]
+                            auto p = (T*)meta->objPtr();
+                                     ^   ~~~~~~~~~~~~~~
+./tgc.h:278:41: warning: use of old-style cast [-Wold-style-cast]
+                            auto meta = (ObjMeta*)param;
+                                        ^         ~~~~~
+./tgc.h:337:23: warning: use of old-style cast [-Wold-style-cast]
+                reset((T*)meta->objPtr(), meta);
+                      ^   ~~~~~~~~~~~~~~
+./tgc.h:532:23: warning: use of old-style cast [-Wold-style-cast]
+            auto* p = (T*)meta->objPtr();
+                      ^   ~~~~~~~~~~~~~~
+./tgc.h:620:24: warning: use of old-style cast [-Wold-style-cast]
+                return (bool)callable;
+                       ^     ~~~~~~~~
+./tgc.h:664:52: warning: use of old-style cast [-Wold-style-cast]
+            ContainerPtrEnumerator(ObjMeta* m) : o((C*)m->objPtr()), it(o->begin())
+                                                   ^   ~~~~~~~~~~~
+./tgc.h:684:35: warning: implicit conversion changes signedness: 'int' to 'std::vector::size_type' (aka 'unsigned long') [-Wsign-conversion]
+                return (*this->p)[idx];
+                       ~          ^~~
+parser.cpp:259:45: note: in instantiation of member function 'tgc::details::gc_vector<MSL::AST::ConstantValue>::operator[]' requested here
+                        if(!stmt->m_itemvals[i] && !stmt->m_itemvals[j])// 2x default
+                                            ^
+13 warnings generated.
+clang++ -std=c++20 -Og -g3 -Wall -Wextra -Wshadow -Wdeprecated-copy -Wstrict-aliasing -Wall -Wextra -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wmissing-declarations -Wmissing-include-dirs -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo  -Wstrict-overflow=5 -Wswitch-default -Wundef -Wno-unused -c  -o stdmod.o stdmod.cpp
+In file included from stdmod.cpp:2:
+In file included from ./priv.h:3:
+In file included from ./msl.h:54:
+./tgc.h:132:78: warning: use of old-style cast [-Wold-style-cast]
+            ObjMeta(ClassMeta* c, char* o, size_t n) : klass(c), arrayLength((LengthType)n)
+                                                                             ^           ~
+./tgc.h:239:24: warning: use of old-style cast [-Wold-style-cast]
+                return (IPtrEnumerator*)memHandler(this, MemRequest::NewPtrEnumerator, m);
+                       ^                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./tgc.h:256:40: warning: use of old-style cast [-Wold-style-cast]
+                            auto cnt = (size_t)param;
+                                       ^       ~~~~~
+./tgc.h:262:41: warning: use of old-style cast [-Wold-style-cast]
+                            auto meta = (ObjMeta*)param;
+                                        ^         ~~~~~
+./tgc.h:263:37: warning: use of old-style cast [-Wold-style-cast]
+                            delete[](char*) meta;
+                                    ^       ~~~~
+./tgc.h:268:41: warning: use of old-style cast [-Wold-style-cast]
+                            auto meta = (ObjMeta*)param;
+                                        ^         ~~~~~
+./tgc.h:269:38: warning: use of old-style cast [-Wold-style-cast]
+                            auto p = (T*)meta->objPtr();
+                                     ^   ~~~~~~~~~~~~~~
+./tgc.h:278:41: warning: use of old-style cast [-Wold-style-cast]
+                            auto meta = (ObjMeta*)param;
+                                        ^         ~~~~~
+./tgc.h:337:23: warning: use of old-style cast [-Wold-style-cast]
+                reset((T*)meta->objPtr(), meta);
+                      ^   ~~~~~~~~~~~~~~
+./tgc.h:532:23: warning: use of old-style cast [-Wold-style-cast]
+            auto* p = (T*)meta->objPtr();
+                      ^   ~~~~~~~~~~~~~~
+./tgc.h:620:24: warning: use of old-style cast [-Wold-style-cast]
+                return (bool)callable;
+                       ^     ~~~~~~~~
+./tgc.h:664:52: warning: use of old-style cast [-Wold-style-cast]
+            ContainerPtrEnumerator(ObjMeta* m) : o((C*)m->objPtr()), it(o->begin())
+                                                   ^   ~~~~~~~~~~~
+In file included from stdmod.cpp:2:
+./priv.h:82:32: warning: implicit conversion changes signedness: 'int' to 'size_t' (aka 'unsigned long') [-Wsign-conversion]
+                        aidx = std::stoi(std::string(m_fmtstr.substr(start, thismuch)));
+                             ~ ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+stdmod.cpp:71:13: warning: use of old-style cast [-Wold-style-cast]
+            MINSL_LOAD_ARGS_1_NUMBER("Number", val);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+stdmod.cpp:44:5: note: expanded from macro 'MINSL_LOAD_ARGS_1_NUMBER'
+    MINSL_LOAD_ARG_NUMBER(dstVarName);                        \
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+stdmod.cpp:19:70: note: expanded from macro 'MINSL_LOAD_ARG_NUMBER'
+                                 minsl_functionName, minsl_argIndex, (int)env.getTypename(minsl_argType).length(), \
+                                                                     ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./msl.h:64:49: note: expanded from macro 'MINSL_EXECUTION_CHECK'
+            throw Error::RuntimeError((place), (errorMessage));    \
+                                                ^~~~~~~~~~~~
+stdmod.cpp:82:13: warning: use of old-style cast [-Wold-style-cast]
+            MINSL_LOAD_ARGS_1_STRING("String", str);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+stdmod.cpp:48:5: note: expanded from macro 'MINSL_LOAD_ARGS_1_STRING'
+    MINSL_LOAD_ARG_STRING(dstVarName);                        \
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+stdmod.cpp:30:70: note: expanded from macro 'MINSL_LOAD_ARG_STRING'
+                                 minsl_functionName, minsl_argIndex, (int)env.getTypename(minsl_argType).length(), \
+                                                                     ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./msl.h:64:49: note: expanded from macro 'MINSL_EXECUTION_CHECK'
+            throw Error::RuntimeError((place), (errorMessage));    \
+                                                ^~~~~~~~~~~~
+stdmod.cpp:143:39: warning: use of old-style cast [-Wold-style-cast]
+            return tgc::gc_new<Value>((double)obj->size());
+                                      ^       ~~~~~~~~~~~
+stdmod.cpp:159:39: warning: use of old-style cast [-Wold-style-cast]
+            return tgc::gc_new<Value>((double)objVal->getArray()->m_arrayitems->size());
+                                      ^       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+stdmod.cpp:220:68: warning: implicit conversion changes signedness: 'size_t' (aka 'unsigned long') to '__gnu_cxx::__normal_iterator<tgc::details::gc<MSL::Value> *, std::vector<tgc::details::gc<MSL::Value>, std::allocator<tgc::details::gc<MSL::Value> > > >::difference_type' (aka 'long') [-Wsign-conversion]
+            arr->m_arrayitems->insert(arr->m_arrayitems->begin() + index, args->at(1));
+                                                                 ~ ^~~~~
+stdmod.cpp:242:67: warning: implicit conversion changes signedness: 'size_t' (aka 'unsigned long') to '__gnu_cxx::__normal_iterator<tgc::details::gc<MSL::Value> *, std::vector<tgc::details::gc<MSL::Value>, std::allocator<tgc::details::gc<MSL::Value> > > >::difference_type' (aka 'long') [-Wsign-conversion]
+            arr->m_arrayitems->erase(arr->m_arrayitems->begin() + index);
+                                                                ~ ^~~~~
+stdmod.cpp:253:39: warning: use of old-style cast [-Wold-style-cast]
+            return tgc::gc_new<Value>((double)objVal->getString()->length());
+                                      ^       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20 warnings generated.
+clang++ -std=c++20 -o run util.o stmt.o value.o error.o dbgprint.o lexer.o object.o tgc.o env.o filemod.o coremod.o main.o parser.o stdmod.o -ldl -lm  -lreadline

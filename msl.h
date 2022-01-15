@@ -52,9 +52,6 @@ SOFTWARE.
 #include <cmath>
 #include <ctype.h>
 
-// F***k Windows.h macros!
-#undef min
-#undef max
 
 #define MINSL_EXECUTION_CHECK(condition, place, errorMessage) \
     do                                                        \
@@ -952,7 +949,8 @@ namespace MSL
         {
             // [0] executed if true, [1] executed if false, optional.
             std::unique_ptr<Expression> m_condexpr;
-            std::unique_ptr<Statement> m_statements[2];
+            std::unique_ptr<Statement> m_truestmt;
+            std::unique_ptr<Statement> m_falsestmt;
 
             explicit Condition(const Location& place) : Statement{ place }
             {
@@ -1280,7 +1278,8 @@ namespace MSL
 
             public:
                 Type m_type;
-                std::unique_ptr<Expression> m_oplist[2];
+                std::unique_ptr<Expression> m_leftoper;
+                std::unique_ptr<Expression> m_rightoper;
 
             private:
                 Value ShiftLeft(const Value& lhs, const Value& rhs) const;
@@ -1298,7 +1297,11 @@ namespace MSL
 
         struct TernaryOperator : Operator
         {
-            std::unique_ptr<Expression> m_oplist[3];
+            std::unique_ptr<Expression> m_condexpr;
+            std::unique_ptr<Expression> m_trueexpr;
+            std::unique_ptr<Expression> m_falseexpr;
+
+
             explicit TernaryOperator(const Location& place) : Operator{ place }
             {
             }
@@ -1411,9 +1414,6 @@ namespace MSL
             void parseScript(AST::Script& outScript);
 
     };
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // EnvironmentPimpl definition
 
     class EnvironmentPimpl
     {

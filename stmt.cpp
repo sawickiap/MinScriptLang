@@ -190,11 +190,11 @@ namespace MSL
         {
             if(m_condexpr->evaluate(ctx, nullptr).isTrue())
             {
-                return m_statements[0]->execute(ctx);
+                return m_truestmt->execute(ctx);
             }
-            else if(m_statements[1])
+            else if(m_falsestmt)
             {
-                return m_statements[1]->execute(ctx);
+                return m_falsestmt->execute(ctx);
             }
             return {};
         }
@@ -892,8 +892,8 @@ namespace MSL
             // This operator is special, discards result of left operand.
             if(m_type == BinaryOperator::Type::Comma)
             {
-                m_oplist[0]->execute(ctx);
-                return m_oplist[1]->evaluate(ctx, othis);
+                m_leftoper->execute(ctx);
+                return m_rightoper->evaluate(ctx, othis);
             }
 
             // Operators that require l-value.
@@ -912,8 +912,8 @@ namespace MSL
                 case BinaryOperator::Type::AssignmentBitwiseOr:
                 {
                     // Getting these explicitly so the order of thier evaluation is defined, unlike in C++ function call arguments.
-                    Value rhsVal = m_oplist[1]->evaluate(ctx, nullptr);
-                    LValue lhsLval = m_oplist[0]->getLeftValue(ctx);
+                    Value rhsVal = m_rightoper->evaluate(ctx, nullptr);
+                    LValue lhsLval = m_leftoper->getLeftValue(ctx);
                     return Assignment(std::move(lhsLval), std::move(rhsVal));
                 }
                 default:
@@ -921,24 +921,24 @@ namespace MSL
             }
 
             // Remaining operators use r-values.
-            left = m_oplist[0]->evaluate(ctx, nullptr);
+            left = m_leftoper->evaluate(ctx, nullptr);
 
             // Logical operators with short circuit for right hand side operand.
             if(m_type == BinaryOperator::Type::LogicalAnd)
             {
                 if(!left.isTrue())
                     return left;
-                return m_oplist[1]->evaluate(ctx, nullptr);
+                return m_rightoper->evaluate(ctx, nullptr);
             }
             if(m_type == BinaryOperator::Type::LogicalOr)
             {
                 if(left.isTrue())
                     return left;
-                return m_oplist[1]->evaluate(ctx, nullptr);
+                return m_rightoper->evaluate(ctx, nullptr);
             }
 
             // Remaining operators use both operands as r-values.
-            right = m_oplist[1]->evaluate(ctx, nullptr);
+            right = m_rightoper->evaluate(ctx, nullptr);
             typleft = left.type();
             typright = right.type();
             // These ones support various types.
@@ -1042,8 +1042,8 @@ namespace MSL
             }
 
             // Remaining operators require numbers.
-            CheckNumberOperand(m_oplist[0].get(), left);
-            CheckNumberOperand(m_oplist[1].get(), right);
+            CheckNumberOperand(m_leftoper.get(), left);
+            CheckNumberOperand(m_rightoper.get(), right);
 
             switch(m_type)
             {
@@ -1081,8 +1081,8 @@ namespace MSL
             Value* leftref;
             if(m_type == BinaryOperator::Type::Indexing)
             {
-                leftref = m_oplist[0]->getLeftValue(ctx).getValueRef(getPlace());
-                idxval = m_oplist[1]->evaluate(ctx, nullptr);
+                leftref = m_leftoper->getLeftValue(ctx).getValueRef(getPlace());
+                idxval = m_rightoper->evaluate(ctx, nullptr);
                 if(leftref->type() == Value::Type::String)
                 {
                     MINSL_EXECUTION_CHECK(idxval.isNumber(), getPlace(), "expected numeric value");
@@ -1208,8 +1208,8 @@ namespace MSL
 
         Value TernaryOperator::evaluate(ExecutionContext& ctx, ThisType* othis) const
         {
-            return m_oplist[0]->evaluate(ctx, nullptr).isTrue() ? m_oplist[1]->evaluate(ctx, othis) :
-                                                                  m_oplist[2]->evaluate(ctx, othis);
+            return m_condexpr->evaluate(ctx, nullptr).isTrue() ? m_trueexpr->evaluate(ctx, othis) :
+                                                                  m_falseexpr->evaluate(ctx, othis);
         }
 
         Value CallOperator::evaluate(ExecutionContext& ctx, ThisType* othis) const

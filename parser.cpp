@@ -142,10 +142,10 @@ namespace MSL
             auto condition = std::make_unique<AST::Condition>(place);
             MUST_PARSE(condition->m_condexpr = TryParseExpr17(), "expected expression after 'if'");
             MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected ')'");
-            MUST_PARSE(condition->m_statements[0] = tryParseStatement(), "expected a statement after 'if'");
+            MUST_PARSE(condition->m_truestmt = tryParseStatement(), "expected a statement after 'if'");
             if(tryParseSymbol(Token::Type::Else))
             {
-                MUST_PARSE(condition->m_statements[1] = tryParseStatement(), "expected statement after 'else'");
+                MUST_PARSE(condition->m_falsestmt = tryParseStatement(), "expected statement after 'else'");
             }
             return condition;
         }
@@ -314,8 +314,8 @@ namespace MSL
         {
             auto idexpr = std::make_unique<AST::Identifier>(place, AST::Identifier::Scope::None, std::move(fnsynsugar.first));
             auto assgp = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperator::Type::Assignment);
-            assgp->m_oplist[0] = std::move(idexpr);
-            assgp->m_oplist[1] = std::move(fnsynsugar.second);
+            assgp->m_leftoper = std::move(idexpr);
+            assgp->m_rightoper = std::move(fnsynsugar.second);
             return assgp;
         }
         auto cls = tryParseClassSynSugar();
@@ -438,7 +438,7 @@ namespace MSL
             std::string clname = tryParseIdentifier();
             MUST_PARSE(!clname.empty(), "expected identifier after 'class'");
             auto assgp = std::make_unique<AST::BinaryOperator>(beginplace, AST::BinaryOperator::Type::Assignment);
-            assgp->m_oplist[0] = std::make_unique<AST::Identifier>(beginplace, AST::Identifier::Scope::None, std::move(clname));
+            assgp->m_leftoper = std::make_unique<AST::Identifier>(beginplace, AST::Identifier::Scope::None, std::move(clname));
             
             if(tryParseSymbol(Token::Type::Colon))
             {
@@ -447,8 +447,8 @@ namespace MSL
             }
             auto objexpr = tryParseObject();
             objexpr->m_baseexpr = std::move(baseexpr);
-            assgp->m_oplist[1] = std::move(objexpr);
-            MUST_PARSE(assgp->m_oplist[1], "expected object");
+            assgp->m_rightoper = std::move(objexpr);
+            MUST_PARSE(assgp->m_rightoper, "expected object");
             return assgp;
         }
         return std::unique_ptr<AST::ObjectExpression>();
@@ -599,8 +599,8 @@ namespace MSL
             else if(tryParseSymbol(Token::Type::SquareBracketOpen))
             {
                 auto op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperator::Type::Indexing);
-                op->m_oplist[0] = std::move(expr);
-                MUST_PARSE(op->m_oplist[1] = TryParseExpr17(), "expected expression");
+                op->m_leftoper = std::move(expr);
+                MUST_PARSE(op->m_rightoper = TryParseExpr17(), "expected expression");
                 MUST_PARSE(tryParseSymbol(Token::Type::SquareBracketClose), "expected ']'");
                 expr = std::move(op);
             }
@@ -644,8 +644,8 @@ namespace MSL
     #define PARSE_BINARY_OPERATOR(binaryOperatorType, exprParseFunc)                            \
         {                                                                                       \
             auto op = std::make_unique<AST::BinaryOperator>(place, (binaryOperatorType));            \
-            op->m_oplist[0] = std::move(expr);                                                  \
-            MUST_PARSE(op->m_oplist[1] = (exprParseFunc)(), "expected expression"); \
+            op->m_leftoper = std::move(expr);                                                  \
+            MUST_PARSE(op->m_rightoper = (exprParseFunc)(), "expected expression"); \
             expr = std::move(op);                                                               \
         }
 
@@ -912,10 +912,10 @@ namespace MSL
         if(tryParseSymbol(Token::Type::QuestionMark))
         {
             auto op = std::make_unique<AST::TernaryOperator>(getCurrentTokenPlace());
-            op->m_oplist[0] = std::move(expr);
-            MUST_PARSE(op->m_oplist[1] = TryParseExpr16(), "expected expression");
+            op->m_condexpr = std::move(expr);
+            MUST_PARSE(op->m_trueexpr = TryParseExpr16(), "expected expression");
             MUST_PARSE(tryParseSymbol(Token::Type::Colon), "expected ':'");
-            MUST_PARSE(op->m_oplist[2] = TryParseExpr16(), "expected expression");
+            MUST_PARSE(op->m_falseexpr = TryParseExpr16(), "expected expression");
             return op;
         }
         // Assignment: Expr15 = Expr16, and variants like += -=
@@ -923,8 +923,8 @@ namespace MSL
         if(tryParseSymbol(symbol))                                                                    \
         {                                                                                             \
             auto op = std::make_unique<AST::BinaryOperator>(getCurrentTokenPlace(), (binaryOperatorType)); \
-            op->m_oplist[0] = std::move(expr);                                                        \
-            MUST_PARSE(op->m_oplist[1] = TryParseExpr16(), "expected expression");        \
+            op->m_leftoper = std::move(expr);                                                        \
+            MUST_PARSE(op->m_rightoper = TryParseExpr16(), "expected expression");        \
             return op;                                                                                \
         }
         TRY_PARSE_ASSIGNMENT(Token::Type::Equals, AST::BinaryOperator::Type::Assignment)
