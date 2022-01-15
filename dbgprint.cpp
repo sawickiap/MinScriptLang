@@ -1,107 +1,50 @@
 
 #include "priv.h"
 
-#define DEBUG_PRINT_FORMAT_STR_BEG \
-    "(%4u,%4u) %s%.*s"
-
-#define DEBUG_PRINT_ARGS_BEG \
-    getPlace().textline, getPlace().textcolumn, getIndent(indentLevel), (int)prefix.length(), prefix.data()
-
-
 namespace MSL
 {
     namespace AST
     {
-        static void printString(std::string_view str)
-        {
-            int c;
-            size_t i;
-            fputc('"', stdout);
-            for(i=0; i<str.size(); i++)
-            {
-                c = str[i];
-                if((c < 32) || (c > 127) || (c == '\"') || (c == '\\'))
-                {
-                    switch(c)
-                    {
-                        case '\'':
-                            printf("\\\'");
-                            break;
-                        case '\"':
-                            printf("\\\"");
-                            break;
-                        case '\\':
-                            printf("\\\\");
-                            break;
-                        case '\b':
-                            printf("\\b");
-                            break;
-                        case '\f':
-                            printf("\\f");
-                            break;
-                        case '\n':
-                            printf("\\n");
-                            break;
-                        case '\r':
-                            printf("\\r");
-                            break;
-                        case '\t':
-                            printf("\\t");
-                            break;
-                        default:
-                            {
-                                constexpr const char* const hexchars = "0123456789ABCDEF";
-                                fputc('\\', stdout);
-                                if(c <= 255)
-                                {
-                                    fputc('x', stdout);
-                                    fputc(char(hexchars[(c >> 4) & 0xf]), stdout);
-                                    fputc(char(hexchars[c & 0xf]), stdout);
-                                }
-                                else
-                                {
-                                    fputc('u', stdout);
-                                    fputc(char(hexchars[(c >> 12) & 0xf]), stdout);
-                                    fputc(char(hexchars[(c >> 8) & 0xf]), stdout);
-                                    fputc(char(hexchars[(c >> 4) & 0xf]), stdout);
-                                    fputc(char(hexchars[c & 0xf]), stdout);
-                                }
-                            }
-                            break;
-                    }
-                }
-                else
-                {
-                    fputc(c, stdout);
-                }
-            }
-            fputc('"', stdout);
-        }
-
-        static const char* getIndent(uint32_t indentLevel)
+        static const char* getIndent(uint32_t idl)
         {
             static const char* silly = "                                                                                                                                                                                                                                                                ";
-            return silly + (256 - std::min<uint32_t>(indentLevel, 128) * 2);
+            return silly + (256 - std::min<uint32_t>(idl, 128) * 2);
         }
 
-        void EmptyStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        static void printPrefix(DebugWriter& dw, uint32_t idl, const Location& pl, std::string_view prefix)
         {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "Empty\n", DEBUG_PRINT_ARGS_BEG);
+            enum{ kMaxBuf = 128 };
+            char fmt[kMaxBuf+1];
+            snprintf(fmt, kMaxBuf, "(%4u,%4u) %s%.*s",
+                pl.textline,
+                pl.textcolumn,
+                getIndent(idl),
+                int(prefix.size()),
+                prefix.data()
+            );
+            dw.writeString(fmt);
         }
 
-        void Condition::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void EmptyStatement::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "If\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            m_condexpr->debugPrint(indentLevel, "ConditionExpression: ");
-            m_truestmt->debugPrint(indentLevel, "TrueStatement: ");
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("Empty\n");
+        }
+
+        void Condition::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
+        {
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("If\n");
+            ++idl;
+            m_condexpr->debugPrint(dw, idl, "ConditionExpression: ");
+            m_truestmt->debugPrint(dw, idl, "TrueStatement: ");
             if(m_falsestmt)
             {
-                m_falsestmt->debugPrint(indentLevel, "FalseStatement: ");
+                m_falsestmt->debugPrint(dw, idl, "FalseStatement: ");
             }
         }
 
-        void WhileLoop::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void WhileLoop::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             const char* name;
             name = nullptr;
@@ -116,149 +59,179 @@ namespace MSL
                 default:
                     assert(0);
             }
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "%s\n", DEBUG_PRINT_ARGS_BEG, name);
-            ++indentLevel;
-            m_condexpr->debugPrint(indentLevel, "ConditionExpression: ");
-            m_body->debugPrint(indentLevel, "Body: ");
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString(name);
+            dw.writeString("\n");
+            ++idl;
+            m_condexpr->debugPrint(dw, idl, "ConditionExpression: ");
+            m_body->debugPrint(dw, idl, "Body: ");
         }
 
-
-        void ForLoop::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void ForLoop::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "For\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("For\n");
+            ++idl;
             if(m_initexpr)
             {
-                m_initexpr->debugPrint(indentLevel, "InitExpression: ");
+                m_initexpr->debugPrint(dw, idl, "InitExpression: ");
             }
             else
             {
-                printf(DEBUG_PRINT_FORMAT_STR_BEG "(Init expression empty)\n", DEBUG_PRINT_ARGS_BEG);
+                printPrefix(dw, idl, getPlace(), prefix);
+                dw.writeString("(Init expression empty)\n");
             }
             if(m_condexpr)
             {
-                m_condexpr->debugPrint(indentLevel, "ConditionExpression: ");
+                m_condexpr->debugPrint(dw, idl, "ConditionExpression: ");
             }
             else
             {
-                printf(DEBUG_PRINT_FORMAT_STR_BEG "(Condition expression empty)\n", DEBUG_PRINT_ARGS_BEG);
+                printPrefix(dw, idl, getPlace(), prefix);
+                dw.writeString("(Condition expression empty)\n");
             }
             if(m_iterexpr)
             {
-                m_iterexpr->debugPrint(indentLevel, "IterationExpression: ");
+                m_iterexpr->debugPrint(dw, idl, "IterationExpression: ");
             }
             else
             {
-                printf(DEBUG_PRINT_FORMAT_STR_BEG "(Iteration expression empty)\n", DEBUG_PRINT_ARGS_BEG);
+                printPrefix(dw, idl, getPlace(), prefix);
+                dw.writeString("(Iteration expression empty)\n");
             }
-            m_body->debugPrint(indentLevel, "Body: ");
+            m_body->debugPrint(dw, idl, "Body: ");
         }
 
-
-        void RangeBasedForLoop::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void RangeBasedForLoop::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             if(!m_keyvar.empty())
             {
-                printf(DEBUG_PRINT_FORMAT_STR_BEG "Range-based for: %s, %s\n", DEBUG_PRINT_ARGS_BEG, m_keyvar.c_str(),
-                       m_valuevar.c_str());
+                printPrefix(dw, idl, getPlace(), prefix);
+                dw.writeString("Range-based for: ");
+                dw.writeString(m_keyvar);
+                dw.writeString(", ");
+                dw.writeString(m_valuevar);
+                dw.writeString("\n");
             }
             else
             {
-                printf(DEBUG_PRINT_FORMAT_STR_BEG "Range-based for: %s\n", DEBUG_PRINT_ARGS_BEG, m_valuevar.c_str());
+                printPrefix(dw, idl, getPlace(), prefix);
+                dw.writeString("Range-based for: ");
+                dw.writeString(m_valuevar);
+                dw.writeString("\n");
             }
-            ++indentLevel;
-            m_rangeexpr->debugPrint(indentLevel, "RangeExpression: ");
-            m_body->debugPrint(indentLevel, "Body: ");
+            ++idl;
+            m_rangeexpr->debugPrint(dw, idl, "RangeExpression: ");
+            m_body->debugPrint(dw, idl, "Body: ");
         }
 
-        void LoopBreakStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void LoopBreakStatement::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             static const char* LOOP_BREAK_TYPE_NAMES[] = { "Break", "Continue" };
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "%s\n", DEBUG_PRINT_ARGS_BEG, LOOP_BREAK_TYPE_NAMES[(size_t)m_type]);
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString(LOOP_BREAK_TYPE_NAMES[size_t(m_type)]);
+            dw.writeString("\n");
         }
 
-
-        void ReturnStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void ReturnStatement::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "return\n", DEBUG_PRINT_ARGS_BEG);
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("return\n");
             if(m_retvalue)
             {
-                m_retvalue->debugPrint(indentLevel + 1, "ReturnedValue: ");
+                m_retvalue->debugPrint(dw, idl + 1, "ReturnedValue: ");
             }
         }
 
-        void Block::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void Block::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "Block\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("Block\n");
+            ++idl;
             for(const auto& stmtPtr : m_statements)
             {
-                stmtPtr->debugPrint(indentLevel, std::string_view{});
+                stmtPtr->debugPrint(dw, idl, std::string_view{});
             }
         }
 
-        void SwitchStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void SwitchStatement::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             size_t i;
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "switch\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            m_cond->debugPrint(indentLevel, "Condition: ");
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("switch\n");
+            ++idl;
+            m_cond->debugPrint(dw, idl, "Condition: ");
             for(i = 0; i < m_itemvals.size(); ++i)
             {
                 if(m_itemvals[i])
                 {
-                    m_itemvals[i]->debugPrint(indentLevel, "ItemValue: ");
+                    m_itemvals[i]->debugPrint(dw, idl, "ItemValue: ");
                 }
                 else
                 {
-                    printf(DEBUG_PRINT_FORMAT_STR_BEG "Default\n", DEBUG_PRINT_ARGS_BEG);
+                    printPrefix(dw, idl, getPlace(), prefix);
+                    dw.writeString("Default\n");
                 }
                 if(m_itemblocks[i])
                 {
-                    m_itemblocks[i]->debugPrint(indentLevel, "ItemBlock: ");
+                    m_itemblocks[i]->debugPrint(dw, idl, "ItemBlock: ");
                 }
                 else
                 {
-                    printf(DEBUG_PRINT_FORMAT_STR_BEG "(Empty block)\n", DEBUG_PRINT_ARGS_BEG);
+                    printPrefix(dw, idl, getPlace(), prefix);
+                    dw.writeString("(Empty block)\n");
                 }
             }
         }
 
-        void ThrowStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void ThrowStatement::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "throw\n", DEBUG_PRINT_ARGS_BEG);
-            m_thrownexpr->debugPrint(indentLevel + 1, "ThrownExpression: ");
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("throw\n");
+            m_thrownexpr->debugPrint(dw, idl + 1, "ThrownExpression: ");
         }
 
-        void TryStatement::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void TryStatement::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "try\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            m_tryblock->debugPrint(indentLevel, "TryBlock: ");
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("try\n");
+            ++idl;
+            m_tryblock->debugPrint(dw, idl, "TryBlock: ");
             if(m_catchblock)
             {
-                m_catchblock->debugPrint(indentLevel, "CatchBlock: ");
+                m_catchblock->debugPrint(dw, idl, "CatchBlock: ");
             }
             if(m_finallyblock)
             {
-                m_finallyblock->debugPrint(indentLevel, "FinallyBlock: ");
+                m_finallyblock->debugPrint(dw, idl, "FinallyBlock: ");
             }
         }
 
-        void ConstantValue::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void ConstantValue::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             switch(m_val.type())
             {
                 case Value::Type::Null:
-                    printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant null\n", DEBUG_PRINT_ARGS_BEG);
+                    {
+                        printPrefix(dw, idl, getPlace(), prefix);
+                        dw.writeString("Constant null\n");
+                    }
                     break;
                 case Value::Type::Number:
-                    printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant number: %g\n", DEBUG_PRINT_ARGS_BEG, m_val.getNumber());
+                    {
+                        printPrefix(dw, idl, getPlace(), prefix);
+                        dw.writeString("Constant number: ");
+                        dw.writeNumber(m_val.getNumber());
+                        dw.writeString("\n");
+                    }
                     break;
                 case Value::Type::String:
-                    printf(DEBUG_PRINT_FORMAT_STR_BEG "Constant string: ", DEBUG_PRINT_ARGS_BEG);
-                    printString(m_val.getString());
-                    printf("\n");
+                    {
+                        printPrefix(dw, idl, getPlace(), prefix);
+                        dw.writeString("Constant string: ");
+                        dw.writeReprString(m_val.getString());
+                        dw.writeString("\n");
+                    }
                     break;
                 default:
                     assert(0 && "ConstantValue should not be used with this type.");
@@ -266,35 +239,45 @@ namespace MSL
             }
         }
 
-        void Identifier::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void Identifier::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             static const char* PREFIX[] = { "", "local.", "global." };
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "Identifier: %s%s\n", DEBUG_PRINT_ARGS_BEG, PREFIX[(size_t)m_scope], m_ident.c_str());
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("Identifier: ");
+            dw.writeString(PREFIX[size_t(m_scope)]);
+            dw.writeString(m_ident);
+            dw.writeString("\n");
         }
 
-        void ThisExpression::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void ThisExpression::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "This\n", DEBUG_PRINT_ARGS_BEG);
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("This\n");
         }
 
-        void UnaryOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void UnaryOperator::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             static const char* UNARY_OPERATOR_TYPE_NAMES[]
             = { "Preincrementation", "Predecrementation", "Postincrementation", "Postdecrementation", "Plus", "Minus",
                 "Logical NOT",       "Bitwise NOT" };
-
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "UnaryOperator %s\n", DEBUG_PRINT_ARGS_BEG, UNARY_OPERATOR_TYPE_NAMES[(uint32_t)m_type]);
-            ++indentLevel;
-            m_operand->debugPrint(indentLevel, "Operand: ");
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("UnaryOperator ");
+            dw.writeString(UNARY_OPERATOR_TYPE_NAMES[uint32_t(m_type)]);
+            dw.writeString("\n");
+            ++idl;
+            m_operand->debugPrint(dw, idl, "Operand: ");
         }
 
-        void MemberAccessOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void MemberAccessOperator::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "MemberAccessOperator Member=%s\n", DEBUG_PRINT_ARGS_BEG, m_membername.c_str());
-            m_operand->debugPrint(indentLevel + 1, "Operand: ");
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("MemberAccessOperator Member=");
+            dw.writeString(m_membername);
+            dw.writeString("\n");
+            m_operand->debugPrint(dw, idl + 1, "Operand: ");
         }
 
-        void BinaryOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void BinaryOperator::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             static const char* BINARY_OPERATOR_TYPE_NAMES[] = {
                 "Mul",
@@ -329,75 +312,80 @@ namespace MSL
                 "Comma",
                 "Indexing",
             };
-
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "BinaryOperator %s\n", DEBUG_PRINT_ARGS_BEG,
-                   BINARY_OPERATOR_TYPE_NAMES[(uint32_t)m_type]);
-            ++indentLevel;
-            m_leftoper->debugPrint(indentLevel, "LeftOperand: ");
-            m_rightoper->debugPrint(indentLevel, "RightOperand: ");
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("BinaryOperator ");
+            dw.writeString(BINARY_OPERATOR_TYPE_NAMES[uint32_t(m_type)]);
+            dw.writeString("\n");
+            ++idl;
+            m_leftoper->debugPrint(dw, idl, "LeftOperand: ");
+            m_rightoper->debugPrint(dw, idl, "RightOperand: ");
         }
 
-        void TernaryOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void TernaryOperator::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "TernaryOperator\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            m_condexpr->debugPrint(indentLevel, "ConditionExpression: ");
-            m_trueexpr->debugPrint(indentLevel, "TrueExpression: ");
-            m_falseexpr->debugPrint(indentLevel, "FalseExpression: ");
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("TernaryOperator\n");
+            ++idl;
+            m_condexpr->debugPrint(dw, idl, "ConditionExpression: ");
+            m_trueexpr->debugPrint(dw, idl, "TrueExpression: ");
+            m_falseexpr->debugPrint(dw, idl, "FalseExpression: ");
         }
 
 
-        void CallOperator::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void CallOperator::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             size_t i;
             size_t count;
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "CallOperator\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
-            m_oplist[0]->debugPrint(indentLevel, "Callee: ");
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("CallOperator\n");
+            ++idl;
+            m_oplist[0]->debugPrint(dw, idl, "Callee: ");
             for(i = 1, count = m_oplist.size(); i < count; ++i)
             {
-                m_oplist[i]->debugPrint(indentLevel, "Argument: ");
+                m_oplist[i]->debugPrint(dw, idl, "Argument: ");
             }
         }
 
-        void FunctionDefinition::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void FunctionDefinition::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             size_t i;
             size_t count;
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "Function(", DEBUG_PRINT_ARGS_BEG);
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("Function(");
             if(!m_paramlist.empty())
             {
-                printf("%s", m_paramlist[0].c_str());
+                dw.writeString(m_paramlist[0]);
                 for(i = 1, count = m_paramlist.size(); i < count; ++i)
                 {
-                    printf(", %s", m_paramlist[i].c_str());
+                    dw.writeString(", ");
+                    dw.writeString(m_paramlist[i]);
                 }
             }
-            printf(")\n");
-            m_body.debugPrint(indentLevel + 1, "Body: ");
+            dw.writeString(")\n");
+            m_body.debugPrint(dw, idl + 1, "Body: ");
         }
 
-        void ObjectExpression::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void ObjectExpression::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "Object\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("Object\n");
+            ++idl;
             for(const auto& [name, value] : m_exprmap)
             {
-                value->debugPrint(indentLevel, name);
+                value->debugPrint(dw, idl, name);
             }
         }
 
-        void ArrayExpression::debugPrint(uint32_t indentLevel, std::string_view prefix) const
+        void ArrayExpression::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             size_t i;
             size_t count;
-            std::string itemPrefix;
-            printf(DEBUG_PRINT_FORMAT_STR_BEG "Array\n", DEBUG_PRINT_ARGS_BEG);
-            ++indentLevel;
+            printPrefix(dw, idl, getPlace(), prefix);
+            dw.writeString("Array\n");
+            ++idl;
             for(i = 0, count = m_exprlist.size(); i < count; ++i)
             {
-                itemPrefix = Util::Format("%zu: ", i);
-                m_exprlist[i]->debugPrint(indentLevel, itemPrefix);
+                m_exprlist[i]->debugPrint(dw, idl, Util::Format("%zu: ", i));
             }
         }
     }

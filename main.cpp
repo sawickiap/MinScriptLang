@@ -17,6 +17,44 @@
 #include "msl.h"
 #include "optionparser.h"
 
+struct StdoutWriter: public MSL::AST::DebugWriter
+{
+    StdoutWriter()
+    {
+    }
+
+    void flush() override
+    {
+        std::cout << std::flush;
+    }
+
+    void writeValue(const MSL::Value& v) override
+    {
+        v.toStream(std::cout);
+    }
+
+    void writeString(std::string_view str) override
+    {
+        std::cout << str;
+    }
+
+    void writeReprString(std::string_view str) override
+    {
+        MSL::Util::reprString(std::cout, str);
+    }
+
+    void writeChar(int ch) override
+    {
+        std::cout << char(ch);
+    }
+
+    void writeNumber(double n) override
+    {
+        std::cout << n;
+    }
+    
+};
+
 void WriteDataToFile(const char* filePath, const char* data, size_t byteCount)
 {
     FILE* f;
@@ -61,6 +99,10 @@ void setARGV(MSL::Environment& env, const std::vector<std::string>& va)
 }
 
 #if !defined(NO_READLINE)
+/*
+* returns true if $line is more than just space.
+* used to ignore blank lines.
+*/
 static bool notjustspace(const char* line)
 {
     int c;
@@ -128,13 +170,15 @@ int repl(MSL::Environment& env)
 
 int dumpSyntaxTreeCode(MSL::Environment& env, std::string_view code)
 {
+    (void)env;
+    StdoutWriter sw;
     MSL::AST::Script ast(MSL::Location{});
     try
     {
         MSL::Tokenizer tkz(code); 
         MSL::Parser prs(tkz);
         prs.parseScript(ast);
-        ast.debugPrint(0, "");
+        ast.debugPrint(sw, 0, "");
     }
     catch(MSL::Error::Exception& e)
     {

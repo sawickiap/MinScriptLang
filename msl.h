@@ -70,7 +70,7 @@ namespace MSL
 {
     namespace AST
     {
-        struct /**/FunctionDefinition;
+        class /**/FunctionDefinition;
         class /**/ExecutionContext;
         class /**/ThisType;
     }
@@ -85,6 +85,8 @@ namespace MSL
         std::shared_ptr<Array> CopyArray(const Array& src);
 
         bool NumberToIndex(size_t& outIndex, double number);
+        void reprChar(std::ostream& os, int c);
+        void reprString(std::ostream& os, std::string_view str);
         std::string VFormat(const char* format, va_list argList);
         std::string Format(const char* format, ...);
 
@@ -138,12 +140,47 @@ namespace MSL
         }
     }
 
-    struct Location
+    class Location
     {
-        uint32_t textindex = 0;
-        uint32_t textline = 1;
-        uint32_t textcolumn = 0;
-        std::string_view filename = "none";
+        public:
+            uint32_t textindex = 0;
+            uint32_t textline = 1;
+            uint32_t textcolumn = 0;
+            std::string_view filename = "none";
+
+        private:
+            inline void copyFrom(const Location& other)
+            {
+                textindex = other.textindex;
+                textline = other.textline;
+                textcolumn = other.textcolumn;
+                filename = other.filename;
+            }
+
+        public:
+            inline Location()
+            {
+            }
+
+            inline Location(uint32_t ti, uint32_t tl, uint32_t tc): textindex(ti), textline(tl), textcolumn(tc)
+            {
+            }
+
+            inline Location(uint32_t ti, uint32_t tl, uint32_t tc, std::string_view f): Location(ti, tl, tc)
+            {
+                filename = f;
+            }
+
+            inline Location(const Location& other)
+            {
+                copyFrom(other);
+            }
+
+            inline Location& operator=(const Location& other)
+            {
+                copyFrom(other);
+                return *this;
+            }
     };
 
     namespace Error
@@ -866,11 +903,11 @@ namespace MSL
             }
     };
 
-    struct BreakException
+    class BreakException
     {
     };
 
-    struct ContinueException
+    class ContinueException
     {
     };
 
@@ -924,35 +961,44 @@ namespace MSL
         "resize", "add", "insert", "remove",
     };
     
-
-    struct ObjectMemberLValue
+    namespace LeftValue
     {
-        Object* objectval;
-        std::string keyval;
-    };
+        class ObjectMember
+        {
+            public:
+                Object* objectval;
+                std::string keyval;
+        };
 
-    struct StringCharacterLValue
-    {
-        std::string* stringval;
-        size_t indexval;
-    };
+        class StringCharacter
+        {
+            public:
+                std::string* stringval;
+                size_t indexval;
+        };
 
-    struct ArrayItemLValue
-    {
-        Array* arrayval;
-        size_t indexval;
-    };
+        class ArrayItem
+        {
+            public:
+                Array* arrayval;
+                size_t indexval;
+        };
 
-    struct LValue : public std::variant<ObjectMemberLValue, StringCharacterLValue, ArrayItemLValue>
-    {
-        Value* getValueRef(const Location& place) const;// Always returns non-null or throws exception.
-        Value getValue(const Location& place) const;
-    };
+        //! TODO: needs a better name
+        class Getter : public std::variant<ObjectMember, StringCharacter, ArrayItem>
+        {
+            public:
+                // Always returns non-null or throws exception.
+                Value* getValueRef(const Location& place) const;
+                Value getValue(const Location& place) const;
+        };
+    }
 
-    struct ReturnException
+    class ReturnException
     {
-        const Location place;
-        Value thrownvalue;
+        public:
+            const Location place;
+            Value thrownvalue;
     };
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -966,6 +1012,21 @@ namespace MSL
             std::shared_ptr<Array>,
             Value::StringValType
         >;
+
+        class DebugWriter
+        {
+            public:
+                virtual void writeValue(const Value& v) = 0;
+                virtual void writeString(std::string_view str) = 0;
+                virtual void writeReprString(std::string_view str) = 0;
+                virtual void writeChar(int ch) = 0;
+                virtual void writeNumber(double n) = 0;
+
+                inline virtual void flush()
+                {
+                }
+        };
+
         class ThisType : public ThisVariant
         {
             public:
@@ -1080,7 +1141,7 @@ namespace MSL
                 const Location m_place;
 
             protected:
-                void assign(const LValue& lhs, Value&& rhs) const;
+                void assign(const LeftValue::Getter& lhs, Value&& rhs) const;
 
             public:
                 explicit Statement(const Location& place) : m_place{ place }
@@ -1096,168 +1157,195 @@ namespace MSL
                     return m_place;
                 }
 
-                virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const = 0;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const = 0;
 
                 virtual Value execute(ExecutionContext& ctx) const = 0;
         };
 
-        struct EmptyStatement : public Statement
+        class EmptyStatement : public Statement
         {
-            explicit EmptyStatement(const Location& place) : Statement{ place }
-            {
-            }
+            public:
+                explicit EmptyStatement(const Location& place) : Statement{ place }
+                {
+                }
 
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
 
-            virtual Value execute(ExecutionContext&) const
-            {
-                return {};
-            }
+                virtual Value execute(ExecutionContext&) const
+                {
+                    return {};
+                }
         };
 
-        struct /**/Expression;
+        class /**/Expression;
 
-        struct Condition : public Statement
+        class Condition : public Statement
         {
-            // [0] executed if true, [1] executed if false, optional.
-            std::unique_ptr<Expression> m_condexpr;
-            std::unique_ptr<Statement> m_truestmt;
-            std::unique_ptr<Statement> m_falsestmt;
+            public:
+                // [0] executed if true, [1] executed if false, optional.
+                std::unique_ptr<Expression> m_condexpr;
+                std::unique_ptr<Statement> m_truestmt;
+                std::unique_ptr<Statement> m_falsestmt;
 
-            explicit Condition(const Location& place) : Statement{ place }
-            {
-            }
+            public:
+                explicit Condition(const Location& place) : Statement{ place }
+                {
+                }
 
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
 
-            virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx) const;
         };
 
-        struct WhileLoop : public Statement
+        class WhileLoop : public Statement
         {
-            enum Type { While, DoWhile };
-        
-            Type m_type;
-            std::unique_ptr<Expression> m_condexpr;
-            std::unique_ptr<Statement> m_body;
+            public:
+                enum Type { While, DoWhile };
 
-            explicit WhileLoop(const Location& place, Type type) : Statement{ place }, m_type{ type }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value execute(ExecutionContext& ctx) const;
+            public:
+                Type m_type;
+                std::unique_ptr<Expression> m_condexpr;
+                std::unique_ptr<Statement> m_body;
+
+            public:
+                explicit WhileLoop(const Location& place, Type type) : Statement{ place }, m_type{ type }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value execute(ExecutionContext& ctx) const;
         };
 
-        struct ForLoop : public Statement
+        class ForLoop : public Statement
         {
-            // Optional
-            std::unique_ptr<Expression> m_initexpr;
-            // Optional
-            std::unique_ptr<Expression> m_condexpr;
-            // Optional
-            std::unique_ptr<Expression> m_iterexpr;
-            std::unique_ptr<Statement> m_body;
-            explicit ForLoop(const Location& place) : Statement{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value execute(ExecutionContext& ctx) const;
+            public:
+                // Optional
+                std::unique_ptr<Expression> m_initexpr;
+                // Optional
+                std::unique_ptr<Expression> m_condexpr;
+                // Optional
+                std::unique_ptr<Expression> m_iterexpr;
+                std::unique_ptr<Statement> m_body;
+
+            public:
+                explicit ForLoop(const Location& place) : Statement{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value execute(ExecutionContext& ctx) const;
         };
 
-        struct RangeBasedForLoop : public Statement
+        class RangeBasedForLoop : public Statement
         {
-            // Can be empty.
-            std::string m_keyvar;
-            // Cannot be empty.
-            std::string m_valuevar;
-            std::unique_ptr<Expression> m_rangeexpr;
-            std::unique_ptr<Statement> m_body;
-            explicit RangeBasedForLoop(const Location& place) : Statement{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value execute(ExecutionContext& ctx) const;
+            public:
+                // Can be empty.
+                std::string m_keyvar;
+                // Cannot be empty.
+                std::string m_valuevar;
+                std::unique_ptr<Expression> m_rangeexpr;
+                std::unique_ptr<Statement> m_body;
+
+            public:
+                explicit RangeBasedForLoop(const Location& place) : Statement{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value execute(ExecutionContext& ctx) const;
         };
 
-
-        struct LoopBreakStatement : public Statement
+        class LoopBreakStatement : public Statement
         {
-            enum class Type
-            {
-                Break,
-                Continue,
-                Count
-            };
-            Type m_type;
+            public:
+                enum class Type
+                {
+                    Break,
+                    Continue,
+                    Count
+                };
 
-            explicit LoopBreakStatement(const Location& place, Type type) : Statement{ place }, m_type{ type }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value execute(ExecutionContext& ctx) const;
+            public:
+                Type m_type;
+
+            public:
+                explicit LoopBreakStatement(const Location& place, Type type) : Statement{ place }, m_type{ type }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value execute(ExecutionContext& ctx) const;
         };
 
-        struct ReturnStatement : public Statement
+        class ReturnStatement : public Statement
         {
-            // Can be null.
-            std::unique_ptr<Expression> m_retvalue;
+            public:
+                // Can be null.
+                std::unique_ptr<Expression> m_retvalue;
 
-            explicit ReturnStatement(const Location& place) : Statement{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value execute(ExecutionContext& ctx) const;
+            public:
+                explicit ReturnStatement(const Location& place) : Statement{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value execute(ExecutionContext& ctx) const;
         };
 
-        struct Block : public Statement
+        class Block : public Statement
         {
-            std::vector<std::unique_ptr<Statement>> m_statements;
+            public:
+                std::vector<std::unique_ptr<Statement>> m_statements;
 
-            explicit Block(const Location& place) : Statement{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value execute(ExecutionContext& ctx) const;
+            public:
+                explicit Block(const Location& place) : Statement{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value execute(ExecutionContext& ctx) const;
         };
 
-        struct /**/ConstantValue;
+        class /**/ConstantValue;
 
-        struct SwitchStatement : public Statement
+        class SwitchStatement : public Statement
         {
-            std::unique_ptr<Expression> m_cond;
-            // null means default block.
-            std::vector<std::unique_ptr<AST::ConstantValue>> m_itemvals;
-            // Can be null if empty.
-            std::vector<std::unique_ptr<AST::Block>> m_itemblocks;
+            public:
+                std::unique_ptr<Expression> m_cond;
+                // null means default block.
+                std::vector<std::unique_ptr<AST::ConstantValue>> m_itemvals;
+                // Can be null if empty.
+                std::vector<std::unique_ptr<AST::Block>> m_itemblocks;
 
-            explicit SwitchStatement(const Location& place) : Statement{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value execute(ExecutionContext& ctx) const;
+            public:
+                explicit SwitchStatement(const Location& place) : Statement{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value execute(ExecutionContext& ctx) const;
         };
 
-        struct ThrowStatement : public Statement
+        class ThrowStatement : public Statement
         {
-            std::unique_ptr<Expression> m_thrownexpr;
-            explicit ThrowStatement(const Location& place) : Statement{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value execute(ExecutionContext& ctx) const;
+            public:
+                std::unique_ptr<Expression> m_thrownexpr;
+
+            public:
+                explicit ThrowStatement(const Location& place) : Statement{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value execute(ExecutionContext& ctx) const;
         };
 
-        struct TryStatement : public Statement
+        class TryStatement : public Statement
         {
-            std::unique_ptr<Statement> m_tryblock;
-            std::unique_ptr<Statement> m_catchblock;// Optional
-            std::unique_ptr<Statement> m_finallyblock;// Optional
-            std::string m_exvarname;
-            explicit TryStatement(const Location& place) : Statement{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value execute(ExecutionContext& ctx) const;
+            public:
+                std::unique_ptr<Statement> m_tryblock;
+                std::unique_ptr<Statement> m_catchblock;// Optional
+                std::unique_ptr<Statement> m_finallyblock;// Optional
+                std::string m_exvarname;
+
+            public:
+                explicit TryStatement(const Location& place) : Statement{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value execute(ExecutionContext& ctx) const;
         };
 
         class Script: public Block
@@ -1269,99 +1357,107 @@ namespace MSL
                 virtual Value execute(ExecutionContext& ctx) const;
         };
 
-        struct Expression : Statement
+        class Expression: public Statement
         {
-            explicit Expression(const Location& place) : Statement{ place }
-            {
-            }
+            public:
+                explicit Expression(const Location& place) : Statement{ place }
+                {
+                }
 
-            virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const
-            {
-                (void)outThis;
-                return getLeftValue(ctx).getValue(getPlace());
-            }
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const
+                {
+                    (void)outThis;
+                    return getLeftValue(ctx).getValue(getPlace());
+                }
 
-            virtual LValue getLeftValue(ExecutionContext& ctx) const
-            {
-                (void)ctx;
-                MINSL_EXECUTION_CHECK(false, getPlace(), "expected lvalue");
-            }
+                virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const
+                {
+                    (void)ctx;
+                    MINSL_EXECUTION_CHECK(false, getPlace(), "expected lvalue");
+                }
 
-            virtual Value execute(ExecutionContext& ctx) const
-            {
-                return evaluate(ctx, nullptr);
-            }
+                virtual Value execute(ExecutionContext& ctx) const
+                {
+                    return evaluate(ctx, nullptr);
+                }
         };
 
-        struct ConstantExpression : Expression
+        class ConstantExpression: public Expression
         {
-            explicit ConstantExpression(const Location& place) : Expression{ place }
-            {
-            }
+            public:
+                explicit ConstantExpression(const Location& place) : Expression{ place }
+                {
+                }
 
-            virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx) const;
         };
 
-        struct ConstantValue : ConstantExpression
+        class ConstantValue: public ConstantExpression
         {
-            Value m_val;
+            public:
+                Value m_val;
 
-            ConstantValue(const Location& place, Value&& val) : ConstantExpression{ place }, m_val{ std::move(val) }
-            {
-                assert(m_val.type() == Value::Type::Null || m_val.isNumber() || m_val.isString());
-            }
+            public:
+                ConstantValue(const Location& place, Value&& val) : ConstantExpression{ place }, m_val{ std::move(val) }
+                {
+                    assert(m_val.type() == Value::Type::Null || m_val.isNumber() || m_val.isString());
+                }
 
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const override;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
 
-            virtual Value evaluate(ExecutionContext&, ThisType*) const override
-            {
-                return Value{ m_val };
-            }
+                virtual Value evaluate(ExecutionContext&, ThisType*) const override
+                {
+                    return Value{ m_val };
+                }
 
-            /*
-            virtual Value execute(ExecutionContext&)
-            {
-                return m_val;
-            }
-            */
-            
+                /*
+                virtual Value execute(ExecutionContext&)
+                {
+                    return m_val;
+                }
+                */
         };
 
-        struct Identifier : ConstantExpression
+        class Identifier : public ConstantExpression
         {
-            enum class Scope
-            {
-                None,
-                Local,
-                Global,
-                Count
-            };
+            public:
+                enum class Scope
+                {
+                    None,
+                    Local,
+                    Global,
+                    Count
+                };
 
-            Scope m_scope = Scope::Count;
-            std::string m_ident;
+            public:
+                Scope m_scope = Scope::Count;
+                std::string m_ident;
 
-            Identifier(const Location& place, Scope scope, std::string&& s): ConstantExpression{ place }, m_scope(scope), m_ident(std::move(s))
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
-            virtual LValue getLeftValue(ExecutionContext& ctx) const;
+            public:
+                Identifier(const Location& place, Scope scope, std::string&& s): ConstantExpression{ place }, m_scope(scope), m_ident(std::move(s))
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+                virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const;
         };
 
-        struct ThisExpression : ConstantExpression
+        class ThisExpression: public ConstantExpression
         {
-            ThisExpression(const Location& place) : ConstantExpression{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+            public:
+                ThisExpression(const Location& place) : ConstantExpression{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
         };
 
-        struct Operator : Expression
+        class Operator: public Expression
         {
-            explicit Operator(const Location& place) : Expression{ place }
-            {
-            }
+            public:
+                explicit Operator(const Location& place) : Expression{ place }
+                {
+                }
         };
 
         class UnaryOperator: public Operator
@@ -1391,22 +1487,24 @@ namespace MSL
                 UnaryOperator(const Location& place, Type type) : Operator{ place }, m_type(type)
                 {
                 }
-                virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
                 virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
-                virtual LValue getLeftValue(ExecutionContext& ctx) const;
+                virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const;
         };
 
-        struct MemberAccessOperator: Operator
+        class MemberAccessOperator: public Operator
         {
-            std::unique_ptr<Expression> m_operand;
-            std::string m_membername;
+            public:
+                std::unique_ptr<Expression> m_operand;
+                std::string m_membername;
 
-            MemberAccessOperator(const Location& place) : Operator{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
-            virtual LValue getLeftValue(ExecutionContext& ctx) const;
+            public:
+                MemberAccessOperator(const Location& place) : Operator{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+                virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const;
         };
 
         class BinaryOperator: public Operator
@@ -1456,77 +1554,91 @@ namespace MSL
             private:
                 Value ShiftLeft(const Value& lhs, const Value& rhs) const;
                 Value ShiftRight(const Value& lhs, const Value& rhs) const;
-                Value Assignment(LValue&& lhs, Value&& rhs) const;
+                Value Assignment(LeftValue::Getter&& lhs, Value&& rhs) const;
 
             public:
                 BinaryOperator(const Location& place, Type type) : Operator{ place }, m_type(type)
                 {
                 }
-                virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
                 virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
-                virtual LValue getLeftValue(ExecutionContext& ctx) const;
+                virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const;
         };
 
-        struct TernaryOperator : Operator
+        class TernaryOperator: public Operator
         {
-            std::unique_ptr<Expression> m_condexpr;
-            std::unique_ptr<Expression> m_trueexpr;
-            std::unique_ptr<Expression> m_falseexpr;
+            public:
+                std::unique_ptr<Expression> m_condexpr;
+                std::unique_ptr<Expression> m_trueexpr;
+                std::unique_ptr<Expression> m_falseexpr;
 
-
-            explicit TernaryOperator(const Location& place) : Operator{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+            public:
+                explicit TernaryOperator(const Location& place) : Operator{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
         };
 
-        struct CallOperator : Operator
+        class CallOperator: public Operator
         {
-            std::vector<std::unique_ptr<Expression>> m_oplist;
-            CallOperator(const Location& place) : Operator{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+            public:
+                std::vector<std::unique_ptr<Expression>> m_oplist;
+
+            public:
+                CallOperator(const Location& place) : Operator{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
         };
 
-        struct FunctionDefinition : public Expression
+        class FunctionDefinition : public Expression
         {
-            std::vector<std::string> m_paramlist;
-            Block m_body;
-            FunctionDefinition(const Location& place) : Expression{ place }, m_body{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value evaluate(ExecutionContext&, ThisType*) const
-            {
-                return Value{ this };
-            }
-            bool areParamsUnique() const;
+            public:
+                std::vector<std::string> m_paramlist;
+                Block m_body;
+
+            public:
+                FunctionDefinition(const Location& place) : Expression{ place }, m_body{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value evaluate(ExecutionContext&, ThisType*) const
+                {
+                    return Value{ this };
+                }
+                bool areParamsUnique() const;
         };
 
-        struct ObjectExpression : public Expression
+        class ObjectExpression : public Expression
         {
-            using ItemMap = std::map<std::string, std::unique_ptr<Expression>>;
+            public:
+                using ItemMap = std::map<std::string, std::unique_ptr<Expression>>;
 
-            std::unique_ptr<Expression> m_baseexpr;
-            ItemMap m_exprmap;
-            ObjectExpression(const Location& place) : Expression{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+            public:
+                std::unique_ptr<Expression> m_baseexpr;
+                ItemMap m_exprmap;
+
+            public:
+                ObjectExpression(const Location& place) : Expression{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
         };
 
-        struct ArrayExpression : public Expression
+        class ArrayExpression : public Expression
         {
-            std::vector<std::unique_ptr<Expression>> m_exprlist;
-            ArrayExpression(const Location& place) : Expression{ place }
-            {
-            }
-            virtual void debugPrint(uint32_t indentLevel, std::string_view prefix) const;
-            virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+            public:
+                std::vector<std::unique_ptr<Expression>> m_exprlist;
+
+            public:
+                ArrayExpression(const Location& place) : Expression{ place }
+                {
+                }
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
         };
 
     }// namespace AST

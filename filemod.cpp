@@ -13,6 +13,7 @@ namespace MSL
             {
                 std::string data;
                 Value filename;
+                (void)env;
                 filename = Util::checkArgument(place, "File.read", args, 0, Value::Type::String);
                 std::fstream fh(filename.getString(), std::ios::in | std::ios::binary);
                 if(!fh.good())

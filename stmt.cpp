@@ -104,81 +104,82 @@ namespace MSL
         MINSL_EXECUTION_CHECK(value.isNumber(), operand->getPlace(), "expected numeric value");
     }
 
-
-    Value* LValue::getValueRef(const Location& place) const
+    namespace LeftValue
     {
-        Value* val;
-        const ObjectMemberLValue* leftmemberval;
-        const ArrayItemLValue* leftarrayitem;
-        leftmemberval = std::get_if<ObjectMemberLValue>(this);
-        if(leftmemberval)
+        Value* Getter::getValueRef(const Location& place) const
         {
-            if((val = leftmemberval->objectval->tryGet(leftmemberval->keyval)))
+            Value* val;
+            const ObjectMember* leftmemberval;
+            const ArrayItem* leftarrayitem;
+            leftmemberval = std::get_if<ObjectMember>(this);
+            if(leftmemberval)
             {
-                return val;
+                if((val = leftmemberval->objectval->tryGet(leftmemberval->keyval)))
+                {
+                    return val;
+                }
+                throw Error::RuntimeError(place, "cannot get reference to lvalue of non-existing members");
             }
-            throw Error::RuntimeError(place, "cannot get reference to lvalue of non-existing members");
-        }
-        leftarrayitem = std::get_if<ArrayItemLValue>(this);
-        if(leftarrayitem)
-        {
-            MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), place, "index out of bounds");
-            return &leftarrayitem->arrayval->at(leftarrayitem->indexval);
-        }
-        throw Error::RuntimeError(place, "lvalue required");
-    }
-
-    Value LValue::getValue(const Location& place) const
-    {
-        char ch;
-        const Value* val;
-        const ArrayItemLValue* leftarrayitem;
-        const ObjectMemberLValue* leftmemberval;
-        const StringCharacterLValue* leftstrchar;
-        if((leftmemberval = std::get_if<ObjectMemberLValue>(this)))
-        {
-            val = leftmemberval->objectval->tryGet(leftmemberval->keyval);
-            if(val)
+            leftarrayitem = std::get_if<ArrayItem>(this);
+            if(leftarrayitem)
             {
-                return *val;
+                MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), place, "index out of bounds");
+                return &leftarrayitem->arrayval->at(leftarrayitem->indexval);
             }
-            throw Error::RuntimeError(place, "cannot get lvalue of non-existing member");
+            throw Error::RuntimeError(place, "lvalue required");
         }
-        if((leftstrchar = std::get_if<StringCharacterLValue>(this)))
-        {
-            MINSL_EXECUTION_CHECK(leftstrchar->indexval < leftstrchar->stringval->length(), place, "index out of bounds");
-            ch = (*leftstrchar->stringval)[leftstrchar->indexval];
-            return Value{ std::string{ &ch, &ch + 1 } };
-        }
-        if((leftarrayitem = std::get_if<ArrayItemLValue>(this)))
-        {
-            MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), place, "index out of bounds");
-            return Value{ leftarrayitem->arrayval->at(leftarrayitem->indexval) };
-        }
-        assert(0);
-        return {};
-    }
 
+        Value Getter::getValue(const Location& place) const
+        {
+            char ch;
+            const Value* val;
+            const ArrayItem* leftarrayitem;
+            const ObjectMember* leftmemberval;
+            const StringCharacter* leftstrchar;
+            if((leftmemberval = std::get_if<ObjectMember>(this)))
+            {
+                val = leftmemberval->objectval->tryGet(leftmemberval->keyval);
+                if(val)
+                {
+                    return *val;
+                }
+                throw Error::RuntimeError(place, "cannot get lvalue of non-existing member");
+            }
+            if((leftstrchar = std::get_if<StringCharacter>(this)))
+            {
+                MINSL_EXECUTION_CHECK(leftstrchar->indexval < leftstrchar->stringval->length(), place, "index out of bounds");
+                ch = (*leftstrchar->stringval)[leftstrchar->indexval];
+                return Value{ std::string{ &ch, &ch + 1 } };
+            }
+            if((leftarrayitem = std::get_if<ArrayItem>(this)))
+            {
+                MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), place, "index out of bounds");
+                return Value{ leftarrayitem->arrayval->at(leftarrayitem->indexval) };
+            }
+            assert(0);
+            return {};
+        }
+    }
     namespace AST
     {
-        void Statement::assign(const LValue& lhs, Value&& rhs) const
+        void Statement::assign(const LeftValue::Getter& lhs, Value&& rhs) const
         {
-            const StringCharacterLValue* leftstrchar;
-            const ArrayItemLValue* leftarrayitem;
-            const ObjectMemberLValue* leftobjmember;
-            if((leftobjmember = std::get_if<ObjectMemberLValue>(&lhs)))
+            const LeftValue::StringCharacter* leftstrchar;
+            const LeftValue::ArrayItem* leftarrayitem;
+            const LeftValue::ObjectMember* leftobjmember;
+            if((leftobjmember = std::get_if<LeftValue::ObjectMember>(&lhs)))
             {
                 if(rhs.isNull())
                     leftobjmember->objectval->removeEntry(leftobjmember->keyval);
                 else
                     leftobjmember->objectval->put(leftobjmember->keyval, std::move(rhs));
             }
-            else if((leftarrayitem = std::get_if<ArrayItemLValue>(&lhs)))
+            else if((leftarrayitem = std::get_if<LeftValue::ArrayItem>(&lhs)))
             {
                 MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), getPlace(), "index out of bounds");
                 leftarrayitem->arrayval->at(leftarrayitem->indexval) = std::move(rhs);
             }
-            else if((leftstrchar = std::get_if<StringCharacterLValue>(&lhs)))
+            else if((leftstrchar = std::get_if<LeftValue::StringCharacter>(&lhs)))
             {
                 MINSL_EXECUTION_CHECK(leftstrchar->indexval < leftstrchar->stringval->length(), getPlace(), "index out of bounds");
                 MINSL_EXECUTION_CHECK(rhs.isString(), getPlace(), "expected string");
@@ -300,10 +301,10 @@ namespace MSL
                 {
                     if(usekey)
                     {
-                        assign(LValue{ ObjectMemberLValue{ &innermostctx, m_keyvar } }, Value{ (double)i });
+                        assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_keyvar } }, Value{ (double)i });
                     }
                     ch = rangeStr[i];
-                    assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{ std::string{ &ch, &ch + 1 } });
+                    assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_valuevar } }, Value{ std::string{ &ch, &ch + 1 } });
                     try
                     {
                         m_body->execute(ctx);
@@ -323,9 +324,9 @@ namespace MSL
                 {
                     if(usekey)
                     {
-                        assign(LValue{ ObjectMemberLValue{ &innermostctx, m_keyvar } }, Value{ std::string{ key } });
+                        assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_keyvar } }, Value{ std::string{ key } });
                     }
-                    assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{ value });
+                    assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_valuevar } }, Value{ value });
                     try
                     {
                         m_body->execute(ctx);
@@ -346,9 +347,9 @@ namespace MSL
                 {
                     if(usekey)
                     {
-                        assign(LValue{ ObjectMemberLValue{ &innermostctx, m_keyvar } }, Value{ (double)i });
+                        assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_keyvar } }, Value{ (double)i });
                     }
-                    assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{ arr->at(i) });
+                    assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_valuevar } }, Value{ arr->at(i) });
                     try
                     {
                         m_body->execute(ctx);
@@ -368,9 +369,9 @@ namespace MSL
             }
             if(usekey)
             {
-                assign(LValue{ ObjectMemberLValue{ &innermostctx, m_keyvar } }, Value{});
+                assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_keyvar } }, Value{});
             }
-            assign(LValue{ ObjectMemberLValue{ &innermostctx, m_valuevar } }, Value{});
+            assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_valuevar } }, Value{});
             return {};
         }
 
@@ -486,9 +487,9 @@ namespace MSL
                 if(m_catchblock)
                 {
                     auto& innermostctx = ctx.getInnermostScope();
-                    assign(LValue{ ObjectMemberLValue{ &innermostctx, m_exvarname } }, std::move(val));
+                    assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_exvarname } }, std::move(val));
                     m_catchblock->execute(ctx);
-                    assign(LValue{ ObjectMemberLValue{ &innermostctx, m_exvarname } }, Value{});
+                    assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_exvarname } }, Value{});
                     if(m_finallyblock)
                     {
                         m_finallyblock->execute(ctx);
@@ -519,10 +520,10 @@ namespace MSL
                 if(m_catchblock)
                 {
                     auto& innermostctx = ctx.getInnermostScope();
-                    assign(LValue{ ObjectMemberLValue{ &innermostctx, m_exvarname } },
+                    assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_exvarname } },
                            Value{ objectFromException(err) });
                     m_catchblock->execute(ctx);
-                    assign(LValue{ ObjectMemberLValue{ &innermostctx, m_exvarname } }, Value{});
+                    assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_exvarname } }, Value{});
                     if(m_finallyblock)
                         m_finallyblock->execute(ctx);
                 }
@@ -656,7 +657,7 @@ namespace MSL
             return {};
         }
 
-        LValue Identifier::getLeftValue(ExecutionContext& ctx) const
+        LeftValue::Getter Identifier::getLeftValue(ExecutionContext& ctx) const
         {
             bool islocal;
             const std::shared_ptr<Object>* thisObj;
@@ -668,7 +669,7 @@ namespace MSL
                 // Local variable
                 if((m_scope == Identifier::Scope::None || m_scope == Identifier::Scope::Local) && ctx.getCurrentLocalScope()->hasKey(m_ident))
                 {
-                    return LValue{ ObjectMemberLValue{ &*ctx.getCurrentLocalScope(), m_ident } };
+                    return LeftValue::Getter{ LeftValue::ObjectMember{ &*ctx.getCurrentLocalScope(), m_ident } };
                 }
                 // This
                 if(m_scope == Identifier::Scope::None)
@@ -676,7 +677,7 @@ namespace MSL
                     thisObj = std::get_if<std::shared_ptr<Object>>(&ctx.getThis());
                     if(thisObj && (*thisObj)->hasKey(m_ident))
                     {
-                        return LValue{ ObjectMemberLValue{ (*thisObj).get(), m_ident } };
+                        return LeftValue::Getter{ LeftValue::ObjectMember{ (*thisObj).get(), m_ident } };
                     }
                 }
             }
@@ -684,14 +685,14 @@ namespace MSL
             // Global variable
             if((m_scope == Identifier::Scope::None || m_scope == Identifier::Scope::Global) && ctx.m_globalscope.hasKey(m_ident))
             {
-                return LValue{ ObjectMemberLValue{ &ctx.m_globalscope, m_ident } };
+                return LeftValue::Getter{ LeftValue::ObjectMember{ &ctx.m_globalscope, m_ident } };
             }
             // Not found: return reference to smallest scope.
             if((m_scope == Identifier::Scope::None || m_scope == Identifier::Scope::Local) && islocal)
             {
-                return LValue{ ObjectMemberLValue{ ctx.getCurrentLocalScope(), m_ident } };
+                return LeftValue::Getter{ LeftValue::ObjectMember{ ctx.getCurrentLocalScope(), m_ident } };
             }
-            return LValue{ ObjectMemberLValue{ &ctx.m_globalscope, m_ident } };
+            return LeftValue::Getter{ LeftValue::ObjectMember{ &ctx.m_globalscope, m_ident } };
         }
 
 
@@ -767,15 +768,15 @@ namespace MSL
             return {};
         }
 
-        LValue UnaryOperator::getLeftValue(ExecutionContext& ctx) const
+        LeftValue::Getter UnaryOperator::getLeftValue(ExecutionContext& ctx) const
         {
-            LValue lval;
+            LeftValue::Getter lval;
             Value* val;
-            const ObjectMemberLValue* leftmemberval;
+            const LeftValue::ObjectMember* leftmemberval;
             if(m_type == UnaryOperator::Type::Preincrementation || m_type == UnaryOperator::Type::Predecrementation)
             {
                 lval = m_operand->getLeftValue(ctx);
-                leftmemberval = std::get_if<ObjectMemberLValue>(&lval);
+                leftmemberval = std::get_if<LeftValue::ObjectMember>(&lval);
                 MINSL_EXECUTION_CHECK(leftmemberval, getPlace(), "lvalue required");
                 val = leftmemberval->objectval->tryGet(leftmemberval->keyval);
                 MINSL_EXECUTION_CHECK(val != nullptr, getPlace(), "no such name");
@@ -863,12 +864,12 @@ namespace MSL
             throw Error::TypeError(getPlace(), "member access in something not an object");
         }
 
-        LValue MemberAccessOperator::getLeftValue(ExecutionContext& ctx) const
+        LeftValue::Getter MemberAccessOperator::getLeftValue(ExecutionContext& ctx) const
         {
             Value vobj;
             vobj = m_operand->evaluate(ctx, nullptr);
             MINSL_EXECUTION_CHECK(vobj.isObject(), getPlace(), "expected object");
-            return LValue{ ObjectMemberLValue{ vobj.getObject(), m_membername } };
+            return LeftValue::Getter{ LeftValue::ObjectMember{ vobj.getObject(), m_membername } };
         }
 
         Value UnaryOperator::BitwiseNot(Value&& operand) const
@@ -916,7 +917,7 @@ namespace MSL
                 {
                     // Getting these explicitly so the order of thier evaluation is defined, unlike in C++ function call arguments.
                     Value rhsVal = m_rightoper->evaluate(ctx, nullptr);
-                    LValue lhsLval = m_leftoper->getLeftValue(ctx);
+                    LeftValue::Getter lhsLval = m_leftoper->getLeftValue(ctx);
                     return Assignment(std::move(lhsLval), std::move(rhsVal));
                 }
                 default:
@@ -1076,7 +1077,7 @@ namespace MSL
             return {};
         }
 
-        LValue BinaryOperator::getLeftValue(ExecutionContext& ctx) const
+        LeftValue::Getter BinaryOperator::getLeftValue(ExecutionContext& ctx) const
         {
             size_t itemidx;
             size_t charidx;
@@ -1090,18 +1091,18 @@ namespace MSL
                 {
                     MINSL_EXECUTION_CHECK(idxval.isNumber(), getPlace(), "expected numeric value");
                     MINSL_EXECUTION_CHECK(Util::NumberToIndex(charidx, idxval.getNumber()), getPlace(), "string index out of bounds");
-                    return LValue{ StringCharacterLValue{ &leftref->getString(), charidx } };
+                    return LeftValue::Getter{ LeftValue::StringCharacter{ &leftref->getString(), charidx } };
                 }
                 if(leftref->type() == Value::Type::Object)
                 {
                     MINSL_EXECUTION_CHECK(idxval.isString(), getPlace(), "expected string value");
-                    return LValue{ ObjectMemberLValue{ leftref->getObject(), idxval.getString() } };
+                    return LeftValue::Getter{ LeftValue::ObjectMember{ leftref->getObject(), idxval.getString() } };
                 }
                 if(leftref->type() == Value::Type::Array)
                 {
                     MINSL_EXECUTION_CHECK(idxval.isNumber(), getPlace(), "expected numeric value");
                     MINSL_EXECUTION_CHECK(Util::NumberToIndex(itemidx, idxval.getNumber()), getPlace(), "array index out of bounds");
-                    return LValue{ ArrayItemLValue{ leftref->getArray(), itemidx } };
+                    return LeftValue::Getter{ LeftValue::ArrayItem{ leftref->getArray(), itemidx } };
                 }
             }
             return Operator::getLeftValue(ctx);
@@ -1123,7 +1124,7 @@ namespace MSL
             return Value{ (double)resval };
         }
 
-        Value BinaryOperator::Assignment(LValue&& lhs, Value&& rhs) const
+        Value BinaryOperator::Assignment(LeftValue::Getter&& lhs, Value&& rhs) const
         {
             Value* leftvalptr;
             // This one is able to create new value.

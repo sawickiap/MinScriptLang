@@ -33,6 +33,77 @@ namespace MSL
             return ((double)outIndex == number);
         }
 
+        void reprChar(std::ostream& os, int c)
+        {
+            switch(c)
+            {
+                case '\'':
+                    os << "\\\'";
+                    break;
+                case '\"':
+                    os << "\\\"";
+                    break;
+                case '\\':
+                    os << "\\\\";
+                    break;
+                case '\b':
+                    os << "\\b";
+                    break;
+                case '\f':
+                    os << "\\f";
+                    break;
+                case '\n':
+                    os << "\\n";
+                    break;
+                case '\r':
+                    os << "\\r";
+                    break;
+                case '\t':
+                    os << "\\t";
+                    break;
+                default:
+                    {
+                        constexpr const char* const hexchars = "0123456789ABCDEF";
+                        os << '\\';
+                        if(c <= 255)
+                        {
+                            os << 'x';
+                            os << hexchars[(c >> 4) & 0xf];
+                            os << hexchars[c & 0xf];
+                        }
+                        else
+                        {
+                            os << 'u';
+                            os << hexchars[(c >> 12) & 0xf];
+                            os << hexchars[(c >> 8) & 0xf];
+                            os << hexchars[(c >> 4) & 0xf];
+                            os << hexchars[c & 0xf];
+                        }
+                    }
+                    break;
+            }
+        }
+
+        void reprString(std::ostream& os, std::string_view str)
+        {
+            int ch;
+            size_t i;
+            os << '"';
+            for(i=0; i<str.size(); i++)
+            {
+                ch = str[i];
+                if((ch < 32) || (ch > 127) || (ch == '\"') || (ch == '\\'))
+                {
+                    reprChar(os, ch);
+                }
+                else
+                {
+                    os.put(char(ch));
+                }
+            }
+            os << '"';
+        }
+
         std::string VFormat(const char* format, va_list argList)
         {
             size_t dstlen;

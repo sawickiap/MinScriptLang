@@ -18,7 +18,7 @@ $(target): $(obj)
 # rule to generate a dep file by using the C preprocessor
 # (see man cpp for details on the -MM and -MT options)
 %.d: %.cpp
-	$(CXX) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
+	$(CXX) $(CFLAGS) $< -MM -MT $(@:.d=.o) -MF $@
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $(DBGFLAGS) -o $@ $<
