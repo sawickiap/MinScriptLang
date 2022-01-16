@@ -3,6 +3,15 @@
 
 namespace MSL
 {
+    Object::Object()
+    {
+    }
+
+    Object::~Object()
+    {
+        //GC::Collector::GC.collect();
+    }
+
     Value* Object::tryGet(const std::string& key)
     {
         auto it = m_entrymap.find(key);

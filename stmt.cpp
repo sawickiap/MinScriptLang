@@ -104,6 +104,63 @@ namespace MSL
         MINSL_EXECUTION_CHECK(value.isNumber(), operand->getPlace(), "expected numeric value");
     }
 
+    namespace AST
+    {
+        ExecutionContext::LocalScopePush::LocalScopePush(ExecutionContext& ctx, Object* localScope, ThisType&& thisObj, const Location& place)
+        : m_context{ ctx }
+        {
+            if(ctx.m_localscopes.size() == LOCAL_SCOPE_STACK_MAX_SIZE)
+            {
+                throw Error::RuntimeError{ place, "stack overflow" };
+            }
+            ctx.m_localscopes.push_back(localScope);
+            ctx.m_thislist.push_back(std::move(thisObj));
+        }
+
+        ExecutionContext::LocalScopePush::~LocalScopePush()
+        {
+            m_context.m_thislist.pop_back();
+            m_context.m_localscopes.pop_back();
+            //GC::Collector::GC.collect();
+        }
+
+        ExecutionContext::ExecutionContext(EnvironmentPimpl& env, Object& globalScope) : m_env{ env }, m_globalscope{ globalScope }
+        {
+        }
+
+        EnvironmentPimpl& ExecutionContext::env()
+        {
+            return m_env;
+        }
+
+        EnvironmentPimpl& ExecutionContext::env() const
+        {
+            return m_env;
+        }
+
+        bool ExecutionContext::isLocal() const
+        {
+            return !m_localscopes.empty();
+        }
+
+        Object* ExecutionContext::getCurrentLocalScope()
+        {
+            assert(isLocal());
+            return m_localscopes.back();
+        }
+
+        const ThisType& ExecutionContext::getThis()
+        {
+            //assert(isLocal());
+            return m_thislist.back();
+        }
+
+        Object& ExecutionContext::getInnermostScope() const
+        {
+            return isLocal() ? *m_localscopes.back() : m_globalscope;
+        }
+    }
+
     namespace LeftValue
     {
         Value* Getter::getValueRef(const Location& place) const
@@ -165,6 +222,27 @@ namespace MSL
 
     namespace AST
     {
+        Block::Block(const Location& place) : Statement{ place }
+        {
+        }
+
+        Block::~Block()
+        {
+        }
+
+        Statement::Statement(const Location& place) : m_place{ place }
+        {
+        }
+
+        Statement::~Statement()
+        {
+        }
+
+        const Location& Statement::getPlace() const
+        {
+            return m_place;
+        }
+
         void Statement::assign(const LeftValue::Getter& lhs, Value&& rhs) const
         {
             const LeftValue::StringCharacter* leftstrchar;

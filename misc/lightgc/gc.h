@@ -6,97 +6,101 @@
     #include <set>
     #include <map>
 
-// Base class for all objects that are tracked by
-// the garbage collector.
-class Collectable
-{
-    public:
-        // For mark and sweep algorithm. When a GC occurs
-        // all live objects are traversed and mMarked is
-        // set to true. This is followed by the sweep phase
-        // where all unmarked objects are deleted.
-        bool mMarked;
+    namespace GC
+    {
+        // Base class for all objects that are tracked by
+        // the garbage collector.
+        class Collectable
+        {
+            public:
+                // For mark and sweep algorithm. When a GC occurs
+                // all live objects are traversed and m_marked is
+                // set to true. This is followed by the sweep phase
+                // where all unmarked objects are deleted.
+                bool m_marked;
 
-    public:
-        Collectable();
-        Collectable(Collectable const&);
-        virtual ~Collectable();
+            public:
+                Collectable();
+                Collectable(Collectable const&);
+                virtual ~Collectable();
 
-        // Mark the object and all its children as live
-        void mark();
+                // Mark the object and all its children as live
+                void mark();
 
-        // Overridden by derived classes to call mark()
-        // on objects referenced by this object. The default
-        // implemention does nothing.
-        virtual void markChildren();
-};
+                // Overridden by derived classes to call mark()
+                // on objects referenced by this object. The default
+                // implemention does nothing.
+                virtual void markChildren();
+        };
 
-// Wrapper for an array of bytes managed by the garbage
-// collector.
-class Memory : public Collectable
-{
-    public:
-        unsigned char* mMemory;
-        int mSize;
+        // Wrapper for an array of bytes managed by the garbage
+        // collector.
+        class Memory : public Collectable
+        {
+            public:
+                unsigned char* m_memory;
+                int m_size;
 
-    public:
-        Memory(int size);
-        virtual ~Memory();
+            public:
+                Memory(int size);
+                virtual ~Memory();
 
-        unsigned char* get();
-        int size();
-};
+                unsigned char* get();
+                int size();
+        };
 
-// Garbage Collector. Implements mark and sweep GC algorithm.
-class Collector
-{
-    public:
-        // A collection of all active heap objects.
-        typedef std::set<Collectable*> ObjectSet;
-        ObjectSet mHeap;
+        // Garbage Collector. Implements mark and sweep GC algorithm.
+        class Collector
+        {
+            public:
+                using ObjectSet = std::set<Collectable*>;
+                using PinnedSet = std::map<Collectable*, unsigned int>;
 
-        // Collection of objects that are scanned for garbage.
-        ObjectSet mRoots;
+            public:
+                // A collection of all active heap objects.
+                ObjectSet m_heap;
 
-        // Pinned objects
-        typedef std::map<Collectable*, unsigned int> PinnedSet;
-        PinnedSet mPinned;
+                // Collection of objects that are scanned for garbage.
+                ObjectSet m_roots;
 
-        // Global garbage collector object
-        static Collector GC;
+                // Pinned objects
+                PinnedSet m_pinned;
 
-    public:
-        // Perform garbage collection. If 'verbose' is true then
-        // GC stats will be printed to stdout.
-        void collect(bool verbose = false);
+                // Global garbage collector object
+                static Collector GC;
 
-        // Add a root object to the collector.
-        void addRoot(Collectable* root);
+            public:
+                // Perform garbage collection. If 'verbose' is true then
+                // GC stats will be printed to stdout.
+                void collect(bool verbose = false);
 
-        // Remove a root object from the collector.
-        void removeRoot(Collectable* root);
+                // Add a root object to the collector.
+                void addRoot(Collectable* root);
 
-        // Pin an object so it temporarily won't be collected.
-        // Pinned objects are reference counted. Pinning it
-        // increments the count. Unpinning it decrements it. When
-        // the count is zero then the object can be collected.
-        void pin(Collectable* o);
-        void unpin(Collectable* o);
+                // Remove a root object from the collector.
+                void removeRoot(Collectable* root);
 
-        // Add an heap allocated object to the collector.
-        void addObject(Collectable* o);
+                // Pin an object so it temporarily won't be collected.
+                // Pinned objects are reference counted. Pinning it
+                // increments the count. Unpinning it decrements it. When
+                // the count is zero then the object can be collected.
+                void pin(Collectable* o);
+                void unpin(Collectable* o);
 
-        // Remove a heap allocated object from the collector.
-        void removeObject(Collectable* o);
+                // Add an heap allocated object to the collector.
+                void addObject(Collectable* o);
 
-        // Go through all objects in the heap, unmarking the live
-        // objects and destroying the unreferenced ones.
-        void sweep(bool verbose);
+                // Remove a heap allocated object from the collector.
+                void removeObject(Collectable* o);
 
-        // Number of live objects in heap
-        int live();
-};
+                // Go through all objects in the heap, unmarking the live
+                // objects and destroying the unreferenced ones.
+                void sweep(bool verbose);
 
+                // Number of live objects in heap
+                int live();
+        };
+    }
 #endif
 // Copyright (C) 2009 Chris Double. All Rights Reserved.
 // The original author of this code can be contacted at: chris.double@double.co.nz

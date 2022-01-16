@@ -33,6 +33,38 @@ namespace MSL
         }
     }
 
+    void Array::markChildren()
+    {
+        for(auto& itm: m_arrayitems)
+        {
+            itm.mark();
+        }
+    }
+
+    Array::Array()
+    {
+    }
+
+    Array::~Array()
+    {
+    }
+
+    void Value::markChildren()
+    {
+        switch(m_type)
+        {
+            case Type::Object:
+                objectRef()->mark();
+                break;
+            case Type::Array:
+                arrayRef()->mark();
+                break;
+            default:
+                break;
+        }
+    }
+
+
     bool Value::isEqual(const Value& rhs) const
     {
         if(m_type != rhs.m_type)

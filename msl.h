@@ -40,6 +40,7 @@ SOFTWARE.
 #include <vector>
 #include <unordered_map>
 #include <variant>
+#include <set>
 #include <map>
 #include <algorithm>
 #include <type_traits>
@@ -317,11 +318,107 @@ namespace MSL
         };
     }
 
+    namespace GC
+    {
+        // Base class for all objects that are tracked by
+        // the garbage collector.
+        class Collectable
+        {
+            public:
+                // For mark and sweep algorithm. When a GC occurs
+                // all live objects are traversed and m_marked is
+                // set to true. This is followed by the sweep phase
+                // where all unmarked objects are deleted.
+                bool m_marked;
+
+            public:
+                Collectable();
+                Collectable(Collectable const&);
+                virtual ~Collectable();
+
+                // Mark the object and all its children as live
+                void mark();
+
+                // Overridden by derived classes to call mark()
+                // on objects referenced by this object. The default
+                // implemention does nothing.
+                virtual void markChildren();
+        };
+
+        // Wrapper for an array of bytes managed by the garbage
+        // collector.
+        class Memory : public Collectable
+        {
+            public:
+                unsigned char* m_memory;
+                int m_size;
+
+            public:
+                Memory(int size);
+                virtual ~Memory();
+
+                unsigned char* get();
+                int size();
+        };
+
+        // Garbage Collector. Implements mark and sweep GC algorithm.
+        class Collector
+        {
+            public:
+                using ObjectSet = std::set<Collectable*>;
+                using PinnedSet = std::map<Collectable*, unsigned int>;
+
+            public:
+                // A collection of all active heap objects.
+                ObjectSet m_heap;
+
+                // Collection of objects that are scanned for garbage.
+                ObjectSet m_roots;
+
+                // Pinned objects
+                PinnedSet m_pinned;
+
+                // Global garbage collector object
+                static Collector GC;
+
+            public:
+                // Perform garbage collection. If 'verbose' is true then
+                // GC stats will be printed to stdout.
+                void collect(bool verbose = false);
+
+                // Add a root object to the collector.
+                void addRoot(Collectable* root);
+
+                // Remove a root object from the collector.
+                void removeRoot(Collectable* root);
+
+                // Pin an object so it temporarily won't be collected.
+                // Pinned objects are reference counted. Pinning it
+                // increments the count. Unpinning it decrements it. When
+                // the count is zero then the object can be collected.
+                void pin(Collectable* o);
+                void unpin(Collectable* o);
+
+                // Add an heap allocated object to the collector.
+                void addObject(Collectable* o);
+
+                // Remove a heap allocated object from the collector.
+                void removeObject(Collectable* o);
+
+                // Go through all objects in the heap, unmarking the live
+                // objects and destroying the unreferenced ones.
+                void sweep(bool verbose);
+
+                // Number of live objects in heap
+                int live();
+        };
+    }
+
     using HostFunction           = std::function<Value(Environment&, const Location&, std::vector<Value>&&)>;
     using MemberMethodFunction   = std::function<Value(AST::ExecutionContext&, const Location&, AST::ThisType&, std::vector<Value>&&)>;
     using MemberPropertyFunction = std::function<Value(AST::ExecutionContext&, const Location&, Value&&)>;
 
-    class Value
+    class Value: public GC::Collectable
     {
         public:
             enum class Type
@@ -407,6 +504,7 @@ namespace MSL
 
         private:
             void actualToStream(std::ostream& os, bool repr) const;
+            virtual void markChildren() override;
 
         public:
             inline Value()
@@ -591,7 +689,7 @@ namespace MSL
         Value checkArgument(const Location& place, std::string_view fname, const Value::List& args, size_t idx, Value::Type type);
     }
 
-    class Object
+    class Object: public GC::Collectable
     {
         public:
             using MapType = std::unordered_map<std::string, Value>;
@@ -599,7 +697,20 @@ namespace MSL
         public:
             MapType m_entrymap;
 
+        private:
+            virtual void markChildren() override
+            {
+                for(auto& pair: m_entrymap)
+                {
+                    pair.second.mark();
+                }
+            }
+
         public:
+            Object();
+
+            virtual ~Object();
+
             size_t size() const
             {
                 return m_entrymap.size();
@@ -626,22 +737,25 @@ namespace MSL
             bool removeEntry(const std::string& key);
     };
 
-    class Array
+    class Array: public GC::Collectable
     {
         private:
             Value::List m_arrayitems;
 
-        public:
-            Array()
-            {
-            }
+        private:
+            virtual void markChildren() override;
 
-            Array(size_t cnt)
+        public:
+            Array();
+
+            virtual ~Array();
+
+            inline Array(size_t cnt)
             {
                 m_arrayitems = Value::List(cnt);
             }
 
-            size_t size() const
+            inline size_t size() const
             {
                 return m_arrayitems.size();
             }
@@ -1069,22 +1183,8 @@ namespace MSL
                         ExecutionContext& m_context;
 
                     public:
-                        LocalScopePush(ExecutionContext& ctx, Object* localScope, ThisType&& thisObj, const Location& place)
-                        : m_context{ ctx }
-                        {
-                            if(ctx.m_localscopes.size() == LOCAL_SCOPE_STACK_MAX_SIZE)
-                            {
-                                throw Error::RuntimeError{ place, "stack overflow" };
-                            }
-                            ctx.m_localscopes.push_back(localScope);
-                            ctx.m_thislist.push_back(std::move(thisObj));
-                        }
-                        ~LocalScopePush()
-                        {
-                            m_context.m_thislist.pop_back();
-                            m_context.m_localscopes.pop_back();
-                        }
-
+                        LocalScopePush(ExecutionContext& ctx, Object* localScope, ThisType&& thisObj, const Location& place);
+                        ~LocalScopePush();
                 };
 
             private:
@@ -1095,41 +1195,20 @@ namespace MSL
                 EnvironmentPimpl& m_env;
                 Object& m_globalscope;
 
-                ExecutionContext(EnvironmentPimpl& env, Object& globalScope) : m_env{ env }, m_globalscope{ globalScope }
-                {
-                }
+            public:
+                ExecutionContext(EnvironmentPimpl& env, Object& globalScope);
 
-                EnvironmentPimpl& env()
-                {
-                    return m_env;
-                }
+                EnvironmentPimpl& env();
 
-                EnvironmentPimpl& env() const
-                {
-                    return m_env;
-                }
+                EnvironmentPimpl& env() const;
 
-                bool isLocal() const
-                {
-                    return !m_localscopes.empty();
-                }
+                bool isLocal() const;
 
-                Object* getCurrentLocalScope()
-                {
-                    assert(isLocal());
-                    return m_localscopes.back();
-                }
+                Object* getCurrentLocalScope();
 
-                const ThisType& getThis()
-                {
-                    //assert(isLocal());
-                    return m_thislist.back();
-                }
+                const ThisType& getThis();
 
-                Object& getInnermostScope() const
-                {
-                    return isLocal() ? *m_localscopes.back() : m_globalscope;
-                }
+                Object& getInnermostScope() const;
         };
 
         class Statement
@@ -1141,18 +1220,11 @@ namespace MSL
                 void assign(const LeftValue::Getter& lhs, Value&& rhs) const;
 
             public:
-                explicit Statement(const Location& place) : m_place{ place }
-                {
-                }
+                explicit Statement(const Location& place);
 
-                virtual ~Statement()
-                {
-                }
+                virtual ~Statement();
 
-                const Location& getPlace() const
-                {
-                    return m_place;
-                }
+                const Location& getPlace() const;
 
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const = 0;
 
@@ -1290,9 +1362,8 @@ namespace MSL
                 std::vector<std::unique_ptr<Statement>> m_statements;
 
             public:
-                explicit Block(const Location& place) : Statement{ place }
-                {
-                }
+                explicit Block(const Location& place);
+                virtual ~Block();
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
                 virtual Value execute(ExecutionContext& ctx) const;
         };
