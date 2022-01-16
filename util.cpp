@@ -104,7 +104,7 @@ namespace MSL
             os << '"';
         }
 
-        std::string VFormat(const char* format, va_list argList)
+        std::string vformatString(const char* format, va_list argList)
         {
             size_t dstlen;
             size_t rtlen;
@@ -114,11 +114,11 @@ namespace MSL
             return std::string{ &buf[0], rtlen };
         }
 
-        std::string Format(const char* format, ...)
+        std::string formatString(const char* format, ...)
         {
             va_list argList;
             va_start(argList, format);
-            auto result = VFormat(format, argList);
+            auto result = vformatString(format, argList);
             va_end(argList);
             return result;
         }
@@ -199,7 +199,6 @@ namespace MSL
 
         void checkArgumentCount(const Location& place, std::string_view fname, size_t argcnt, size_t expect)
         {
-            //if((!(expect > argcnt)) || ((expect > 0) && (argcnt == 0)))
             if((expect > 0) && ((argcnt == 0) || (argcnt < expect)))
             {
                 throw Error::ArgumentError(place, Util::joinArgs("function '", fname, "' expects at least ", expect, " arguments"));

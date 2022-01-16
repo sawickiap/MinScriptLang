@@ -1,55 +1,6 @@
 
 #include "priv.h"
 
-// Convenience macros for loading function arguments
-// They require to have following available: env, place, args.
-#define MINSL_LOAD_ARG_BEGIN(functionNameStr)           \
-    const char* minsl_functionName = (functionNameStr); \
-    size_t minsl_argIndex = 0;                          \
-    size_t minsl_argCount = (args).size();              \
-    Value::Type minsl_argType;
-#define MINSL_LOAD_ARG_NUMBER(dstVarName)                                                                          \
-    MINSL_EXECUTION_CHECK(minsl_argIndex < minsl_argCount, place,                                                  \
-                          Util::Format("Function %s received too few arguments. Number expected as argument %zu.",       \
-                                 minsl_functionName, minsl_argIndex));                                             \
-    minsl_argType = args[minsl_argIndex].type();                                                                \
-    MINSL_EXECUTION_CHECK(minsl_argType == Value::Type::Number, place,                                               \
-                          Util::Format("Function %s received incorrect argument %zu. Expected: Number, actual: %.*s.",   \
-                                 minsl_functionName, minsl_argIndex, (int)env.getTypename(minsl_argType).length(), \
-                                 env.getTypename(minsl_argType).data()));                                          \
-    double dstVarName = args[minsl_argIndex++].getNumber();
-#define MINSL_LOAD_ARG_STRING(dstVarName)                                                                          \
-    MINSL_EXECUTION_CHECK(minsl_argIndex < minsl_argCount, place,                                                  \
-                          Util::Format("Function %s received too few arguments. String expected as argument %zu.",       \
-                                 minsl_functionName, minsl_argIndex));                                             \
-    minsl_argType = args[minsl_argIndex].type();                                                                \
-    MINSL_EXECUTION_CHECK(minsl_argType == Value::Type::String, place,                                               \
-                          Util::Format("Function %s received incorrect argument %zu. Expected: String, actual: %.*s.",   \
-                                 minsl_functionName, minsl_argIndex, (int)env.getTypename(minsl_argType).length(), \
-                                 env.getTypename(minsl_argType).data()));                                          \
-    std::string dstVarName = std::move(args[minsl_argIndex++].getString());
-#define MINSL_LOAD_ARG_END()                 \
-    MINSL_EXECUTION_CHECK(                   \
-    minsl_argIndex == minsl_argCount, place, \
-    Util::Format("Function %s requires %zu arguments, %zu provided.", minsl_functionName, minsl_argIndex, minsl_argCount));
-
-#define MINSL_LOAD_ARGS_0(functionNameStr) \
-    MINSL_LOAD_ARG_BEGIN(functionNameStr); \
-    MINSL_LOAD_ARG_END();
-#define MINSL_LOAD_ARGS_1_NUMBER(functionNameStr, dstVarName) \
-    MINSL_LOAD_ARG_BEGIN(functionNameStr);                    \
-    MINSL_LOAD_ARG_NUMBER(dstVarName);                        \
-    MINSL_LOAD_ARG_END();
-#define MINSL_LOAD_ARGS_1_STRING(functionNameStr, dstVarName) \
-    MINSL_LOAD_ARG_BEGIN(functionNameStr);                    \
-    MINSL_LOAD_ARG_STRING(dstVarName);                        \
-    MINSL_LOAD_ARG_END();
-#define MINSL_LOAD_ARGS_2_NUMBERS(functionNameStr, dstVarName1, dstVarName2) \
-    MINSL_LOAD_ARG_BEGIN(functionNameStr);                                   \
-    MINSL_LOAD_ARG_NUMBER(dstVarName1);                                      \
-    MINSL_LOAD_ARG_NUMBER(dstVarName2);                                      \
-    MINSL_LOAD_ARG_END();
-
 namespace MSL
 {
     namespace Builtins
@@ -64,20 +15,20 @@ namespace MSL
 
         Value ctor_number(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
         {
-            Environment& env = ctx.m_env.getOwner();
-            MINSL_LOAD_ARGS_1_NUMBER("Number", val);
+            (void)ctx;
+            auto val = Util::checkArgument(place, "Number", args, 0, Value::Type::Number);
             return Value{ val };
         }
 
         Value ctor_string(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
         {
+            (void)ctx;
             if(args.empty())
             {
                 return Value{ std::string{} };
             }
-            Environment& env = ctx.m_env.getOwner();
-            MINSL_LOAD_ARGS_1_STRING("String", str);
-            return Value{ std::move(str) };
+            auto strv = Util::checkArgument(place, "String", args, 0, Value::Type::String);
+            return Value{ std::move(strv.string()) };
         }
 
         Value ctor_object(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
@@ -91,7 +42,7 @@ namespace MSL
             {
                 throw Error::ArgumentError(place, "Object can be constructed only from no arguments or from another object value.");
             }
-            return Value{ Util::CopyObject(*args[0].getObject()) };
+            return Value{ Util::CopyObject(*args[0].object()) };
         }
 
         Value ctor_array(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
@@ -105,7 +56,7 @@ namespace MSL
             {
                 throw Error::ArgumentError(place, "Array can be constructed only from no arguments or from another array value.");
             }
-            return Value{ Util::CopyArray(*args[0].getArray()) };
+            return Value{ Util::CopyArray(*args[0].array()) };
         }
 
         Value ctor_function(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
@@ -133,7 +84,7 @@ namespace MSL
         {
             (void)ctx;
             Object* obj;
-            if(!objVal.isObject() || ((obj = objVal.getObject()) == nullptr))
+            if(!objVal.isObject() || ((obj = objVal.object()) == nullptr))
             {
                 throw Error::TypeError(place, "Object() requires an object");
             }
@@ -144,11 +95,11 @@ namespace MSL
         {
             (void)ctx;
             Array* arr;
-            if(!objVal.isArray() || ((arr = objVal.getArray()) == nullptr))
+            if(!objVal.isArray() || ((arr = objVal.array()) == nullptr))
             {
                 throw Error::TypeError(place, "Array.length called on something not an Array");
             }
-            return Value{ (double)objVal.getArray()->size() };
+            return Value{ (double)objVal.array()->size() };
         }
 
 
@@ -158,7 +109,7 @@ namespace MSL
             Array* arr;
             (void)ctx;
             (void)th;
-            arr = th.getArray();
+            arr = th.array();
             if(!arr)
             {
                 throw Error::TypeError(place, "Array.add() called on something not an Array");
@@ -180,7 +131,7 @@ namespace MSL
             (void)ctx;
             (void)th;
             (void)args;
-            arr = th.getArray();
+            arr = th.array();
             if(!arr)
             {
                 throw Error::TypeError(place, "Array.pop() called on something not an Array");
@@ -194,7 +145,7 @@ namespace MSL
         {
             Array* arr;
             (void)ctx;
-            arr = th.getArray();
+            arr = th.array();
             if(!arr)
             {
                 throw Error::ArgumentError(place, "Array.insert() called on something not an Array");
@@ -205,7 +156,7 @@ namespace MSL
             }
             size_t index;
             index= 0;
-            if(!args[0].isNumber() || !Util::NumberToIndex(index, args[0].getNumber()))
+            if(!args[0].isNumber() || !Util::NumberToIndex(index, args[0].number()))
             {
                 throw Error::RuntimeError(place, "cannot insert out-of-bounds");
             }
@@ -217,7 +168,7 @@ namespace MSL
         {
             Array* arr;
             (void)ctx;
-            arr = th.getArray();
+            arr = th.array();
             if(!arr)
             {
                 throw Error::TypeError(place, "expected array object");
@@ -227,7 +178,7 @@ namespace MSL
                 throw Error::TypeError(place, "too few arguments");
             }
             size_t index = 0;
-            if(!args[0].isNumber() || !Util::NumberToIndex(index, args[0].getNumber()))
+            if(!args[0].isNumber() || !Util::NumberToIndex(index, args[0].number()))
             {
                 throw Error::RuntimeError(place, "cannot remove out-of-bounds");
             }
@@ -242,7 +193,7 @@ namespace MSL
             {
                 throw Error::TypeError(place, "expected string object");
             }
-            return Value{ (double)objVal.getString().length() };
+            return Value{ (double)objVal.string().length() };
         }
 
         Value protofn_string_chars(AST::ExecutionContext& ctx, const Location& place, Value&& objVal)
@@ -254,7 +205,7 @@ namespace MSL
                 throw Error::TypeError(place, "expected string object");
             }
             auto res = std::make_shared<Array>();
-            for(auto ch: objVal.getString())
+            for(auto ch: objVal.string())
             {
                 res->push_back(Value{double(ch)});
             }
@@ -265,7 +216,7 @@ namespace MSL
         {
             (void)ctx;
             (void)place;
-            auto self = objVal.getString();
+            auto self = objVal.string();
             Util::stripInplaceLeft(self);
             return Value{std::move(self)};
         }
@@ -274,7 +225,7 @@ namespace MSL
         {
             (void)ctx;
             (void)place;
-            auto self = objVal.getString();
+            auto self = objVal.string();
             Util::stripInplaceRight(self);
             return Value{std::move(self)};
         }
@@ -283,7 +234,7 @@ namespace MSL
         {
             (void)ctx;
             (void)place;
-            auto self = objVal.getString();
+            auto self = objVal.string();
             Util::stripInplace(self);
             return Value{std::move(self)};
         }
@@ -307,16 +258,16 @@ namespace MSL
                 throw Error::ArgumentError(place, "String.startsWith() needs exactly 1 argument");
             }
             auto findme = args[0];
-            res = (th.getString().rfind(findme.getString(), 0) == 0);
+            res = (th.string().rfind(findme.string(), 0) == 0);
             return Value{res};
         }
 
         Value memberfn_string_endswith(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args)
         {
             (void)ctx;
-            const auto& self = th.getString();
+            const auto& self = th.string();
             auto findme = Util::checkArgument(place, "Strings.endsWith", args, 0, Value::Type::String);
-            auto sf = findme.getString();
+            auto sf = findme.string();
             if(sf.size() > self.size())
             {
                 return Value{double(0)};

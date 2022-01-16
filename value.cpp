@@ -16,7 +16,7 @@ namespace MSL
             for(i=0; i<sz; i++)
             {
                 auto val = arr->at(i);
-                if(val.isArray() && (val.getArray() == arr))
+                if(val.isArray() && (val.array() == arr))
                 {
                     os << "<recursion>";
                 }
@@ -36,7 +36,9 @@ namespace MSL
     bool Value::isEqual(const Value& rhs) const
     {
         if(m_type != rhs.m_type)
+        {
             return false;
+        }
         switch(m_type)
         {
             case Value::Type::Null:
@@ -134,42 +136,42 @@ namespace MSL
                 break;
             case Value::Type::Number:
                 {
-                    os << getNumber();
+                    os << number();
                 }
                 break;
             case Value::Type::String:
                 {
                     if(repr)
                     {
-                        Util::reprString(os, getString());
+                        Util::reprString(os, string());
                     }
                     else
                     {
-                        os << getString();
+                        os << string();
                     }
                 }
                 break;
             case Value::Type::Function:
                 {
-                    auto p = getFunction();
-                    os << "<astfunction @" << &p << ">";
+                    auto p = scriptFunction();
+                    os << "<scriptfunction @" << &p << ">";
                 }
                 break;
             case Value::Type::HostFunction:
                 {
-                    auto p = getHostFunction();
-                    os << "<hostfunction @" << &p << ">";
+                    auto p = hostFunction();
+                    os << "<nativefunction @" << &p << ">";
                 }
                 break;
             case Value::Type::Object:
                 {
-                    auto obj = getObject();
+                    auto obj = object();
                     os << "<object @" << &obj << ">";
                 }
                 break;
             case Value::Type::Array:
                 {
-                    dump_array(os, getArray(), repr);
+                    dump_array(os, array(), repr);
                 }
                 break;
             case Value::Type::Type:
@@ -179,13 +181,13 @@ namespace MSL
                 break;
             case Value::Type::MemberMethod:
                 {
-                    auto p = getMemberFunction();
-                    os << "<member @" << &p << ">";
+                    auto p = memberFunction();
+                    os << "<memberfunction @" << &p << ">";
                 }
                 break;
             case Value::Type::MemberProperty:
                 {
-                    auto p = getPropertyFunction();
+                    auto p = propertyFunction();
                     os << "<property @" << &p << ">";
                 }
                 break;

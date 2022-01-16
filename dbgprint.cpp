@@ -221,7 +221,7 @@ namespace MSL
                     {
                         printPrefix(dw, idl, getPlace(), prefix);
                         dw.writeString("Constant number: ");
-                        dw.writeNumber(m_val.getNumber());
+                        dw.writeNumber(m_val.number());
                         dw.writeString("\n");
                     }
                     break;
@@ -229,7 +229,7 @@ namespace MSL
                     {
                         printPrefix(dw, idl, getPlace(), prefix);
                         dw.writeString("Constant string: ");
-                        dw.writeReprString(m_val.getString());
+                        dw.writeReprString(m_val.string());
                         dw.writeString("\n");
                     }
                     break;
@@ -385,7 +385,7 @@ namespace MSL
             ++idl;
             for(i = 0, count = m_exprlist.size(); i < count; ++i)
             {
-                m_exprlist[i]->debugPrint(dw, idl, Util::Format("%zu: ", i));
+                m_exprlist[i]->debugPrint(dw, idl, Util::formatString("%zu: ", i));
             }
         }
     }

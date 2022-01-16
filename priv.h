@@ -136,7 +136,7 @@ namespace MSL
                                         break;
                                     case 's':
                                         {
-                                            os << av.getString();
+                                            os << av.string();
                                             if(shouldflush)
                                             {
                                                 os << std::flush;
@@ -147,7 +147,7 @@ namespace MSL
                                         {
                                             if(av.isNumber())
                                             {
-                                                os << char(av.getNumber());
+                                                os << char(av.number());
                                                 if(shouldflush)
                                                 {
                                                     os << std::flush;
@@ -165,7 +165,7 @@ namespace MSL
                                         {
                                             if(av.isNumber())
                                             {
-                                                os << av.getNumber();
+                                                os << av.number();
                                                 if(shouldflush)
                                                 {
                                                     os << std::flush;

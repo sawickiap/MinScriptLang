@@ -54,17 +54,14 @@ SOFTWARE.
 
 
 #define MINSL_EXECUTION_CHECK(condition, place, errorMessage) \
-    do                                                        \
-    {                                                         \
-        if(!(condition))                                      \
-            throw Error::RuntimeError((place), (errorMessage));    \
-    } while(false)
-
-#define MINSL_EXECUTION_FAIL(place, errorMessage)      \
-    do                                                 \
-    {                                                  \
+    if(!(condition)) \
+    { \
         throw Error::RuntimeError((place), (errorMessage)); \
-    } while(false)
+    }
+
+#define MINSL_EXECUTION_FAIL(place, errorMessage) \
+    throw Error::RuntimeError((place), (errorMessage));
+
 
 namespace MSL
 {
@@ -87,8 +84,8 @@ namespace MSL
         bool NumberToIndex(size_t& outIndex, double number);
         void reprChar(std::ostream& os, int c);
         void reprString(std::ostream& os, std::string_view str);
-        std::string VFormat(const char* format, va_list argList);
-        std::string Format(const char* format, ...);
+        std::string vformatString(const char* format, va_list argList);
+        std::string formatString(const char* format, ...);
 
         /*
         // strip from start (in place)
@@ -458,67 +455,67 @@ namespace MSL
                 return m_type;
             }
 
-            inline NumberValType getNumber() const
+            inline NumberValType number() const
             {
                 assert(m_type == Type::Number);
                 return std::get<NumberValType>(m_variant);
             }
 
-            inline StringValType& getString()
+            inline StringValType& string()
             {
                 assert(m_type == Type::String);
                 return std::get<StringValType>(m_variant);
             }
 
-            inline const StringValType& getString() const
+            inline const StringValType& string() const
             {
                 assert(m_type == Type::String);
                 return std::get<StringValType>(m_variant);
             }
 
-            inline AstFuncValType getFunction() const
+            inline AstFuncValType scriptFunction() const
             {
                 assert(m_type == Type::Function && std::get<AstFuncValType>(m_variant));
                 return std::get<AstFuncValType>(m_variant);
             }
 
-            inline HostFuncValType getHostFunction() const
+            inline HostFuncValType hostFunction() const
             {
                 assert(m_type == Type::HostFunction);
                 return std::get<HostFuncValType>(m_variant);
             }
 
-            inline MemberFuncValType getMemberFunction() const
+            inline MemberFuncValType memberFunction() const
             {
                 assert(m_type == Type::MemberMethod);
                 return std::get<MemberFuncValType>(m_variant);
             }
 
-            inline MemberPropValType getPropertyFunction() const
+            inline MemberPropValType propertyFunction() const
             {
                 assert(m_type == Type::MemberProperty);
                 return std::get<MemberPropValType>(m_variant);
             }
 
-            inline Object* getObject() const
+            inline Object* object() const
             {
                 assert(m_type == Type::Object && std::get<ObjectValType>(m_variant));
                 return std::get<ObjectValType>(m_variant).get();
             }
 
-            inline ObjectValType getObjectRef() const
+            inline ObjectValType objectRef() const
             {
                 assert(m_type == Type::Object && std::get<ObjectValType>(m_variant));
                 return std::get<ObjectValType>(m_variant);
             }
 
-            inline Array* getArray() const
+            inline Array* array() const
             {
                 assert(m_type == Type::Array && std::get<ArrayValType>(m_variant));
                 return std::get<ArrayValType>(m_variant).get();
             }
 
-            inline ArrayValType getArrayRef() const
+            inline ArrayValType arrayRef() const
             {
                 assert(m_type == Type::Array && std::get<ArrayValType>(m_variant));
                 return std::get<ArrayValType>(m_variant);
@@ -533,7 +530,7 @@ namespace MSL
             inline void setNumberValue(double number)
             {
                 assert(m_type == Type::Number);
-                std::get<double>(m_variant) = number;
+                m_variant = number;
             }
 
             bool isEqual(const Value& rhs) const;
@@ -1035,24 +1032,24 @@ namespace MSL
                     return std::get_if<std::monostate>(this) != nullptr;
                 }
 
-                inline Object* getObject() const
+                inline Object* object() const
                 {
                     auto objectPtr = std::get_if<std::shared_ptr<Object>>(this);
                     return objectPtr ? objectPtr->get() : nullptr;
                 }
 
-                inline Array* getArray() const
+                inline Array* array() const
                 {
                     auto arrayPtr = std::get_if<std::shared_ptr<Array>>(this);
                     return arrayPtr ? arrayPtr->get() : nullptr;
                 }
 
-                inline Value::StringValType& getString()
+                inline Value::StringValType& string()
                 {
                     return std::get<Value::StringValType>(*this);
                 }
 
-                inline Value::StringValType getString() const
+                inline const Value::StringValType& string() const
                 {
                     return std::get<Value::StringValType>(*this);
                 }
@@ -1373,7 +1370,7 @@ namespace MSL
                 virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const
                 {
                     (void)ctx;
-                    MINSL_EXECUTION_CHECK(false, getPlace(), "expected lvalue");
+                    throw Error::RuntimeError(getPlace(), "expected lvalue to expression");
                 }
 
                 virtual Value execute(ExecutionContext& ctx) const

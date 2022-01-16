@@ -51,7 +51,7 @@ namespace MSL
                     Value ch;
                     (void)ctx;
                     ch = Util::checkArgument(place, "putchar", args, 0, Value::Type::Number);
-                    rs = fputc(int(ch.getNumber()), m_stream);
+                    rs = fputc(int(ch.number()), m_stream);
                     if(rs == EOF)
                     {
                         throw Error::EOFError(place, "EOF");

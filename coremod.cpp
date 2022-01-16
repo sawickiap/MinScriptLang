@@ -1,6 +1,8 @@
 
 #include "priv.h"
 
+
+
 namespace MSL
 {
     namespace Builtins
@@ -47,7 +49,7 @@ namespace MSL
                 {
                     throw Error::ArgumentError(place, "Built-in function min requires number arguments.");
                 }
-                argNum = args[i].getNumber();
+                argNum = args[i].number();
                 if(i == 0 || argNum < result)
                 {
                     result = argNum;
@@ -75,7 +77,7 @@ namespace MSL
                 {
                     throw Error::ArgumentError(place, "Built-in function min requires number arguments.");
                 }
-                argNum = args[i].getNumber();
+                argNum = args[i].number();
                 if(i == 0 || argNum > result)
                 {
                     result = argNum;
