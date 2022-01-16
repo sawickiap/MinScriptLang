@@ -205,19 +205,34 @@ namespace MSL
             }
         }
 
-        Value checkArgument(const Location& place, std::string_view name, const Value::List& args, size_t idx, Value::Type type)
+        Value checkArgument(const Location& place, std::string_view name, const Value::List& args, size_t idx, std::initializer_list<Value::Type> types)
         {
+            size_t i;
             Value r;
+            std::stringstream emsg;
             checkArgumentCount(place, name, args.size(), idx);
             r = args[idx];
             // using Value::Type::Null means any type
-            if((type != Value::Type::Null) && (r.type() != type))
+            for(i=0; i<types.size(); i++)
             {
-                auto etype = Value::getTypename(type);
-                auto gtype = Value::getTypename(r.type());
-                throw Error::TypeError(place,
-                    Util::joinArgs("expected argument #", idx, " to be a ", etype, ", but got ", gtype, " instead"));
+                if(types.begin()[i] == r.type())
+                {
+                    return r;
+                }
             }
+            auto gtype = Value::getTypename(r.type());
+            emsg << "expected argument #" << idx << " to be ";
+            for(i=0; i<types.size(); i++)
+            {
+                auto etype = Value::getTypename(types.begin()[i]);
+                emsg << etype;
+                if((i+1) < types.size())
+                {
+                    emsg << ", or ";
+                }
+            }
+            emsg << ", but got " << gtype << " instead";
+            throw Error::TypeError(place, emsg.str());
             return r;
         }
 

@@ -439,7 +439,7 @@ namespace MSL
             using List = std::vector<Value>;
             using NumberValType = double;
             using StringValType = std::string;
-            using AstFuncValType = const AST::FunctionDefinition*;
+            using AstFuncValType = AST::FunctionDefinition*;
             using HostFuncValType = HostFunction;
             using MemberFuncValType = MemberMethodFunction;
             using MemberPropValType = MemberPropertyFunction;
@@ -520,7 +520,7 @@ namespace MSL
             {
             }
 
-            inline explicit Value(const AST::FunctionDefinition* func) : m_type{ Type::Function }, m_variant{ func }
+            inline explicit Value(AST::FunctionDefinition* func) : m_type{ Type::Function }, m_variant{ func }
             {
             }
 
@@ -570,6 +570,12 @@ namespace MSL
             {
                 assert(m_type == Type::String);
                 return std::get<StringValType>(m_variant);
+            }
+
+            inline AstFuncValType scriptFunction()
+            {
+                assert(m_type == Type::Function && std::get<AstFuncValType>(m_variant));
+                return std::get<AstFuncValType>(m_variant);
             }
 
             inline AstFuncValType scriptFunction() const
@@ -687,7 +693,7 @@ namespace MSL
     namespace Util
     {
         void checkArgumentCount(const Location& place, std::string_view fname, size_t argcnt, size_t expect);
-        Value checkArgument(const Location& place, std::string_view fname, const Value::List& args, size_t idx, Value::Type type);
+        Value checkArgument(const Location& place, std::string_view fname, const Value::List& args, size_t idx, std::initializer_list<Value::Type> type);
     }
 
     class Object: public GC::Collectable
@@ -1223,7 +1229,7 @@ namespace MSL
 
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const = 0;
 
-                virtual Value execute(ExecutionContext& ctx) const = 0;
+                virtual Value execute(ExecutionContext& ctx) = 0;
         };
 
         class EmptyStatement : public Statement
@@ -1235,7 +1241,7 @@ namespace MSL
 
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
 
-                virtual Value execute(ExecutionContext&) const
+                virtual Value execute(ExecutionContext&)
                 {
                     return {};
                 }
@@ -1258,7 +1264,7 @@ namespace MSL
 
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
 
-                virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx);
         };
 
         class WhileLoop : public Statement
@@ -1276,7 +1282,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx);
         };
 
         class ForLoop : public Statement
@@ -1295,7 +1301,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx);
         };
 
         class RangeBasedForLoop : public Statement
@@ -1313,7 +1319,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx);
         };
 
         class LoopBreakStatement : public Statement
@@ -1334,7 +1340,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx);
         };
 
         class ReturnStatement : public Statement
@@ -1348,7 +1354,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx);
         };
 
         class Block : public Statement
@@ -1360,7 +1366,7 @@ namespace MSL
                 explicit Block(const Location& place);
                 virtual ~Block();
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx);
         };
 
         class /**/ConstantValue;
@@ -1379,7 +1385,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx);
         };
 
         class ThrowStatement : public Statement
@@ -1392,7 +1398,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx);
         };
 
         class TryStatement : public Statement
@@ -1408,7 +1414,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx);
         };
 
         class Script: public Block
@@ -1417,7 +1423,7 @@ namespace MSL
                 explicit Script(const Location& place) : Block{ place }
                 {
                 }
-                virtual Value execute(ExecutionContext& ctx) const;
+                virtual Value execute(ExecutionContext& ctx);
         };
 
         class Expression: public Statement
@@ -1427,7 +1433,7 @@ namespace MSL
                 {
                 }
 
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis)
                 {
                     (void)outThis;
                     return getLeftValue(ctx).getValue(getPlace());
@@ -1439,7 +1445,7 @@ namespace MSL
                     throw Error::RuntimeError(getPlace(), "expected lvalue to expression");
                 }
 
-                virtual Value execute(ExecutionContext& ctx) const
+                virtual Value execute(ExecutionContext& ctx)
                 {
                     return evaluate(ctx, nullptr);
                 }
@@ -1452,7 +1458,6 @@ namespace MSL
                 {
                 }
 
-                //virtual Value execute(ExecutionContext& ctx) const;
         };
 
         class ConstantValue: public ConstantExpression
@@ -1468,17 +1473,10 @@ namespace MSL
 
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
 
-                virtual Value evaluate(ExecutionContext&, ThisType*) const override
+                virtual Value evaluate(ExecutionContext&, ThisType*) override
                 {
                     return Value{ m_val };
                 }
-
-                /*
-                virtual Value execute(ExecutionContext&)
-                {
-                    return m_val;
-                }
-                */
         };
 
         class Identifier : public ConstantExpression
@@ -1501,7 +1499,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
                 virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const;
         };
 
@@ -1512,7 +1510,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
         };
 
         class Operator: public Expression
@@ -1551,7 +1549,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
                 virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const;
         };
 
@@ -1566,7 +1564,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
                 virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const;
         };
 
@@ -1624,7 +1622,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
                 virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const;
         };
 
@@ -1640,7 +1638,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
         };
 
         class CallOperator: public Operator
@@ -1653,7 +1651,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
         };
 
         class FunctionDefinition : public Expression
@@ -1666,12 +1664,17 @@ namespace MSL
                 FunctionDefinition(const Location& place) : Expression{ place }, m_body{ place }
                 {
                 }
+
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext&, ThisType*) const
+
+                virtual Value evaluate(ExecutionContext&, ThisType*)
                 {
                     return Value{ this };
                 }
+
                 bool areParamsUnique() const;
+
+                Value call(ExecutionContext& ctx, Value::List&& args, ThisType& th);
         };
 
         class ObjectExpression : public Expression
@@ -1688,7 +1691,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
         };
 
         class ArrayExpression : public Expression
@@ -1701,7 +1704,7 @@ namespace MSL
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis) const;
+                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
         };
 
     }// namespace AST

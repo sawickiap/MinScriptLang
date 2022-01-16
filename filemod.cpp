@@ -14,7 +14,7 @@ namespace MSL
                 std::string data;
                 Value filename;
                 (void)env;
-                filename = Util::checkArgument(place, "File.read", args, 0, Value::Type::String);
+                filename = Util::checkArgument(place, "File.read", args, 0, {Value::Type::String});
                 std::fstream fh(filename.string(), std::ios::in | std::ios::binary);
                 if(!fh.good())
                 {
@@ -32,7 +32,7 @@ namespace MSL
             {
                 Value path;
                 (void)env;
-                path = Util::checkArgument(place, "File.readDirectory", args, 0, Value::Type::String);
+                path = Util::checkArgument(place, "File.readDirectory", args, 0, {Value::Type::String});
                 auto ary = std::make_shared<Array>();
                 try
                 {
@@ -53,7 +53,7 @@ namespace MSL
             {
                 Value path;
                 (void)env;
-                path = Util::checkArgument(place, "File.exists", args, 0, Value::Type::String);
+                path = Util::checkArgument(place, "File.exists", args, 0, {Value::Type::String});
                 return Value(double(std::filesystem::exists(path.string())));
             }
 
@@ -63,7 +63,7 @@ namespace MSL
                 Value path;
                 (void)env;
                 std::error_code ec;
-                path = Util::checkArgument(place, "File.size", args, 0, Value::Type::String);
+                path = Util::checkArgument(place, "File.size", args, 0, {Value::Type::String});
                 rs = double(std::filesystem::file_size(path.string(), ec));
                 if(ec)
                 {
@@ -77,7 +77,7 @@ namespace MSL
                 Value path;
                 (void)env;
                 std::error_code ec;
-                path = Util::checkArgument(place, "File.readLink", args, 0, Value::Type::String);
+                path = Util::checkArgument(place, "File.readLink", args, 0, {Value::Type::String});
                 auto rs = std::filesystem::read_symlink(path.string(), ec);
                 if(ec)
                 {
@@ -94,7 +94,7 @@ namespace MSL
             {
                 Value path;
                 (void)env;
-                path = Util::checkArgument(place, "File.basename", args, 0, Value::Type::String);
+                path = Util::checkArgument(place, "File.basename", args, 0, {Value::Type::String});
                 return Value(std::filesystem::path(path.string()).filename().string());
             }
 
@@ -102,7 +102,7 @@ namespace MSL
             {
                 Value path;
                 (void)env;
-                path = Util::checkArgument(place, "File.dirname", args, 0, Value::Type::String);
+                path = Util::checkArgument(place, "File.dirname", args, 0, {Value::Type::String});
                 return Value(std::filesystem::path(path.string()).parent_path().string());
             }
 
@@ -110,7 +110,7 @@ namespace MSL
             {
                 Value path;
                 (void)env;
-                path = Util::checkArgument(place, "File.extname", args, 0, Value::Type::String);
+                path = Util::checkArgument(place, "File.extname", args, 0, {Value::Type::String});
                 return Value(std::filesystem::path(path.string()).extension().string());
             }
 

@@ -245,6 +245,9 @@ namespace MSL
         Value memberfn_array_pop(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
         Value memberfn_array_insert(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
         Value memberfn_array_remove(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+        Value memberfn_array_each(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+        Value memberfn_array_map(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args);
+
     }
 
     struct StandardObjectMemberFunc

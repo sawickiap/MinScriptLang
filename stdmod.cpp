@@ -16,7 +16,7 @@ namespace MSL
         Value ctor_number(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
         {
             (void)ctx;
-            auto val = Util::checkArgument(place, "Number", args, 0, Value::Type::Number);
+            auto val = Util::checkArgument(place, "Number", args, 0, {Value::Type::Number});
             return Value{ val };
         }
 
@@ -27,7 +27,7 @@ namespace MSL
             {
                 return Value{ std::string{} };
             }
-            auto strv = Util::checkArgument(place, "String", args, 0, Value::Type::String);
+            auto strv = Util::checkArgument(place, "String", args, 0, {Value::Type::String});
             return Value{ std::move(strv.string()) };
         }
 
@@ -186,6 +186,58 @@ namespace MSL
             return {};
         }
 
+        Value memberfn_array_each(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args)
+        {
+            size_t idx;
+            Array* arr;
+            (void)ctx;
+            arr = th.array();
+            if(!arr)
+            {
+                throw Error::TypeError(place, "expected array object");
+            }
+            auto vfunc = Util::checkArgument(place, "Array.each", args, 0, {Value::Type::Function, Value::Type::HostFunction});
+            return {};
+            /*
+            for(auto i=0; i<arr->size(); i++)
+            {
+                if(vfunc->isFunction())
+                {
+                    
+                }
+            }
+            */
+        }
+
+        Value memberfn_array_map(AST::ExecutionContext& ctx, const Location& place, AST::ThisType& th, Value::List&& args)
+        {
+            size_t i;
+            Array* arr;
+            Value nv;
+            (void)ctx;
+            arr = th.array();
+            if(!arr)
+            {
+                throw Error::TypeError(place, "expected array object");
+            }
+            auto vfunc = Util::checkArgument(place, "Array.map", args, 0, {Value::Type::Function, Value::Type::HostFunction});
+            auto newarr = std::make_shared<Array>();
+            for(i=0; i<arr->size(); i++)
+            {
+                Value::List fnargs = {arr->at(i)};
+                if(vfunc.type() == Value::Type::Function)
+                {
+                    nv = vfunc.scriptFunction()->call(ctx, std::move(fnargs), th);
+                }
+                else if(vfunc.type() == Value::Type::HostFunction)
+                {
+                    nv = vfunc.hostFunction()(ctx.m_env.getOwner(), place, std::move(fnargs));
+                }
+                newarr->push_back(std::move(nv));
+            }
+            return Value{std::move(newarr)};
+        }
+
         Value protofn_string_length(AST::ExecutionContext& ctx, const Location& place, Value&& objVal)
         {
             (void)ctx;
@@ -266,7 +318,7 @@ namespace MSL
         {
             (void)ctx;
             const auto& self = th.string();
-            auto findme = Util::checkArgument(place, "Strings.endsWith", args, 0, Value::Type::String);
+            auto findme = Util::checkArgument(place, "Strings.endsWith", args, 0, {Value::Type::String});
             auto sf = findme.string();
             if(sf.size() > self.size())
             {

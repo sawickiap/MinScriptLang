@@ -55,6 +55,9 @@ namespace MSL
         {"pop", Builtins::memberfn_array_pop},
         {"insert", Builtins::memberfn_array_insert},
         {"remove", Builtins::memberfn_array_remove},
+        {"each", Builtins::memberfn_array_each},
+        {"map", Builtins::memberfn_array_map},
+
     });
 
     template<typename Type, size_t sz, typename DestType>
@@ -222,15 +225,6 @@ namespace MSL
 
     namespace AST
     {
-        /*
-        Value ConstantExpression::execute(ExecutionContext& ctx) const
-        {
-            (void)ctx;
-            fprintf(stderr, "ConstantExpression::execute()?\n");
-            return {};
-        }
-        */
-
         Block::Block(const Location& place) : Statement{ place }
         {
         }
@@ -292,7 +286,7 @@ namespace MSL
             }
         }
 
-        Value Condition::execute(ExecutionContext& ctx) const
+        Value Condition::execute(ExecutionContext& ctx)
         {
             if(m_condexpr->evaluate(ctx, nullptr).isTrue())
             {
@@ -305,7 +299,7 @@ namespace MSL
             return {};
         }
 
-        Value WhileLoop::execute(ExecutionContext& ctx) const
+        Value WhileLoop::execute(ExecutionContext& ctx)
         {
             switch(m_type)
             {
@@ -356,7 +350,7 @@ namespace MSL
             return {};
         }
 
-        Value ForLoop::execute(ExecutionContext& ctx) const
+        Value ForLoop::execute(ExecutionContext& ctx)
         {
             if(m_initexpr)
             {
@@ -384,7 +378,7 @@ namespace MSL
         }
 
 
-        Value RangeBasedForLoop::execute(ExecutionContext& ctx) const
+        Value RangeBasedForLoop::execute(ExecutionContext& ctx)
         {
             int ch;
             size_t i;
@@ -477,7 +471,7 @@ namespace MSL
             return {};
         }
 
-        Value LoopBreakStatement::execute(ExecutionContext& ctx) const
+        Value LoopBreakStatement::execute(ExecutionContext& ctx)
         {
             (void)ctx;
             switch(m_type)
@@ -501,7 +495,7 @@ namespace MSL
             return {};
         }
 
-        Value ReturnStatement::execute(ExecutionContext& ctx) const
+        Value ReturnStatement::execute(ExecutionContext& ctx)
         {
             if(m_retvalue)
             {
@@ -514,7 +508,7 @@ namespace MSL
             return {};
         }
 
-        Value Block::execute(ExecutionContext& ctx) const
+        Value Block::execute(ExecutionContext& ctx)
         {
             Value rv;
             for(const auto& stmt : m_statements)
@@ -524,7 +518,7 @@ namespace MSL
             return rv;
         }
 
-        Value SwitchStatement::execute(ExecutionContext& ctx) const
+        Value SwitchStatement::execute(ExecutionContext& ctx)
         {
             Value condval;
             size_t itemidx;
@@ -568,13 +562,13 @@ namespace MSL
             return {};
         }
 
-        Value ThrowStatement::execute(ExecutionContext& ctx) const
+        Value ThrowStatement::execute(ExecutionContext& ctx)
         {
             throw m_thrownexpr->evaluate(ctx, nullptr);
             return {};
         }
 
-        Value TryStatement::execute(ExecutionContext& ctx) const
+        Value TryStatement::execute(ExecutionContext& ctx)
         {
             /**
             // Careful with this function!
@@ -685,7 +679,7 @@ namespace MSL
             return {};
         }
 
-        Value Script::execute(ExecutionContext& ctx) const
+        Value Script::execute(ExecutionContext& ctx)
         {
             try
             {
@@ -702,7 +696,7 @@ namespace MSL
             return {};
         }
 
-        Value Identifier::evaluate(ExecutionContext& ctx, ThisType* othis) const
+        Value Identifier::evaluate(ExecutionContext& ctx, ThisType* othis)
         {
             size_t i;
             size_t count;
@@ -797,14 +791,14 @@ namespace MSL
             return LeftValue::Getter{ LeftValue::ObjectMember{ &ctx.m_globalscope, m_ident } };
         }
 
-        Value ThisExpression::evaluate(ExecutionContext& ctx, ThisType* othis) const
+        Value ThisExpression::evaluate(ExecutionContext& ctx, ThisType* othis)
         {
             (void)othis;
             MINSL_EXECUTION_CHECK(ctx.isLocal() && std::get_if<std::shared_ptr<Object>>(&ctx.getThis()), getPlace(), "use of 'this' not possible in this context");
             return Value{ std::shared_ptr<Object>{ *std::get_if<std::shared_ptr<Object>>(&ctx.getThis()) } };
         }
 
-        Value UnaryOperator::evaluate(ExecutionContext& ctx, ThisType* othis) const
+        Value UnaryOperator::evaluate(ExecutionContext& ctx, ThisType* othis)
         {
             Value* pval;
             Value val;
@@ -934,7 +928,7 @@ namespace MSL
         // TODO:
         // turn this into a table lookup.
         */
-        Value MemberAccessOperator::evaluate(ExecutionContext& ctx, ThisType* othis) const
+        Value MemberAccessOperator::evaluate(ExecutionContext& ctx, ThisType* othis)
         {
             Value vobj;
             const Value* memberval;
@@ -1014,7 +1008,7 @@ namespace MSL
             return Value{ (double)resval };
         }
 
-        Value BinaryOperator::evaluate(ExecutionContext& ctx, ThisType* othis) const
+        Value BinaryOperator::evaluate(ExecutionContext& ctx, ThisType* othis)
         {
             size_t index;
             bool result;
@@ -1398,18 +1392,47 @@ namespace MSL
         }
 
 
-        Value TernaryOperator::evaluate(ExecutionContext& ctx, ThisType* othis) const
+        Value TernaryOperator::evaluate(ExecutionContext& ctx, ThisType* othis)
         {
             return m_condexpr->evaluate(ctx, nullptr).isTrue() ? m_trueexpr->evaluate(ctx, othis) :
                                                                   m_falseexpr->evaluate(ctx, othis);
         }
 
-        Value CallOperator::evaluate(ExecutionContext& ctx, ThisType* othis) const
+        Value FunctionDefinition::call(ExecutionContext& ctx, Value::List&& args, ThisType& th)
+        {
+            size_t argidx;
+            Object ourlocalscope;
+            // Setup parameters
+            for(argidx = 0; argidx<args.size(); argidx++)
+            {
+                ourlocalscope.put(m_paramlist[argidx], std::move(args[argidx]));
+            }
+            ExecutionContext::LocalScopePush ourlocalcontext{ ctx, &ourlocalscope, std::move(th), getPlace() };
+            try
+            {
+                m_body.execute(ctx);
+            }
+            catch(ReturnException& returnEx)
+            {
+                return std::move(returnEx.thrownvalue);
+            }
+            catch(BreakException)
+            {
+                throw Error::RuntimeError(getPlace(), "use of 'break' outside of a loop");
+            }
+            catch(ContinueException)
+            {
+                throw Error::RuntimeError(getPlace(), "use of 'continue' outside of a loop");
+            }
+            return {};
+        }
+
+
+        Value CallOperator::evaluate(ExecutionContext& ctx, ThisType* othis)
         {
             (void)othis;
             size_t i;
             size_t argcnt;
-            size_t argidx;
             ThisType th;
             th = ThisType{};
             Value callee;
@@ -1433,15 +1456,17 @@ namespace MSL
             }
             if(callee.type() == Value::Type::Function)
             {
-                auto funcDef = callee.scriptFunction();
-                MINSL_EXECUTION_CHECK(argcnt == funcDef->m_paramlist.size(), getPlace(), "inexact number of arguments");
+                auto funcdef = callee.scriptFunction();
+                MINSL_EXECUTION_CHECK(argcnt == funcdef->m_paramlist.size(), getPlace(), "inexact number of arguments");
+                /*
                 Object ourlocalscope;
                 // Setup parameters
                 for(argidx = 0; argidx != argcnt; ++argidx)
                 {
-                    ourlocalscope.put(funcDef->m_paramlist[argidx], std::move(arguments[argidx]));
+                    ourlocalscope.put(funcdef->m_paramlist[argidx], std::move(arguments[argidx]));
                 }
                 ExecutionContext::LocalScopePush ourlocalcontext{ ctx, &ourlocalscope, std::move(th), getPlace() };
+                
                 try
                 {
                     callee.scriptFunction()->m_body.execute(ctx);
@@ -1459,6 +1484,8 @@ namespace MSL
                     throw Error::RuntimeError(getPlace(), "use of 'continue' outside of a loop");
                 }
                 return {};
+                */
+                return callee.scriptFunction()->call(ctx, std::move(arguments), th);
             }
             if(callee.type() == Value::Type::HostFunction)
             {
@@ -1551,7 +1578,7 @@ namespace MSL
             return true;
         }
 
-        Value ObjectExpression::evaluate(ExecutionContext& ctx, ThisType* othis) const
+        Value ObjectExpression::evaluate(ExecutionContext& ctx, ThisType* othis)
         {
             std::shared_ptr<Object> obj;
             (void)othis;
@@ -1583,7 +1610,7 @@ namespace MSL
             return Value{ std::move(obj) };
         }
 
-        Value ArrayExpression::evaluate(ExecutionContext& ctx, ThisType* othis) const
+        Value ArrayExpression::evaluate(ExecutionContext& ctx, ThisType* othis)
         {
             (void)othis;
             auto result = std::make_shared<Array>();

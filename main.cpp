@@ -207,12 +207,14 @@ int main(int argc, char* argv[])
     bool havecodechunk;
     bool forcerepl;
     bool dumpsyntax;
+    bool alsoprint;
     std::string filename;
     std::string filedata;
     std::string codechunk;
     std::vector<std::string> rest;
     MSL::Environment env;
     OptionParser prs;
+    alsoprint = false;
     dumpsyntax = false;
     forcerepl = false;
     havecodechunk = false;
@@ -225,6 +227,10 @@ int main(int argc, char* argv[])
         codechunk = v.str();
         havecodechunk = true;
         prs.stopParsing();
+    });
+    prs.on({"-p", "--print"}, "when using '-e', print the result", [&]
+    {
+        alsoprint = true;
     });
     prs.on({"-d", "--dump"}, "dump source through debugPrint() - can also be used with '-e'", [&]
     {
@@ -252,6 +258,10 @@ int main(int argc, char* argv[])
             try
             {
                 auto v = env.execute(codechunk);
+                if(alsoprint)
+                {
+                    v.toStream(std::cout);
+                }
             }
             catch(MSL::Error::Exception& e)
             {
