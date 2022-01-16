@@ -62,16 +62,6 @@ namespace MSL
         };
     }
 
-    namespace AST
-    {
-        Value ConstantExpression::execute(ExecutionContext& ctx) const
-        {
-            /* Nothing - just ignore its value. */
-            (void)ctx;
-            return {};
-        }
-    }
-
     Environment::Environment() : m_implenv{ new EnvironmentPimpl{ *this, m_globalscope } }
     {
         makeStdHandle({}, "$stdin", stdin);

@@ -12,6 +12,14 @@ namespace MSL
         //GC::Collector::GC.collect();
     }
 
+    void Object::markChildren()
+    {
+        for(auto& pair: m_entrymap)
+        {
+            pair.second.mark();
+        }
+    }
+
     Value* Object::tryGet(const std::string& key)
     {
         auto it = m_entrymap.find(key);

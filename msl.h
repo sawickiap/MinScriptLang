@@ -37,6 +37,7 @@ SOFTWARE.
 #include <string_view>
 #include <exception>
 #include <memory>
+#include <functional>
 #include <vector>
 #include <unordered_map>
 #include <variant>
@@ -698,13 +699,7 @@ namespace MSL
             MapType m_entrymap;
 
         private:
-            virtual void markChildren() override
-            {
-                for(auto& pair: m_entrymap)
-                {
-                    pair.second.mark();
-                }
-            }
+            virtual void markChildren() override;
 
         public:
             Object();
@@ -744,7 +739,7 @@ namespace MSL
 
         private:
             virtual void markChildren() override;
-
+            
         public:
             Array();
 
@@ -1457,7 +1452,7 @@ namespace MSL
                 {
                 }
 
-                virtual Value execute(ExecutionContext& ctx) const;
+                //virtual Value execute(ExecutionContext& ctx) const;
         };
 
         class ConstantValue: public ConstantExpression

@@ -222,6 +222,15 @@ namespace MSL
 
     namespace AST
     {
+        /*
+        Value ConstantExpression::execute(ExecutionContext& ctx) const
+        {
+            (void)ctx;
+            fprintf(stderr, "ConstantExpression::execute()?\n");
+            return {};
+        }
+        */
+
         Block::Block(const Location& place) : Statement{ place }
         {
         }
