@@ -121,6 +121,7 @@ namespace MSL
             auto obj = std::make_shared<Object>();
             {
                 obj->put("readFile", Value{filefunc_readfile});
+                obj->put("read", Value{filefunc_readfile});
                 obj->put("readDirectory", Value(HostFunction(filefunc_readdir)));
                 obj->put("readLink", Value(HostFunction(filefunc_readlink)));
                 obj->put("exists", Value(HostFunction(filefunc_exists)));

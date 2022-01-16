@@ -1090,17 +1090,29 @@ namespace MSL
                 {
                     return Value{ left.number() + right.number() };
                 }
-                if(typleft == Value::Type::String && typright == Value::Type::String)
+                else if(typleft == Value::Type::String)
                 {
-                    return Value{ left.string() + right.string() };
+                    if(typright == Value::Type::String)
+                    {
+                        return Value{ left.string() + right.string() };
+                    }
+                    else if(typright == Value::Type::Number)
+                    {
+                        left.string().push_back(right.number());
+                        return Value{ std::move(left.string()) };
+                    }
+                    else
+                    {
+                        left.string() += right.toString();
+                        return Value{ std::move(left.string()) };
+                    }
                 }
-                if(typleft == Value::Type::String && typright == Value::Type::Number)
+                else if(typleft == Value::Type::Array)
                 {
-                    left.string().push_back(right.number());
-                    return Value{ std::move(left.string()) };
+                    auto nary = Util::CopyArray(*left.array());
+                    nary->push_back(std::move(right));
+                    return Value{std::move(nary)};
                 }
-
-
                 return binaryBadTypes(location(), "+", typleft, typright);
             }
             if(m_type == BinaryOperator::Type::Equal)
@@ -1342,13 +1354,26 @@ namespace MSL
                 {
                     leftvalptr->setNumberValue(leftvalptr->number() + rhs.number());
                 }
-                else if(leftvalptr->isString() && rhs.isString())
+                else if(leftvalptr->isString())
                 {
-                    leftvalptr->string() += rhs.string();
+                    if(rhs.isString())
+                    {
+                        leftvalptr->string() += rhs.string();
+                    }
+                    else if(rhs.isNumber())
+                    {
+                        leftvalptr->string().push_back(int(rhs.number()));
+                    }
+                    else
+                    {
+                        leftvalptr->string() += rhs.toString();
+                    }
+                    return *leftvalptr;
                 }
-                else if(leftvalptr->isString() && rhs.isNumber())
+                else if(leftvalptr->isArray())
                 {
-                    leftvalptr->string().push_back(int(rhs.number()));
+                    leftvalptr->array()->push_back(std::move(rhs));
+                    return *leftvalptr;
                 }
                 else
                 {

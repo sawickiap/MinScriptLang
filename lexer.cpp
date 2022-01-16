@@ -3,17 +3,89 @@
 
 namespace MSL
 {
-    static constexpr std::string_view SYMBOL_STR[] = {
-        // Token types
-        "", "", "", "", "",
-        // Symbols
-        ",", "?", ":", ";", "(", ")", "[", "]", "{", "}", "*", "/", "%", "+", "-", "=", "!", "~", "<", ">", "&", "^", "|", ".",
-        // Multiple character symbols
-        "++", "--", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||",
-        // Keywords
-        "null", "false", "true", "if", "else", "while", "do", "for", "break", "continue", "switch", "case", "default",
-        "function", "return", "local", "this", "global", "class", "throw", "try", "catch", "finally"
+    struct SymTypePair
+    {
+        Token::Type type;
+        std::string_view sym;
     };
+
+    static constexpr auto g_symtable = std::to_array<SymTypePair>(
+    {
+        { Token::Type::None, ""},
+        { Token::Type::Identifier, ""},
+        { Token::Type::Number, ""},
+        { Token::Type::String, ""},
+        { Token::Type::End, ""},
+        { Token::Type::Comma, ","},
+        { Token::Type::QuestionMark, "?"},
+        { Token::Type::Colon, ":"},
+        { Token::Type::Semicolon, ";"},
+        { Token::Type::RoundBracketOpen, "("},
+        { Token::Type::RoundBracketClose, ")"},
+        { Token::Type::SquareBracketOpen, "["},
+        { Token::Type::SquareBracketClose, "]"},
+        { Token::Type::CurlyBracketOpen, "{"},
+        { Token::Type::CurlyBracketClose, "}"},
+        { Token::Type::Asterisk, "*"},
+        { Token::Type::Slash, "/"},
+        { Token::Type::Percent, "%"},
+        { Token::Type::Plus, "+"},
+        { Token::Type::Dash, "-"},
+        { Token::Type::Equals, "="},
+        { Token::Type::ExclamationMark, "!"},
+        { Token::Type::Tilde, "~"},
+        { Token::Type::Less, "<"},
+        { Token::Type::Greater, ">"},
+        { Token::Type::Amperstand, "&"},
+        { Token::Type::Caret, "^"},
+        { Token::Type::Pipe, "|"},
+        { Token::Type::Dot, "."},
+        { Token::Type::DoublePlus, "++"},
+        { Token::Type::DoubleDash, "--"},
+        { Token::Type::PlusEquals, "+="},
+        { Token::Type::DashEquals, "-="},
+        { Token::Type::AsteriskEquals, "*="},
+        { Token::Type::SlashEquals, "/="},
+        { Token::Type::PercentEquals, "%="},
+        { Token::Type::DoubleLessEquals, "<<="},
+        { Token::Type::DoubleGreaterEquals, ">>="},
+        { Token::Type::AmperstandEquals, "&="},
+        { Token::Type::CaretEquals, "^="},
+        { Token::Type::PipeEquals, "|="},
+        { Token::Type::DoubleLess, "<<"},
+        { Token::Type::DoubleGreater, ">>"},
+        { Token::Type::LessEquals, "<="},
+        { Token::Type::GreaterEquals, ">="},
+        { Token::Type::DoubleEquals, "=="},
+        { Token::Type::ExclamationEquals, "!="},
+        { Token::Type::DoubleAmperstand, "&&"},
+        { Token::Type::DoublePipe, "||"},
+        { Token::Type::Null, "null"},
+        { Token::Type::False, "false"},
+        { Token::Type::True, "true"},
+        { Token::Type::If, "if"},
+        { Token::Type::Else, "else"},
+        { Token::Type::While, "while"},
+        { Token::Type::Do, "do"},
+        { Token::Type::For, "for"},
+        { Token::Type::Break, "break"},
+        { Token::Type::Continue, "continue"},
+        { Token::Type::Switch, "switch"},
+        { Token::Type::Case, "case"},
+        { Token::Type::Default, "default"},
+        { Token::Type::Function, "function"},
+        { Token::Type::Return, "return"},
+        { Token::Type::Local, "local"},
+        { Token::Type::This, "this"},
+        { Token::Type::Global, "global"},
+        { Token::Type::Class, "class"},
+        { Token::Type::Throw, "throw"},
+        { Token::Type::Try, "try"},
+        { Token::Type::Catch, "catch"},
+        { Token::Type::Finally, "finally"},
+
+    });
+
 
     static inline bool IsDecimalNumber(char ch)
     {
@@ -505,9 +577,9 @@ namespace MSL
         size_t symlen;
         size_t currlen;
         const char*  currcode;
-        constexpr Token::Type firstSingleCharSymbol = Token::Type::Comma;
-        constexpr Token::Type firstMultiCharSymbol = Token::Type::DoublePlus;
-        constexpr Token::Type firstKeywordSymbol = Token::Type::Null;
+        constexpr Token::Type firstsinglecharsym = Token::Type::Comma;
+        constexpr Token::Type firstmulticharsym = Token::Type::DoublePlus;
+        constexpr Token::Type firstkwsym = Token::Type::Null;
         skipSpacesAndComments();
         out.m_place = m_code.location();
         // End of input
@@ -527,22 +599,25 @@ namespace MSL
             return;
         }
         // Multi char symbol
-        for(i = (size_t)firstMultiCharSymbol; i < (size_t)firstKeywordSymbol; ++i)
+        for(i = (size_t)firstmulticharsym; i < (size_t)firstkwsym; ++i)
         {
-            symlen = SYMBOL_STR[i].length();
-            if(currlen >= symlen && memcmp(SYMBOL_STR[i].data(), currcode, symlen) == 0)
+            //symlen = g_symbolstrings[i].length();
+            symlen = g_symtable[i].sym.length();
+            //if(currlen >= symlen && memcmp(g_symbolstrings[i].data(), currcode, symlen) == 0)
+            if(currlen >= symlen && memcmp(g_symtable[i].sym.data(), currcode, symlen) == 0)
             {
-                out.type((Token::Type)i);
+                out.type(g_symtable[i].type);
                 m_code.moveForward(symlen);
                 return;
             }
         }
         // symtype
-        for(i = (size_t)firstSingleCharSymbol; i < (size_t)firstMultiCharSymbol; ++i)
+        for(i = (size_t)firstsinglecharsym; i < (size_t)firstmulticharsym; ++i)
         {
-            if(currcode[0] == SYMBOL_STR[i][0])
+            //if(currcode[0] == g_symbolstrings[i][0])
+            if(currcode[0] == g_symtable[i].sym[0])
             {
-                out.type((Token::Type)i);
+                out.type(g_symtable[i].type);
                 m_code.moveForward();
                 return;
             }
@@ -556,10 +631,12 @@ namespace MSL
                 ++tklen;
             }
             // Keyword
-            for(i = (size_t)firstKeywordSymbol; i < (size_t)Token::Type::Count; ++i)
+            for(i = (size_t)firstkwsym; i < (size_t)Token::Type::Count; ++i)
             {
-                kwlen = SYMBOL_STR[i].length();
-                if(kwlen == tklen && memcmp(SYMBOL_STR[i].data(), currcode, tklen) == 0)
+                //kwlen = g_symbolstrings[i].length();
+                kwlen = g_symtable[i].sym.length();
+                //if(kwlen == tklen && memcmp(g_symbolstrings[i].data(), currcode, tklen) == 0)
+                if(kwlen == tklen && memcmp(g_symtable[i].sym.data(), currcode, tklen) == 0)
                 {
                     out.type((Token::Type)i);
                     m_code.moveForward(kwlen);
