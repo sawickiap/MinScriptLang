@@ -55,22 +55,22 @@ namespace MSL
         return m_place.textindex >= m_code.length();
     }
 
-    const Location& CodeReader::getCurrentPlace() const
+    const Location& CodeReader::location() const
     {
         return m_place;
     }
 
-    const char* CodeReader::getCurrentCode() const
+    const char* CodeReader::code() const
     {
         return m_code.data() + m_place.textindex;
     }
 
-    size_t CodeReader::getCurrentLength() const
+    size_t CodeReader::codeLength() const
     {
         return m_code.length() - m_place.textindex;
     }
 
-    char CodeReader::getCurrentChar() const
+    char CodeReader::getCurrent() const
     {
         return m_code[m_place.textindex];
     }
@@ -188,7 +188,7 @@ namespace MSL
         while(!m_code.isAtEnd())
         {
             // Whitespace
-            if(isspace(m_code.getCurrentChar()))
+            if(isspace(m_code.getCurrent()))
             {
                 m_code.moveForward();
             }
@@ -196,7 +196,7 @@ namespace MSL
             else if(m_code.peekNext("//", 2))
             {
                 m_code.moveForward(2);
-                while(!m_code.isAtEnd() && m_code.getCurrentChar() != '\n')
+                while(!m_code.isAtEnd() && m_code.getCurrent() != '\n')
                 {
                     m_code.moveForward();
                 }
@@ -208,7 +208,7 @@ namespace MSL
                 {
                     if(m_code.isAtEnd())
                     {
-                        throw Error::ParsingError(m_code.getCurrentPlace(), "unexpected EOF while looking for end of comment block");
+                        throw Error::ParsingError(m_code.location(), "unexpected EOF while looking for end of comment block");
                     }
                     else if(m_code.peekNext("*/", 2))
                     {
@@ -237,8 +237,8 @@ namespace MSL
         size_t digitsafterpoint;
         const char* currcode;
         char sz[kBufSize + 1];
-        currcode = m_code.getCurrentCode();
-        currlen = m_code.getCurrentLength();
+        currcode = m_code.code();
+        currlen = m_code.codeLength();
         if(!IsDecimalNumber(currcode[0]) && currcode[0] != '.')
         {
             return false;
@@ -329,8 +329,8 @@ namespace MSL
         uint32_t val;
         char chdelim;
         const char* currcode;
-        currcode = m_code.getCurrentCode();
-        currlen = m_code.getCurrentLength();
+        currcode = m_code.code();
+        currlen = m_code.codeLength();
         chdelim = currcode[0];
         if(chdelim != '"' && chdelim != '\'')
         {
@@ -509,15 +509,15 @@ namespace MSL
         constexpr Token::Type firstMultiCharSymbol = Token::Type::DoublePlus;
         constexpr Token::Type firstKeywordSymbol = Token::Type::Null;
         skipSpacesAndComments();
-        out.m_place = m_code.getCurrentPlace();
+        out.m_place = m_code.location();
         // End of input
         if(m_code.isAtEnd())
         {
             out.type(Token::Type::End);
             return;
         }
-        currcode = m_code.getCurrentCode();
-        currlen = m_code.getCurrentLength();
+        currcode = m_code.code();
+        currlen = m_code.codeLength();
         if(parseString(out))
         {
             return;

@@ -16,12 +16,12 @@ namespace MSL
                 {
                 }
 
-                Value io_write(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
+                Value io_write(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
                 {
                     (void)ctx;
                     size_t rs;
                     rs = 0;
-                    Util::checkArgumentCount(place, "write", args.size(), 1);
+                    Util::checkArgumentCount(loc, "write", args.size(), 1);
                     for(const auto& a: args)
                     {
                         auto tmpstr = a.toString();
@@ -31,7 +31,7 @@ namespace MSL
                     return Value{double(rs)};
                 }
 
-                Value io_getchar(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
+                Value io_getchar(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
                 {
                     int ch;
                     (void)ctx;
@@ -39,22 +39,22 @@ namespace MSL
                     ch = fgetc(m_stream);
                     if(ch == EOF)
                     {
-                        throw Error::EOFError(place, "EOF");
+                        throw Error::EOFError(loc, "EOF");
                     }
                     fflush(m_stream);
                     return Value{double(ch)};
                 }
 
-                Value io_putchar(AST::ExecutionContext& ctx, const Location& place, Value::List&& args)
+                Value io_putchar(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
                 {
                     int rs;
                     Value ch;
                     (void)ctx;
-                    ch = Util::checkArgument(place, "putchar", args, 0, {Value::Type::Number});
+                    ch = Util::checkArgument(loc, "putchar", args, 0, {Value::Type::Number});
                     rs = fputc(int(ch.number()), m_stream);
                     if(rs == EOF)
                     {
-                        throw Error::EOFError(place, "EOF");
+                        throw Error::EOFError(loc, "EOF");
                     }
                     fflush(m_stream);
                     return Value{double(rs)};
@@ -109,10 +109,10 @@ namespace MSL
         /// todo: abstract this noise away? somehow?
         #define do_entry(expname, classmethod) \
             {\
-                obj->put(expname, Value{[weak](AST::ExecutionContext& ctx, const Location& place, AST::ThisType&, Value::List&& args)\
+                obj->put(expname, Value{[weak](AST::ExecutionContext& ctx, const Location& loc, AST::ThisType&, Value::List&& args)\
                 {\
                     auto hereobj = weak.lock(); \
-                    return hereobj->classmethod(ctx, place, std::move(args)); \
+                    return hereobj->classmethod(ctx, loc, std::move(args)); \
                 }});\
             }
             

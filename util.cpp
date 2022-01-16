@@ -197,20 +197,20 @@ namespace MSL
             }
         }
 
-        void checkArgumentCount(const Location& place, std::string_view fname, size_t argcnt, size_t expect)
+        void checkArgumentCount(const Location& loc, std::string_view fname, size_t argcnt, size_t expect)
         {
             if((expect > 0) && ((argcnt == 0) || (argcnt < expect)))
             {
-                throw Error::ArgumentError(place, Util::joinArgs("function '", fname, "' expects at least ", expect, " arguments"));
+                throw Error::ArgumentError(loc, Util::joinArgs("function '", fname, "' expects at least ", expect, " arguments"));
             }
         }
 
-        Value checkArgument(const Location& place, std::string_view name, const Value::List& args, size_t idx, std::initializer_list<Value::Type> types)
+        Value checkArgument(const Location& loc, std::string_view name, const Value::List& args, size_t idx, std::initializer_list<Value::Type> types)
         {
             size_t i;
             Value r;
             std::stringstream emsg;
-            checkArgumentCount(place, name, args.size(), idx);
+            checkArgumentCount(loc, name, args.size(), idx);
             r = args[idx];
             // using Value::Type::Null means any type
             for(i=0; i<types.size(); i++)
@@ -232,7 +232,7 @@ namespace MSL
                 }
             }
             emsg << ", but got " << gtype << " instead";
-            throw Error::TypeError(place, emsg.str());
+            throw Error::TypeError(loc, emsg.str());
             return r;
         }
 

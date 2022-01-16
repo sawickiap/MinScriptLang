@@ -55,14 +55,14 @@ SOFTWARE.
 #include <ctype.h>
 
 
-#define MINSL_EXECUTION_CHECK(condition, place, errorMessage) \
+#define MINSL_EXECUTION_CHECK(condition, loc, errorMessage) \
     if(!(condition)) \
     { \
-        throw Error::RuntimeError((place), (errorMessage)); \
+        throw Error::RuntimeError((loc), (errorMessage)); \
     }
 
-#define MINSL_EXECUTION_FAIL(place, errorMessage) \
-    throw Error::RuntimeError((place), (errorMessage));
+#define MINSL_EXECUTION_FAIL(loc, errorMessage) \
+    throw Error::RuntimeError((loc), (errorMessage));
 
 
 namespace MSL
@@ -191,11 +191,11 @@ namespace MSL
                 mutable std::string m_what;
 
             public:
-                inline Exception(const Location& place) : m_place{ place }
+                inline Exception(const Location& loc) : m_place{ loc }
                 {
                 }
 
-                inline const Location& getPlace() const
+                inline const Location& location() const
                 {
                     return m_place;
                 }
@@ -215,7 +215,7 @@ namespace MSL
                 const std::string_view m_message;// Externally owned
 
             public:
-                inline ParsingError(const Location& place, std::string_view message) : Exception{ place }, m_message{ message }
+                inline ParsingError(const Location& loc, std::string_view message) : Exception{ loc }, m_message{ message }
                 {
                 }
 
@@ -237,7 +237,7 @@ namespace MSL
                 const std::string m_message;
 
             public:
-                inline RuntimeError(const Location& place, std::string_view message) : Exception{ place }, m_message{ message }
+                inline RuntimeError(const Location& loc, std::string_view message) : Exception{ loc }, m_message{ message }
                 {
                 }
 
@@ -692,8 +692,8 @@ namespace MSL
 
     namespace Util
     {
-        void checkArgumentCount(const Location& place, std::string_view fname, size_t argcnt, size_t expect);
-        Value checkArgument(const Location& place, std::string_view fname, const Value::List& args, size_t idx, std::initializer_list<Value::Type> type);
+        void checkArgumentCount(const Location& loc, std::string_view fname, size_t argcnt, size_t expect);
+        Value checkArgument(const Location& loc, std::string_view fname, const Value::List& args, size_t idx, std::initializer_list<Value::Type> type);
     }
 
     class Object: public GC::Collectable
@@ -1032,10 +1032,10 @@ namespace MSL
         public:
             CodeReader(std::string_view code);
             bool isAtEnd() const;
-            const Location& getCurrentPlace() const;
-            const char* getCurrentCode() const;
-            size_t getCurrentLength() const;
-            char getCurrentChar() const;
+            const Location& location() const;
+            const char* code() const;
+            size_t codeLength() const;
+            char getCurrent() const;
             bool peekNext(char ch) const;
             bool peekNext(const char* s, size_t sLen) const;
 
@@ -1101,8 +1101,8 @@ namespace MSL
         {
             public:
                 // Always returns non-null or throws exception.
-                Value* getValueRef(const Location& place) const;
-                Value getValue(const Location& place) const;
+                Value* getValueRef(const Location& loc) const;
+                Value getValue(const Location& loc) const;
         };
     }
 
@@ -1184,7 +1184,7 @@ namespace MSL
                         ExecutionContext& m_context;
 
                     public:
-                        LocalScopePush(ExecutionContext& ctx, Object* localScope, ThisType&& thisObj, const Location& place);
+                        LocalScopePush(ExecutionContext& ctx, Object* localScope, ThisType&& thisObj, const Location& loc);
                         ~LocalScopePush();
                 };
 
@@ -1221,11 +1221,11 @@ namespace MSL
                 void assign(const LeftValue::Getter& lhs, Value&& rhs) const;
 
             public:
-                explicit Statement(const Location& place);
+                explicit Statement(const Location& loc);
 
                 virtual ~Statement();
 
-                const Location& getPlace() const;
+                const Location& location() const;
 
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const = 0;
 
@@ -1235,7 +1235,7 @@ namespace MSL
         class EmptyStatement : public Statement
         {
             public:
-                explicit EmptyStatement(const Location& place) : Statement{ place }
+                explicit EmptyStatement(const Location& loc) : Statement{ loc }
                 {
                 }
 
@@ -1258,7 +1258,7 @@ namespace MSL
                 std::unique_ptr<Statement> m_falsestmt;
 
             public:
-                explicit Condition(const Location& place) : Statement{ place }
+                explicit Condition(const Location& loc) : Statement{ loc }
                 {
                 }
 
@@ -1278,7 +1278,7 @@ namespace MSL
                 std::unique_ptr<Statement> m_body;
 
             public:
-                explicit WhileLoop(const Location& place, Type type) : Statement{ place }, m_type{ type }
+                explicit WhileLoop(const Location& loc, Type type) : Statement{ loc }, m_type{ type }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1297,7 +1297,7 @@ namespace MSL
                 std::unique_ptr<Statement> m_body;
 
             public:
-                explicit ForLoop(const Location& place) : Statement{ place }
+                explicit ForLoop(const Location& loc) : Statement{ loc }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1315,7 +1315,7 @@ namespace MSL
                 std::unique_ptr<Statement> m_body;
 
             public:
-                explicit RangeBasedForLoop(const Location& place) : Statement{ place }
+                explicit RangeBasedForLoop(const Location& loc) : Statement{ loc }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1336,7 +1336,7 @@ namespace MSL
                 Type m_type;
 
             public:
-                explicit LoopBreakStatement(const Location& place, Type type) : Statement{ place }, m_type{ type }
+                explicit LoopBreakStatement(const Location& loc, Type type) : Statement{ loc }, m_type{ type }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1350,7 +1350,7 @@ namespace MSL
                 std::unique_ptr<Expression> m_retvalue;
 
             public:
-                explicit ReturnStatement(const Location& place) : Statement{ place }
+                explicit ReturnStatement(const Location& loc) : Statement{ loc }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1363,7 +1363,7 @@ namespace MSL
                 std::vector<std::unique_ptr<Statement>> m_statements;
 
             public:
-                explicit Block(const Location& place);
+                explicit Block(const Location& loc);
                 virtual ~Block();
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
                 virtual Value execute(ExecutionContext& ctx);
@@ -1381,7 +1381,7 @@ namespace MSL
                 std::vector<std::unique_ptr<AST::Block>> m_itemblocks;
 
             public:
-                explicit SwitchStatement(const Location& place) : Statement{ place }
+                explicit SwitchStatement(const Location& loc) : Statement{ loc }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1394,7 +1394,7 @@ namespace MSL
                 std::unique_ptr<Expression> m_thrownexpr;
 
             public:
-                explicit ThrowStatement(const Location& place) : Statement{ place }
+                explicit ThrowStatement(const Location& loc) : Statement{ loc }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1410,7 +1410,7 @@ namespace MSL
                 std::string m_exvarname;
 
             public:
-                explicit TryStatement(const Location& place) : Statement{ place }
+                explicit TryStatement(const Location& loc) : Statement{ loc }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1420,7 +1420,7 @@ namespace MSL
         class Script: public Block
         {
             public:
-                explicit Script(const Location& place) : Block{ place }
+                explicit Script(const Location& loc) : Block{ loc }
                 {
                 }
                 virtual Value execute(ExecutionContext& ctx);
@@ -1429,20 +1429,20 @@ namespace MSL
         class Expression: public Statement
         {
             public:
-                explicit Expression(const Location& place) : Statement{ place }
+                explicit Expression(const Location& loc) : Statement{ loc }
                 {
                 }
 
                 virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis)
                 {
                     (void)outThis;
-                    return getLeftValue(ctx).getValue(getPlace());
+                    return getLeftValue(ctx).getValue(location());
                 }
 
                 virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const
                 {
                     (void)ctx;
-                    throw Error::RuntimeError(getPlace(), "expected lvalue to expression");
+                    throw Error::RuntimeError(location(), "expected lvalue to expression");
                 }
 
                 virtual Value execute(ExecutionContext& ctx)
@@ -1454,7 +1454,7 @@ namespace MSL
         class ConstantExpression: public Expression
         {
             public:
-                explicit ConstantExpression(const Location& place) : Expression{ place }
+                explicit ConstantExpression(const Location& loc) : Expression{ loc }
                 {
                 }
 
@@ -1466,7 +1466,7 @@ namespace MSL
                 Value m_val;
 
             public:
-                ConstantValue(const Location& place, Value&& val) : ConstantExpression{ place }, m_val{ std::move(val) }
+                ConstantValue(const Location& loc, Value&& val) : ConstantExpression{ loc }, m_val{ std::move(val) }
                 {
                     assert(m_val.type() == Value::Type::Null || m_val.isNumber() || m_val.isString());
                 }
@@ -1495,7 +1495,7 @@ namespace MSL
                 std::string m_ident;
 
             public:
-                Identifier(const Location& place, Scope scope, std::string&& s): ConstantExpression{ place }, m_scope(scope), m_ident(std::move(s))
+                Identifier(const Location& loc, Scope scope, std::string&& s): ConstantExpression{ loc }, m_scope(scope), m_ident(std::move(s))
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1506,7 +1506,7 @@ namespace MSL
         class ThisExpression: public ConstantExpression
         {
             public:
-                ThisExpression(const Location& place) : ConstantExpression{ place }
+                ThisExpression(const Location& loc) : ConstantExpression{ loc }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1516,7 +1516,7 @@ namespace MSL
         class Operator: public Expression
         {
             public:
-                explicit Operator(const Location& place) : Expression{ place }
+                explicit Operator(const Location& loc) : Expression{ loc }
                 {
                 }
         };
@@ -1545,7 +1545,7 @@ namespace MSL
                 std::unique_ptr<Expression> m_operand;
 
             public:
-                UnaryOperator(const Location& place, Type type) : Operator{ place }, m_type(type)
+                UnaryOperator(const Location& loc, Type type) : Operator{ loc }, m_type(type)
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1560,7 +1560,7 @@ namespace MSL
                 std::string m_membername;
 
             public:
-                MemberAccessOperator(const Location& place) : Operator{ place }
+                MemberAccessOperator(const Location& loc) : Operator{ loc }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1618,7 +1618,7 @@ namespace MSL
                 Value Assignment(LeftValue::Getter&& lhs, Value&& rhs) const;
 
             public:
-                BinaryOperator(const Location& place, Type type) : Operator{ place }, m_type(type)
+                BinaryOperator(const Location& loc, Type type) : Operator{ loc }, m_type(type)
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1634,7 +1634,7 @@ namespace MSL
                 std::unique_ptr<Expression> m_falseexpr;
 
             public:
-                explicit TernaryOperator(const Location& place) : Operator{ place }
+                explicit TernaryOperator(const Location& loc) : Operator{ loc }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1647,7 +1647,7 @@ namespace MSL
                 std::vector<std::unique_ptr<Expression>> m_oplist;
 
             public:
-                CallOperator(const Location& place) : Operator{ place }
+                CallOperator(const Location& loc) : Operator{ loc }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1661,7 +1661,7 @@ namespace MSL
                 Block m_body;
 
             public:
-                FunctionDefinition(const Location& place) : Expression{ place }, m_body{ place }
+                FunctionDefinition(const Location& loc) : Expression{ loc }, m_body{ loc }
                 {
                 }
 
@@ -1687,7 +1687,7 @@ namespace MSL
                 ItemMap m_exprmap;
 
             public:
-                ObjectExpression(const Location& place) : Expression{ place }
+                ObjectExpression(const Location& loc) : Expression{ loc }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1700,7 +1700,7 @@ namespace MSL
                 std::vector<std::unique_ptr<Expression>> m_exprlist;
 
             public:
-                ArrayExpression(const Location& place) : Expression{ place }
+                ArrayExpression(const Location& loc) : Expression{ loc }
                 {
                 }
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
@@ -1752,7 +1752,8 @@ namespace MSL
             std::unique_ptr<AST::Expression> TryParseExpr17();
             bool tryParseSymbol(Token::Type symbol);
             std::string tryParseIdentifier();// If failed, returns empty string.
-            const Location& getCurrentTokenPlace() const
+
+            const Location& currentTokenLocation() const
             {
                 return m_toklist[m_tokidx].m_place;
             }

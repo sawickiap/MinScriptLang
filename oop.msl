@@ -6,17 +6,18 @@ initiating them is equiv to C++, or Python: calling the name likea function init
 class foo
 {
     name: nil,
-    new: function()
-    {
-        print("constructor...\n");
-        return this;
-    }
 }
 
+foo['__init__'] = function()
+{
+    print("constructor...\n");
+    return this;
+};
+
 print("foo=", foo, "\n");
-f = foo.new();
+f = foo();
 print("f=", f, "\n");
-b = foo.new();
+b = foo();
 print("b=", b.count, "\n");
 print("foo=", foo, "\n");
 

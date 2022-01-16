@@ -20,17 +20,17 @@ namespace MSL
         }
 
 
-        Value func_typeof(Environment& env, const Location& place, Value::List&& args)
+        Value func_typeof(Environment& env, const Location& loc, Value::List&& args)
         {
             (void)env;
             if(args.size() == 0)
             {
-                throw Error::ArgumentError(place, "typeof() requires exactly 1 argument");
+                throw Error::ArgumentError(loc, "typeof() requires exactly 1 argument");
             }
             return Value{ args[0].type() };
         }
 
-        Value func_min(Environment& ctx, const Location& place, Value::List&& args)
+        Value func_min(Environment& ctx, const Location& loc, Value::List&& args)
         {
             size_t i;
             size_t argCount;
@@ -40,14 +40,14 @@ namespace MSL
             argCount = args.size();
             if(argCount == 0)
             {
-                throw Error::ArgumentError(place, "Built-in function min requires at least 1 argument.");
+                throw Error::ArgumentError(loc, "Built-in function min requires at least 1 argument.");
             }
             result = 0.0;
             for(i = 0; i < argCount; ++i)
             {
                 if(!args[i].isNumber())
                 {
-                    throw Error::ArgumentError(place, "Built-in function min requires number arguments.");
+                    throw Error::ArgumentError(loc, "Built-in function min requires number arguments.");
                 }
                 argNum = args[i].number();
                 if(i == 0 || argNum < result)
@@ -58,7 +58,7 @@ namespace MSL
             return Value{ result };
         }
 
-        Value func_max(Environment& ctx, const Location& place, Value::List&& args)
+        Value func_max(Environment& ctx, const Location& loc, Value::List&& args)
         {
             size_t i;
             size_t argCount;
@@ -68,14 +68,14 @@ namespace MSL
             argCount = args.size();
             if(argCount == 0)
             {
-                throw Error::ArgumentError(place, "Built-in function min requires at least 1 argument.");
+                throw Error::ArgumentError(loc, "Built-in function min requires at least 1 argument.");
             }
             result = 0.0;
             for(i = 0; i < argCount; ++i)
             {
                 if(!args[i].isNumber())
                 {
-                    throw Error::ArgumentError(place, "Built-in function min requires number arguments.");
+                    throw Error::ArgumentError(loc, "Built-in function min requires number arguments.");
                 }
                 argNum = args[i].number();
                 if(i == 0 || argNum > result)
@@ -86,10 +86,10 @@ namespace MSL
             return Value{ result };
         }
 
-        Value func_print(Environment& env, const Location& place, Value::List&& args)
+        Value func_print(Environment& env, const Location& loc, Value::List&& args)
         {
             (void)env;
-            (void)place;
+            (void)loc;
             for(const auto& val : args)
             {
                 val.toStream(std::cout);
@@ -98,10 +98,10 @@ namespace MSL
             return {};
         }
 
-        Value func_println(Environment& env, const Location& place, Value::List&& args)
+        Value func_println(Environment& env, const Location& loc, Value::List&& args)
         {
             (void)env;
-            (void)place;
+            (void)loc;
             for(const auto& val : args)
             {
                 val.toStream(std::cout);
@@ -111,24 +111,24 @@ namespace MSL
             return {};
         }
 
-        Value func_sprintf(Environment& env, const Location& place, Value::List&& args)
+        Value func_sprintf(Environment& env, const Location& loc, Value::List&& args)
         {
             std::stringstream ss;
             std::string fmtstr;
-            fmtfunc_checkargs("sprintf", place, args);
+            fmtfunc_checkargs("sprintf", loc, args);
             fmtstr = args[0].toString();
             auto restargs = Value::List(args.begin() + 1, args.end());
-            Util::StringFormatter(env, place, fmtstr, restargs).run(ss, false);
+            Util::StringFormatter(env, loc, fmtstr, restargs).run(ss, false);
             return Value{ss.str()};
         }
 
-        Value func_printf(Environment& env, const Location& place, Value::List&& args)
+        Value func_printf(Environment& env, const Location& loc, Value::List&& args)
         {
             std::string fmtstr;
-            fmtfunc_checkargs("printf", place, args);
+            fmtfunc_checkargs("printf", loc, args);
             fmtstr = args[0].toString();
             auto restargs = Value::List(args.begin() + 1, args.end());
-            Util::StringFormatter(env, place, fmtstr, restargs).run(std::cout, true);
+            Util::StringFormatter(env, loc, fmtstr, restargs).run(std::cout, true);
             return {};
         }
     }

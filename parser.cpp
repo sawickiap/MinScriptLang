@@ -7,7 +7,7 @@ namespace MSL
         do                                                                  \
         {                                                                   \
             if(!(result))                                                   \
-                throw Error::ParsingError(getCurrentTokenPlace(), (errorMessage)); \
+                throw Error::ParsingError(currentTokenLocation(), (errorMessage)); \
         } while(false)
 
     void Parser::parseScript(AST::Script& outscr)
@@ -35,7 +35,7 @@ namespace MSL
         parseBlock(outscr);
         if(m_toklist[m_tokidx].type() != Token::Type::End)
         {
-            throw Error::ParsingError(getCurrentTokenPlace(), "parsing error: expected End");
+            throw Error::ParsingError(currentTokenLocation(), "parsing error: expected End");
         }
         //outscr.debugPrint(0, "Script: "); // #DELME
     }
@@ -55,13 +55,13 @@ namespace MSL
 
     bool Parser::tryParseSwitchItem(AST::SwitchStatement& swstmt)
     {
-        auto place = getCurrentTokenPlace();
+        auto loc = currentTokenLocation();
         // 'default' ':' Block
         if(tryParseSymbol(Token::Type::Default))
         {
             MUST_PARSE(tryParseSymbol(Token::Type::Colon), "expected ':'");
             swstmt.m_itemvals.push_back(std::unique_ptr<AST::ConstantValue>{});
-            swstmt.m_itemblocks.push_back(std::make_unique<AST::Block>(place));
+            swstmt.m_itemblocks.push_back(std::make_unique<AST::Block>(loc));
             parseBlock(*swstmt.m_itemblocks.back());
             return true;
         }
@@ -72,7 +72,7 @@ namespace MSL
             MUST_PARSE(cval, "expected constant value");
             swstmt.m_itemvals.push_back(std::move(cval));
             MUST_PARSE(tryParseSymbol(Token::Type::Colon), "expected ':'");
-            swstmt.m_itemblocks.push_back(std::make_unique<AST::Block>(place));
+            swstmt.m_itemblocks.push_back(std::make_unique<AST::Block>(loc));
             parseBlock(*swstmt.m_itemblocks.back());
             return true;
         }
@@ -120,17 +120,17 @@ namespace MSL
         size_t i;
         size_t j;
         size_t count;
-        auto place = getCurrentTokenPlace();
+        auto loc = currentTokenLocation();
 
         // Empty statement: ';'
         if(tryParseSymbol(Token::Type::Semicolon))
         {
-            return std::make_unique<AST::EmptyStatement>(place);
+            return std::make_unique<AST::EmptyStatement>(loc);
         }
         // Block: '{' Block '}'
         if(!peekSymbols({ Token::Type::CurlyBracketOpen, Token::Type::String, Token::Type::Colon }) && tryParseSymbol(Token::Type::CurlyBracketOpen))
         {
-            auto block = std::make_unique<AST::Block>(getCurrentTokenPlace());
+            auto block = std::make_unique<AST::Block>(currentTokenLocation());
             parseBlock(*block);
             MUST_PARSE(tryParseSymbol(Token::Type::CurlyBracketClose), "expected '}' after block");
             return block;
@@ -139,7 +139,7 @@ namespace MSL
         if(tryParseSymbol(Token::Type::If))
         {
             MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), "expected '(' after 'if'");
-            auto condition = std::make_unique<AST::Condition>(place);
+            auto condition = std::make_unique<AST::Condition>(loc);
             MUST_PARSE(condition->m_condexpr = TryParseExpr17(), "expected expression after 'if'");
             MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected ')'");
             MUST_PARSE(condition->m_truestmt = tryParseStatement(), "expected a statement after 'if'");
@@ -153,7 +153,7 @@ namespace MSL
         if(tryParseSymbol(Token::Type::While))
         {
             MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), "expected '(' after 'while'");
-            auto loop = std::make_unique<AST::WhileLoop>(place, AST::WhileLoop::Type::While);
+            auto loop = std::make_unique<AST::WhileLoop>(loc, AST::WhileLoop::Type::While);
             MUST_PARSE(loop->m_condexpr = TryParseExpr17(), "expected expression after 'while'");
             MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected ')'");
             MUST_PARSE(loop->m_body = tryParseStatement(), "expected statement after 'while'");
@@ -162,7 +162,7 @@ namespace MSL
         // Loop: 'do' Statement 'while' '(' Expr17 ')' ';'    - loop
         if(tryParseSymbol(Token::Type::Do))
         {
-            auto loop = std::make_unique<AST::WhileLoop>(place, AST::WhileLoop::Type::DoWhile);
+            auto loop = std::make_unique<AST::WhileLoop>(loc, AST::WhileLoop::Type::DoWhile);
             MUST_PARSE(loop->m_body = tryParseStatement(), "expect a statement after 'do'");
             MUST_PARSE(tryParseSymbol(Token::Type::While), "expected 'while' after 'do' block");
             MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), "expected '(' after 'while' in 'do...while'");
@@ -178,7 +178,7 @@ namespace MSL
             if(peekSymbols({ Token::Type::Identifier, Token::Type::Colon })
                || peekSymbols({ Token::Type::Identifier, Token::Type::Comma, Token::Type::Identifier, Token::Type::Colon }))
             {
-                auto loop = std::make_unique<AST::RangeBasedForLoop>(place);
+                auto loop = std::make_unique<AST::RangeBasedForLoop>(loc);
                 loop->m_valuevar = tryParseIdentifier();
                 MUST_PARSE(!loop->m_valuevar.empty(), "expected identifier in range-based for-loop");
                 if(tryParseSymbol(Token::Type::Comma))
@@ -196,7 +196,7 @@ namespace MSL
             // Loop: 'for' '(' Expr17? ';' Expr17? ';' Expr17? ')' Statement
             else
             {
-                auto loop = std::make_unique<AST::ForLoop>(place);
+                auto loop = std::make_unique<AST::ForLoop>(loc);
                 if(!tryParseSymbol(Token::Type::Semicolon))
                 {
                     MUST_PARSE(loop->m_initexpr = TryParseExpr17(), "expected expression for init of for-loop");
@@ -220,18 +220,18 @@ namespace MSL
         if(tryParseSymbol(Token::Type::Break))
         {
             MUST_PARSE(tryParseSymbol(Token::Type::Semicolon), "expected ';'");
-            return std::make_unique<AST::LoopBreakStatement>(place, AST::LoopBreakStatement::Type::Break);
+            return std::make_unique<AST::LoopBreakStatement>(loc, AST::LoopBreakStatement::Type::Break);
         }
         // 'continue' ';'
         if(tryParseSymbol(Token::Type::Continue))
         {
             MUST_PARSE(tryParseSymbol(Token::Type::Semicolon), "expected ';' after continue");
-            return std::make_unique<AST::LoopBreakStatement>(place, AST::LoopBreakStatement::Type::Continue);
+            return std::make_unique<AST::LoopBreakStatement>(loc, AST::LoopBreakStatement::Type::Continue);
         }
         // 'return' [ Expr17 ] ';'
         if(tryParseSymbol(Token::Type::Return))
         {
-            auto stmt = std::make_unique<AST::ReturnStatement>(place);
+            auto stmt = std::make_unique<AST::ReturnStatement>(loc);
             stmt->m_retvalue = TryParseExpr17();
             MUST_PARSE(tryParseSymbol(Token::Type::Semicolon), "expected ';' after return");
             return stmt;
@@ -239,7 +239,7 @@ namespace MSL
         // 'switch' '(' Expr17 ')' '{' SwitchItem+ '}'
         if(tryParseSymbol(Token::Type::Switch))
         {
-            auto stmt = std::make_unique<AST::SwitchStatement>(place);
+            auto stmt = std::make_unique<AST::SwitchStatement>(loc);
             MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketOpen), "expected '(' after 'switch'");
             MUST_PARSE(stmt->m_cond = TryParseExpr17(), "expected expression after 'switch'");
             MUST_PARSE(tryParseSymbol(Token::Type::RoundBracketClose), "expected closing ')' after expression after 'switch'");
@@ -257,13 +257,13 @@ namespace MSL
                     {
                         if(!stmt->m_itemvals[i] && !stmt->m_itemvals[j])// 2x default
                         {
-                            throw Error::ParsingError(place, "duplicate 'case' clause");
+                            throw Error::ParsingError(loc, "duplicate 'case' clause");
                         }
                         if(stmt->m_itemvals[i] && stmt->m_itemvals[j])
                         {
                             if(stmt->m_itemvals[i]->m_val.isEqual(stmt->m_itemvals[j]->m_val))
                             {
-                                throw Error::ParsingError(stmt->m_itemvals[j]->getPlace(), "expected a constant value for 'case' clause");
+                                throw Error::ParsingError(stmt->m_itemvals[j]->location(), "expected a constant value for 'case' clause");
                             }
                         }
                     }
@@ -274,7 +274,7 @@ namespace MSL
         // 'throw' Expr17 ';'
         if(tryParseSymbol(Token::Type::Throw))
         {
-            auto stmt = std::make_unique<AST::ThrowStatement>(place);
+            auto stmt = std::make_unique<AST::ThrowStatement>(loc);
             MUST_PARSE(stmt->m_thrownexpr = TryParseExpr17(), "expected expression after 'throw'");
             MUST_PARSE(tryParseSymbol(Token::Type::Semicolon), "expected ';'");
             return stmt;
@@ -282,7 +282,7 @@ namespace MSL
         // 'try' Statement ( ( 'catch' '(' TOKEN_IDENTIFIER ')' Statement [ 'finally' Statement ] ) | ( 'finally' Statement ) )
         if(tryParseSymbol(Token::Type::Try))
         {
-            auto stmt = std::make_unique<AST::TryStatement>(place);
+            auto stmt = std::make_unique<AST::TryStatement>(loc);
             MUST_PARSE(stmt->m_tryblock = tryParseStatement(), "expected statement after 'try'");
             if(tryParseSymbol(Token::Type::Finally))
             {
@@ -312,8 +312,8 @@ namespace MSL
         auto fnsynsugar = tryParseFuncSynSugar();
         if(fnsynsugar.second)
         {
-            auto idexpr = std::make_unique<AST::Identifier>(place, AST::Identifier::Scope::None, std::move(fnsynsugar.first));
-            auto assgp = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperator::Type::Assignment);
+            auto idexpr = std::make_unique<AST::Identifier>(loc, AST::Identifier::Scope::None, std::move(fnsynsugar.first));
+            auto assgp = std::make_unique<AST::BinaryOperator>(loc, AST::BinaryOperator::Type::Assignment);
             assgp->m_leftoper = std::move(idexpr);
             assgp->m_rightoper = std::move(fnsynsugar.second);
             return assgp;
@@ -396,10 +396,10 @@ namespace MSL
         {
             return rident;
         }
-        auto place = m_toklist[m_tokidx].m_place;
+        auto loc = m_toklist[m_tokidx].m_place;
         if(tryParseSymbol(Token::Type::This))
         {
-            return std::make_unique<AST::ThisExpression>(place);
+            return std::make_unique<AST::ThisExpression>(loc);
         }
         return {};
     }
@@ -411,7 +411,7 @@ namespace MSL
         {
             ++m_tokidx;
             result.first = m_toklist[m_tokidx++].string();
-            result.second = std::make_unique<AST::FunctionDefinition>(getCurrentTokenPlace());
+            result.second = std::make_unique<AST::FunctionDefinition>(currentTokenLocation());
             parseFuncDef(*result.second);
             return result;
         }
@@ -432,7 +432,7 @@ namespace MSL
     std::unique_ptr<AST::Expression> Parser::tryParseClassSynSugar()
     {
         std::unique_ptr<AST::Expression> baseexpr;
-        auto beginplace = getCurrentTokenPlace();
+        auto beginplace = currentTokenLocation();
         if(tryParseSymbol(Token::Type::Class))
         {
             std::string clname = tryParseIdentifier();
@@ -460,7 +460,7 @@ namespace MSL
            peekSymbols({ Token::Type::CurlyBracketOpen, Token::Type::String, Token::Type::Colon }) ||// { 'key' :
            peekSymbols({ Token::Type::CurlyBracketOpen, Token::Type::Identifier, Token::Type::Colon }))// { key :
         {
-            auto objexpr = std::make_unique<AST::ObjectExpression>(getCurrentTokenPlace());
+            auto objexpr = std::make_unique<AST::ObjectExpression>(currentTokenLocation());
             tryParseSymbol(Token::Type::CurlyBracketOpen);
             if(!tryParseSymbol(Token::Type::CurlyBracketClose))
             {
@@ -491,7 +491,7 @@ namespace MSL
     {
         if(tryParseSymbol(Token::Type::SquareBracketOpen))
         {
-            auto arrexpr = std::make_unique<AST::ArrayExpression>(getCurrentTokenPlace());
+            auto arrexpr = std::make_unique<AST::ArrayExpression>(currentTokenLocation());
             if(!tryParseSymbol(Token::Type::SquareBracketClose))
             {
                 auto itemval = TryParseExpr16();
@@ -516,7 +516,7 @@ namespace MSL
 
     std::unique_ptr<AST::Expression> Parser::tryParseParentheses()
     {
-        const Location place = getCurrentTokenPlace();
+        const Location loc = currentTokenLocation();
         // '(' Expr17 ')'
         if(tryParseSymbol(Token::Type::RoundBracketOpen))
         {
@@ -537,7 +537,7 @@ namespace MSL
         if(m_toklist[m_tokidx].type() == Token::Type::Function && m_toklist[m_tokidx + 1].type() == Token::Type::RoundBracketOpen)
         {
             ++m_tokidx;
-            auto func = std::make_unique<AST::FunctionDefinition>(place);
+            auto func = std::make_unique<AST::FunctionDefinition>(loc);
             parseFuncDef(*func);
             return func;
         }
@@ -559,25 +559,25 @@ namespace MSL
         }
         for(;;)
         {
-            auto place = getCurrentTokenPlace();
+            auto loc = currentTokenLocation();
             // Postincrementation: Expr0 '++'
             if(tryParseSymbol(Token::Type::DoublePlus))
             {
-                auto op = std::make_unique<AST::UnaryOperator>(place, AST::UnaryOperator::Type::Postincrementation);
+                auto op = std::make_unique<AST::UnaryOperator>(loc, AST::UnaryOperator::Type::Postincrementation);
                 op->m_operand = std::move(expr);
                 expr = std::move(op);
             }
             // Postdecrementation: Expr0 '--'
             else if(tryParseSymbol(Token::Type::DoubleDash))
             {
-                auto op = std::make_unique<AST::UnaryOperator>(place, AST::UnaryOperator::Type::Postdecrementation);
+                auto op = std::make_unique<AST::UnaryOperator>(loc, AST::UnaryOperator::Type::Postdecrementation);
                 op->m_operand = std::move(expr);
                 expr = std::move(op);
             }
             // Call: Expr0 '(' [ Expr16 ( ',' Expr16 )* ')'
             else if(tryParseSymbol(Token::Type::RoundBracketOpen))
             {
-                auto op = std::make_unique<AST::CallOperator>(place);
+                auto op = std::make_unique<AST::CallOperator>(loc);
                 // Callee
                 op->m_oplist.push_back(std::move(expr));
                 // First argument
@@ -598,7 +598,7 @@ namespace MSL
             // Indexing: Expr0 '[' Expr17 ']'
             else if(tryParseSymbol(Token::Type::SquareBracketOpen))
             {
-                auto op = std::make_unique<AST::BinaryOperator>(place, AST::BinaryOperator::Type::Indexing);
+                auto op = std::make_unique<AST::BinaryOperator>(loc, AST::BinaryOperator::Type::Indexing);
                 op->m_leftoper = std::move(expr);
                 MUST_PARSE(op->m_rightoper = TryParseExpr17(), "expected expression");
                 MUST_PARSE(tryParseSymbol(Token::Type::SquareBracketClose), "expected ']'");
@@ -607,7 +607,7 @@ namespace MSL
             // Member access: Expr2 '.' TOKEN_IDENTIFIER
             else if(tryParseSymbol(Token::Type::Dot))
             {
-                auto op = std::make_unique<AST::MemberAccessOperator>(place);
+                auto op = std::make_unique<AST::MemberAccessOperator>(loc);
                 op->m_operand = std::move(expr);
                 auto identifier = tryParseIdentVal();
                 MUST_PARSE(identifier && identifier->m_scope == AST::Identifier::Scope::None, "expected identifier");
@@ -622,11 +622,11 @@ namespace MSL
 
     std::unique_ptr<AST::Expression> Parser::tryParseOperator()
     {
-        const Location place = getCurrentTokenPlace();
+        const Location loc = currentTokenLocation();
     #define PARSE_UNARY_OPERATOR(symbol, unaryOperatorType)                               \
         if(tryParseSymbol(symbol))                                                        \
         {                                                                                 \
-            auto op = std::make_unique<AST::UnaryOperator>(place, (unaryOperatorType));        \
+            auto op = std::make_unique<AST::UnaryOperator>(loc, (unaryOperatorType));        \
             MUST_PARSE(op->m_operand = tryParseOperator(), "expected expression"); \
             return op;                                                                    \
         }
@@ -643,7 +643,7 @@ namespace MSL
 
     #define PARSE_BINARY_OPERATOR(binaryOperatorType, exprParseFunc)                            \
         {                                                                                       \
-            auto op = std::make_unique<AST::BinaryOperator>(place, (binaryOperatorType));            \
+            auto op = std::make_unique<AST::BinaryOperator>(loc, (binaryOperatorType));            \
             op->m_leftoper = std::move(expr);                                                  \
             MUST_PARSE(op->m_rightoper = (exprParseFunc)(), "expected expression"); \
             expr = std::move(op);                                                               \
@@ -658,7 +658,7 @@ namespace MSL
         }
         for(;;)
         {
-            auto place = getCurrentTokenPlace();
+            auto loc = currentTokenLocation();
             if(tryParseSymbol(Token::Type::Asterisk))
             {
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::Mul, tryParseOperator)
@@ -688,7 +688,7 @@ namespace MSL
         }
         for(;;)
         {
-            auto place = getCurrentTokenPlace();
+            auto loc = currentTokenLocation();
             if(tryParseSymbol(Token::Type::Plus))
             {
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::Add, tryParseBinary)
@@ -714,7 +714,7 @@ namespace MSL
         }
         for(;;)
         {
-            auto place = getCurrentTokenPlace();
+            auto loc = currentTokenLocation();
             if(tryParseSymbol(Token::Type::DoubleLess))
             {
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::ShiftLeft, tryParseAddSub)
@@ -740,7 +740,7 @@ namespace MSL
         }
         for(;;)
         {
-            const Location place = getCurrentTokenPlace();
+            const Location loc = currentTokenLocation();
             if(tryParseSymbol(Token::Type::Less))
             {
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::Less, tryParseAngleSign)
@@ -774,7 +774,7 @@ namespace MSL
         }
         for(;;)
         {
-            auto place = getCurrentTokenPlace();
+            auto loc = currentTokenLocation();
             if(tryParseSymbol(Token::Type::DoubleEquals))
             {
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::Equal, tryParseAngleCompare)
@@ -800,7 +800,7 @@ namespace MSL
         }
         for(;;)
         {
-            auto place = getCurrentTokenPlace();
+            auto loc = currentTokenLocation();
             if(tryParseSymbol(Token::Type::Amperstand))
             {
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::BitwiseAnd, tryParseEquals)
@@ -822,7 +822,7 @@ namespace MSL
         }
         for(;;)
         {
-            auto place = getCurrentTokenPlace();
+            auto loc = currentTokenLocation();
             if(tryParseSymbol(Token::Type::Caret))
             {
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::BitwiseXor, TryParseExpr11)
@@ -844,7 +844,7 @@ namespace MSL
         }
         for(;;)
         {
-            const Location place = getCurrentTokenPlace();
+            const Location loc = currentTokenLocation();
             if(tryParseSymbol(Token::Type::Pipe))
             {
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::BitwiseOr, TryParseExpr12)
@@ -866,7 +866,7 @@ namespace MSL
         }
         for(;;)
         {
-            auto place = getCurrentTokenPlace();
+            auto loc = currentTokenLocation();
             if(tryParseSymbol(Token::Type::DoubleAmperstand))
             {
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::LogicalAnd, TryParseExpr13)
@@ -888,7 +888,7 @@ namespace MSL
         }
         for(;;)
         {
-            auto place = getCurrentTokenPlace();
+            auto loc = currentTokenLocation();
             if(tryParseSymbol(Token::Type::DoublePipe))
             {
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::LogicalOr, TryParseExpr14)
@@ -911,7 +911,7 @@ namespace MSL
         // Ternary operator: Expr15 '?' Expr16 ':' Expr16
         if(tryParseSymbol(Token::Type::QuestionMark))
         {
-            auto op = std::make_unique<AST::TernaryOperator>(getCurrentTokenPlace());
+            auto op = std::make_unique<AST::TernaryOperator>(currentTokenLocation());
             op->m_condexpr = std::move(expr);
             MUST_PARSE(op->m_trueexpr = TryParseExpr16(), "expected expression");
             MUST_PARSE(tryParseSymbol(Token::Type::Colon), "expected ':'");
@@ -922,7 +922,7 @@ namespace MSL
     #define TRY_PARSE_ASSIGNMENT(symbol, binaryOperatorType)                                          \
         if(tryParseSymbol(symbol))                                                                    \
         {                                                                                             \
-            auto op = std::make_unique<AST::BinaryOperator>(getCurrentTokenPlace(), (binaryOperatorType)); \
+            auto op = std::make_unique<AST::BinaryOperator>(currentTokenLocation(), (binaryOperatorType)); \
             op->m_leftoper = std::move(expr);                                                        \
             MUST_PARSE(op->m_rightoper = TryParseExpr16(), "expected expression");        \
             return op;                                                                                \
@@ -952,7 +952,7 @@ namespace MSL
         }
         for(;;)
         {
-            auto place = getCurrentTokenPlace();
+            auto loc = currentTokenLocation();
             if(tryParseSymbol(Token::Type::Comma))
             {
                 PARSE_BINARY_OPERATOR(AST::BinaryOperator::Type::Comma, TryParseExpr16)

@@ -31,6 +31,37 @@ namespace MSL
             }
             os << "]";
         }
+
+        template<typename CharT>
+        void dump_object(std::basic_ostream<CharT>& os, Object* obj, bool repr)
+        {
+            os << "Object{";
+            for(auto iter = std::begin(obj->m_entrymap); iter != std::end(obj->m_entrymap); iter++)
+            { 
+                Util::reprString(os, iter->first);
+                os << ": ";
+                if(iter->second.isObject())
+                {
+                    if(iter->second.object() == obj)
+                    {
+                        os << "<recursion>";
+                    }
+                    else
+                    {
+                        iter->second.toStream(os, repr);
+                    }
+                }
+                else
+                {
+                    iter->second.toStream(os, repr);
+                }
+                if (std::next(iter) != std::end(obj->m_entrymap))
+                {
+                    os << ", ";
+                }
+            }
+            os << "}";
+        }
     }
 
     void Array::markChildren()
@@ -198,7 +229,8 @@ namespace MSL
             case Value::Type::Object:
                 {
                     auto obj = object();
-                    os << "<object @" << &obj << ">";
+                    //os << "<object @" << &obj << ">";
+                    dump_object(os, obj, repr);
                 }
                 break;
             case Value::Type::Array:

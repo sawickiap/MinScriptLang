@@ -31,7 +31,7 @@ numbers = [
     (2 + 3) * 4,
 ];
 
-print("basic branching:\n");
+println("basic branching:");
 if (true)
 {
 }
@@ -50,14 +50,14 @@ if (false)
 else if (false)
     throw "fail";
 else
-    print(3);
+    println("if-elseif-else ok");
 if (true)
     if (false)
         throw "fail";
     else
-        print("ok\n");
+        println("if-iffalse-else ok");
 
-print("loops:\n");
+println("loops:");
 for (i = 0; i < 5; ++i)
     printf("for-loop: i=%v\n", i);
 for (i = 0; ; ++i)
@@ -128,19 +128,19 @@ printf("i now = %v\n", i);
 a = 1;
 printf("other ops (+, -, /, *, %%, etc) (a=%v):\n", a);
 a += 3;
-print("a after '+=' = ", a, "\n");
+printf("a after '+='  = %v\n", a);
 a -= 10;
-print("a after '-=' = ", a, "\n");
+printf("a after '-='  = %v\n", a);
 a *= -2;
-print("a after '*=' = ", a, "\n");
+printf("a after '*='  = %v\n", a);
 a /= 4;
-print("a after '/=' = ", a, "\n");
+printf("a after '/='  = %v\n", a);
 a %= 2;
-print("a after '%=' = ", a, "\n");
+printf("a after '%%='  = %v\n", a);
 a <<= 2;
-print("a after '<<=' = ", a, "\n");
+printf("a after '<<=' = %v\n", a);
 a >>= 1;
-print("a after '>>=' = ", a, "\n");
+printf("a after '>>=' = %v\n", a);
 a = 6;
 printf("binary ops (a=%v):\n", a);
 a |= 8;
@@ -151,7 +151,7 @@ a ^= 3;
 printf("a after '^=' = %v\n", a);
 a = 1;
 b = 2;
-print("multiple assignment:\n");
+println("multiple assignment:");
 b *= a += 7;
 printf("b *= a += 7 = a=%v, b=%v\n", a, b);
 a = b = c = 2;
@@ -169,7 +169,7 @@ b = true;
 c = a && b && a && b || a || a && a;
 printf("operator precedence: a&&b&&a&&b||a||a&&a = %v\n", c);
 
-print("syntax testing ....\n");
+println("syntax testing ....");
 a = "aaa";
 b = 'bbb
     ccc';
@@ -178,7 +178,7 @@ empty = '';
 printf("empty = %v\n", empty ? 1 : 0);
 tmp = ('aa' 'bb' /* comment */ "cc");
 printf("string literal concat = %v\n", tmp);
-//print('\\ \" \' \b \f \n \r \t \? \a \v \/ \0a');
+printf("escapes: %p\n", '\\ \" \' \b \f \n \r \t \? \a \v \/ \0a');
 printf("hexadecimal escapes in sq string = %p\n", '\xA5 \xa5');
 printf("unicode escapes in sq string=%p\n", '\u0104 \U00000104');
 s = 'aa' + 'bb';
@@ -196,17 +196,17 @@ printf("eq comparison: 1=%v, 2=%v, 3=%v, 4=%v, 5=%v, 6=%v\n", n1 == n1, n1 == n2
 s1 = 'A';
 s2 = s1;
 s3 = 'C';
-print("eq comparison: ", s1 == s1, s1 == s2, s1 == s3, s1 != s1, s1 != s2, s1 != s3, "\n");
+println("eq comparison: ", s1 == s1, s1 == s2, s1 == s3, s1 != s1, s1 != s2, s1 != s3);
 
 f1 = function ()  {};
 f2 = f1;
 f3 = function ()  {};
-print("eq comparison (functions): ", f1 == f1, f1 == f2, f1 == f3, f1 != f1, f1 != f2, f1 != f3, "\n");
+println("eq comparison (functions): ", f1 == f1, f1 == f2, f1 == f3, f1 != f1, f1 != f2, f1 != f3);
 
 sf1 = print;
 sf2 = sf1;
 sf3 = print;
-print("eq comparison (copied native funcs): ", sf1 == sf1, sf1 == sf2, sf1 == sf3, sf1 != sf1, sf1 != sf2, sf1 != sf3, "\n");
+println("eq comparison (copied native funcs): ", sf1 == sf1, sf1 == sf2, sf1 == sf3, sf1 != sf1, sf1 != sf2, sf1 != sf3);
 
 
 s = 'ABCD';
@@ -216,7 +216,7 @@ for (i, ch: s)
     printf("for-range with index: i=%v, ch=%p\n", i, ch);
 printf("after loop: i=%v, ch=%v\n", i, ch);
 
-print("switch statements:\n");
+println("switch statements:");
 switch (123)
 {
     case 1:
@@ -224,9 +224,9 @@ switch (123)
     case 'a':
         throw "fail";
     case 123:
-        print("switch-fallthrough...\n");
+        println("switch-fallthrough...");
     default:
-        print("switch-fallthrough: ok\n");
+        println("switch-fallthrough: ok");
 }
 switch (123)
 {
@@ -237,7 +237,7 @@ switch (123)
         throw "fail";
         break;
     case 123:
-        print("swith with break\n");
+        println("swith with break ok");
         break;
     default:
         throw "fail";
@@ -246,7 +246,7 @@ switch (123)
 switch (124)
 {
     default:
-        print("switch with default");;
+        println("switch with default ok");;
         break;
     case 1:
         throw "fail";
@@ -263,36 +263,36 @@ for (i = 0; i < 5; ++i)
     switch (i)
     {
         case 0:
-            print("switch-in-for: 0\n");
+            println("switch-in-for: 0");
             break;
         case 1:
-            print("switch-in-for: 1\n");
+            println("switch-in-for: 1 and continue");
             continue;
         case 2:
-            print("switch-in-for: 2\n");
+            println("switch-in-for: 2");
             break;
         case 3:
         default:
-            print("switch-in-for: Other\n");
+            println("switch-in-for: Other");
     }
 }
 function ChangeDefault()
 {
-    print("changedefault: before: a=", a, "\n");
+    printf("changedefault: before: a=%v\n", a);
     a = 1;
-    print("changedefault: after: a=", a, "\n");
+    printf("changedefault: after: a=%v\n", a);
 }
 function ChangeGlobal()
 {
-    print("changeglobal: before: a=", a, "\n");
+    printf("changeglobal: before: a=%v\n", a);
     global.a = 2;
-    print("changeglobal: after: a=", a, "\n");
+    printf("changeglobal: after: a=%v\n", a);
 }
 function ChangeLocal()
 {
-    print("changelocal: before: a=", a, "\n");
+    printf("changelocal: before: a=%v\n", a);
     local.a = 3;
-    print("changelocal: after: a=", a, "\n");
+    print("changelocal: after: a=%v\n");
 }
 ChangeDefault();
 ChangeGlobal();
@@ -309,15 +309,15 @@ function Outer()
 {
     function InnerNone()
     {
-        print("functions: InnerNone called\n");
+        println("functions: InnerNone called");
     }
     local.InnerLocal = function ()
     {
-        print("functions: InnerLocal called\n");
+        println("functions: InnerLocal called");
     };
     global.InnerGlobal = function ()
     {
-        print("functions: InnerGlobal called\n");
+        println("functions: InnerGlobal called");
     };
     InnerNone();
     InnerLocal();
@@ -329,10 +329,10 @@ InnerGlobal();
 try
 {
     throw 1;
-    print("***ERROR*** Should not get here ....\n");
+    println("***ERROR*** Should not get here ....");
 }
 catch (ex)
-    print("try-catch: caugh exception: ", ex, "\n");
+    printf("try-catch: caugh exception: %v\n", ex);
 
 function f()
 {
@@ -350,7 +350,7 @@ try
 }
 catch (ex)
 {
-    print("try-catch from function: ex=", ex, "\n");
+    printf("try-catch from function: ex=%v\n", ex);
 }
 
 try
@@ -359,40 +359,40 @@ try
 }
 catch (ex)
 {
-    print("try-catch runtime: type=", ex.type, "\n");
-    print("try-catch runtime: index=", ex.index, "\n");
-    print("try-catch runtime: line=", ex.line, "\n");
-    print("try-catch runtime: column=", ex.column, "\n");
-    print("try-catch runtime: message=(%v) %s\n", typeOf(ex.message), ex.message);
+    printf("try-catch runtime: type=%v\n", ex.type);
+    printf("try-catch runtime: index=%v\n", ex.index);
+    printf("try-catch runtime: line=%v\n", ex.line);
+    printf("try-catch runtime: column=%v\n", ex.column);
+    printf("try-catch runtime: message=(%v) %s\n", typeOf(ex.message), ex.message);
 }
 
 
 try
-    print("try-finally: in try ...\n");
+    println("try-finally: in try ...");
 finally
-    print("try-finally in finally\n");
+    println("try-finally in finally ok");
 
 try
 {
-    print('A');
+    println("throwing a number ...");
     throw 1;
 }
 catch (ex)
-    print('EX');
+    println("throwing a number: caught ok");
 finally
-    print('B');
+    println("throwing a number: finally ok");
 
 for (i: [1, 2, 3, 4, 5])
 {
     try
     {
-        print(i * 100);
+        printf("for-range: modifying i*100=%v\n", i * 100);
         if (i == 4)
             break;
     }
     finally
     {
-        print(i);
+        printf("for-range: finally: i=%v\n", i);
     }
 }
 
@@ -402,11 +402,11 @@ for (i: [1, 2, 3, 4, 5])
     {
         if (i == 4)
             continue;
-        print(i * 100);
+        printf("for-range with continue: i=%v\n", i * 100);
     }
     finally
     {
-        print(i);
+        printf("for-range with continue: finally: i=%v\n", i);
     }
 }
 
@@ -415,14 +415,14 @@ function fn()
 {
     try
     {
-        print('Try');
+        println("try-catch in func: try ...");
     }
     catch (ex)
-        print('Catch');
+        println("try-catch in func: catch");
     finally
-        print('Finally');
+        println("try-catch in func: finally");
 }
-print(fn());
+printf("try-catch in func: returns=%v\n", fn());
 
 a = [1, 2, 3];
 for (i = 0; i < 10; ++i)
@@ -437,9 +437,8 @@ for (i = 0; i < 10; ++i)
         break;
     }
 }
-println("\nwe good?\n");
 
-print(a[2]);
+printf("a[2]=%v\n", a[2]);
 try
 {
     try
@@ -448,18 +447,18 @@ try
     }
     catch (ex)
     {
-        print("throwing in catch\n");
+        println("re-throwing in catch");
         throw ex;
     }
 }
 catch (ex)
-    print(ex[1]);
+    printf("catching array: ex=%v\n", ex[1]);
 
 function f()
 {
     try
     {
-        print("before finally\n");
+        println("before finally");
     }
     finally
     {
@@ -472,20 +471,20 @@ try
 }
 catch (ex)
 {
-    print("ex=", ex, "\n");
+    printf("ex=%v\n", ex);
 }
 
 function f()
 {
     try
     {
-        print("try before throw\n");
+        println("try before throw");
         throw 1;
-        print("try after throw\n");
+        println("try after throw");
     }
     finally
     {
-        print("try finally\n");
+        println("try finally");
     }
 }
 try
@@ -494,7 +493,7 @@ try
 }
 catch (ex)
 {
-    print('catch', ex, "\n");
+    printf("catch from function: ex=%v\n", ex);
 }
 
 function f()
@@ -502,7 +501,7 @@ function f()
     try
     {
         throw 1;
-        print('AAA');
+        println("should not be reached");
     }
     finally
     {
@@ -515,14 +514,14 @@ try
 }
 catch (ex)
 {
-    print(ex);
+    printf("catching from function again: ex=%v\n", ex);
 }
 
 s = 'A';
-print(s);
+printf("s=%v\n", s);
 a = [1, 2, 3];
-print(min(a[0], a[1], a[2]));
-print(max(a[0], a[1], a[2]));
+printf("min=%v\n", min(a[0], a[1], a[2]));
+printf("max=%v\n", max(a[0], a[1], a[2]));
 globalArr = ['AAA', 'BBB', 'CCC'];
 function getNewChar()
 {
@@ -530,15 +529,15 @@ function getNewChar()
     return 'D';
 }
 //globalArr[0][0] = getNewChar();
-print("typeOf(globalArr) = ", typeOf(globalArr), "\n");
+printf("typeOf(globalArr) = %v\n", typeOf(globalArr));
 
 // arrays
 
 a1 = [];
-print(a1);
+printf("empty array: a1=%v\n", a1);
 
 a1 = [1, 2, 3];
-print(a1[0], a1[1], a1[2]);
+printf("a[0]=%v, a[1]=%v, a[2]=%v\n", a1[0], a1[1], a1[2]);
 
 a1 = [1, 2, 3, 4, 5];
 a1[0] = 10;
@@ -546,7 +545,7 @@ a1[1] += 10;
 a1[2] *= 10;
 a1[3]++;
 ++a1[4];
-print(a1[0], a1[1], a1[2], a1[3], a1[4]);
+printf("a[0]=%v, a[1]=%v, a[2]=%v, a[3]=%v, a[4]=%v\n" , a1[0], a1[1], a1[2], a1[3], a1[4]);
 
 a1 = [1, 2, 3];
 a2 = a1;
@@ -556,54 +555,54 @@ function f(arg)
     return arg;
 }
 a3 = f(a2);
-print(a1[0], a1[1], a1[2], a3[1], a1 == a3, a1 != a3);
+println("ary comparison: ", a1[0], a1[1], a1[2], a3[1], a1 == a3, a1 != a3);
 
 a1 = [1, 2, 3];
 a2 = Array(a1);
 a0 = Array();
-print(a2[0], a2[1], a2[2], a1 == a2, a1 == a0);
+println("ary comparison #2: ", a2[0], a2[1], a2[2], a1 == a2, a1 == a0);
 
 a = [1, 2, 3, ];
-print(a[0], a[1], a[2]);
+printf("a[0]=%v, a[1]=%v, a[2]=%v\n", a[0], a[1], a[2]);
 a = [1, 2, 3];
 a[1] = null;
 a[2] = null;
-print(a[0], a[1], a[2]);
+printf("a[0]=%v, a[1]=%v, a[2]=%v\n", a[0], a[1], a[2]);
 a = [1, 2, 3];
 for (val: a)
-    print(val);
-print(val);
+    printf("range: val=%v\n", val);
+printf("after loop: val=%v\n", val);
 
 a = [1, 2, 3];
 for (i, val: a)
 {
     {
-        print(i, val);
+        printf("range with index: i=%v, val=%v\n", i, val);
     }; ; ;
 }
-print(i, val);
+printf("after range with index: i=%v, val=%v\n", i, val);
 
 function f()
 {
     a = [1, 2, 3];
     for (i, v: a)
     {
-        print(i, v);
+        printf("range in function: i=%v, v=%v\n", i, v);
     }
 }
 i = 'A';
 v = 'B';
 f();
-print(i, v);
+printf("i=%v, v=%v\n", i, v);
 
 a0 = [];
 a3 = [1, 2, 3];
 n = null;
-print(a0 ? 'Y' : 'N', a3 ? 'Y' : 'N', n ? 'Y' : 'N');
+println("ternary: ", a0 ? 'Y' : 'N', a3 ? 'Y' : 'N', n ? 'Y' : 'N');
 
 a0 = [];
 a3 = [1, 2, 3];
-print(a0.count, a3.count);
+printf("array props: 1=%v, 2=%v\n", a0.count, a3.count);
 
 a = [1, 2, 3];
 a.add(4);
@@ -619,7 +618,7 @@ printf("array: a(%v) = %v\n", a.count, a);
 
 for (i: [1, 2, 3, 4, 5, 6])
 {
-    print("array-iterate: i=", i, "\n");
+    printf("array-iterate: i=%v\n", i);
     if (i == 3)
         break;
 }
@@ -629,13 +628,13 @@ t1 = Null;
 t2 = Number;
 t3 = String;
 t4 = Object;
-print(t1, t2, t3, t4);
+printf("builtin types: t1=%v, t2=%v, t3=%v, t4=%v\n", t1, t2, t3, t4);
 tn1 = Number;
 n2 = 123;
 tn2 = typeOf(n2);
 tnull = typeOf(nonExistent);
-print(tn1, tn2, tnull);
-print(tn1 == tn2, tn1 != tn2, tn2 == tnull, tn2 != tnull);
+printf("builtin return vals: tn1=%v, tn2=%v, tnull=%v\n", tn1, tn2, tnull);
+println("comparison: ", tn1 == tn2, tn1 != tn2, tn2 == tnull, tn2 != tnull);
 
 tobj = typeOf(
     {
@@ -644,19 +643,19 @@ tobj = typeOf(
     }
     );
 tnull = typeOf(nonExistent);
-print(tobj ? 1 : 0, tnull ? 1 : 0);
+println("comparison: ", tobj ? 1 : 0, tnull ? 1 : 0);
 
 v1 = Null();
 v2 = Null(nonExistent);
-print(v1, v2);
+printf("v1=%v, v2=%v\n", v1, v2);
 
 v1 = 2;
 v2 = Number(v1);
-print(v1, v2);
+printf("v1=%v, v2=%v\n", v1, v2);
 
 v1 = 'A';
 v2 = String(v1);
-print(v1, v2);
+printf("v1=%v, v2=%v\n", v1, v2);
 
 v1 =
 {
@@ -664,7 +663,7 @@ v1 =
     b: 2
 };
 v2 = Object(v1);
-print(v1.a, v2.a, v1 == v2);
+printf("v1.a=%v, v2.a=%v, compare=%v\n", v1.a, v2.a, v1 == v2);
 
 function f()
 {
@@ -672,66 +671,66 @@ function f()
 }
 v2 = Function(f);
 v3 = print;
-print(f == v2, v2 == v3, v2());
+println("comparison: ", f == v2, v2 == v3, v2());
 
 v1 = typeOf(125);
 v2 = Type(v1);
 v3 = v2(123);
-print(v1 == v2, v3);
+println("comparison: ", v1 == v2, v3);
 
 a = {};
-print(a);
-print(a.x);
+printf("object: a=%v\n", a);
+printf("object: a.x=%v\n", a.x);
 a =
 {
     'x': 2
 };
-print(a);
-print(a.x);
+printf("object: a=%v\n", a);
+printf("object: a.x=%v\n", a.x);
 a =
 {
     'x': 2,
 };
-print(a);
-print(a.x);
+printf("object: a=%v\n", a);
+printf("object: a.x=%v\n", a.x);
 a =
 {
     'x': 2,
     'y': 3
 };
-print(a);
-print(a.y);
+printf("object: a=%v\n", a);
+printf("object: a.y=%v\n", a.y);
 a =
 {
     'x': 2,
     'y': 3,
 };
-print(a);
-print(a.y);
+printf("object: a=%v\n", a);
+printf("object: a.y=%v\n", a.y);
 a.z = 5;
 a.w = a.z;
 a.z = 4;
-print(a.z);
-print(a.w);
+printf("object: a.z=%v\n", a.z);
+printf("object: a.w=%v\n", a.w);
 obj =
 {
     a: 1,
     b: 2,
     c: 3
 };
-print(obj.a, obj.b, obj.c);
+printf("object: obj.a=%v, obj.b=%v, obj.c=%v\n", obj.a, obj.b, obj.c);
 a =
 {
     'AAA' /*comment*/ "BBB": 5
 };
-print(a.AAABBB);
+printf("object: a.AAABBB=%v\n", a.AAABBB);
 {
-    print(1);
+    println("in block");
     {
-        print(2);
+        println("in block: nested");
     }
     {}
-    print(3);
+    println("in block again");
 }
 {};
 {
@@ -739,9 +738,9 @@ print(a.AAABBB);
     'b': false
 };
 {
-    print(4);
+    println("in block (after object)");
 }
-print(5);
+println("after block");
 o1 =
 {
     'x': 1
@@ -750,7 +749,7 @@ o2 =
 {
     'y': o1
 };
-print(o2.y.x);
+printf("object: o2.y.x=%v\n", o2.y.x);
 
 o1 =
 {
@@ -760,7 +759,7 @@ o1 =
     }
 };
 o1.x.y += 5;
-print(o1.x.y);
+printf("object: o1.x.y=%v\n", o1.x.y);
 
 o1 =
 {
@@ -773,8 +772,8 @@ function f(arg)
     arg.x += 2;
     return arg;
 }
-print(f(o2).x);
-print(o1.x);
+printf("object: f(o2).x=%v\n", f(o2).x);
+printf("object: o1.x=%v\n", o1.x);
 
 o1 =
 {
@@ -792,7 +791,7 @@ o2 =
     },
     'val2': 2
 };
-print(o1.f1().f2().val1);
+printf("object: %v\n", o1.f1().f2().val1);
 
 o1 =
 {
@@ -801,7 +800,7 @@ o1 =
     'a b c': 3
 };
 index = 'y';
-print(o1['x'], o1[index], o1['a b' + ' c']);
+println("objects: ", o1['x'], o1[index], o1['a b' + ' c']);
 
 o1 =
 {
@@ -813,18 +812,18 @@ o1 =
         }
     }
 };
-print(o1['x'].y['z']);
+println("objects: ", o1['x'].y['z']);
 
 o = {};
 o['A A'] = 1;
 o['A A'] += 5;
-print(o['A A']);
+println("objects: ", o['A A']);
 
 o = {};
 o['A'] = {};
 o['A']['B'] = {};
 o['A']['B'].c = 10;
-print(o.A.B['c']);
+println("objects: ", o.A.B['c']);
 
 o1 =
 {
@@ -837,7 +836,7 @@ o3 =
     'a': 1,
     'b': 2
 };
-print(o1 == o1, o1 == o2, o1 == o3, o1 != o1, o1 != o2, o1 != o3);
+println("object comparison: ", o1 == o1, o1 == o2, o1 == o3, o1 != o1, o1 != o2, o1 != o3);
 
 obj =
 {
@@ -847,7 +846,7 @@ obj =
 };
 obj.c = 3;
 obj.b = null;
-print(obj.count);
+printf("obj.count=%v\n", obj.count);
 
 obj =
 {
@@ -858,7 +857,7 @@ obj =
 sum = 0;
 for (val: obj)
     sum += val;
-print(sum);
+printf("sum=%v\n", sum);
 sumKeyLen = 0;
 sumVal = 0;
 for (key, val: obj)
@@ -866,8 +865,8 @@ for (key, val: obj)
     sumKeyLen += key.count;
     sumVal += val;
 }
-print(sumKeyLen, sumVal);
-print(key, val);
+printf("sumKeyLen=%v, sumVal=%v\n", sumKeyLen, sumVal);
+printf("key=%v, val=%v\n", key, val);
 
 obj =
 {
@@ -875,7 +874,7 @@ obj =
     'f1': function ()
     {
         x += 1;
-        print(x);
+        printf("function in object with var access: x=%v\n", x);
     }
 };
 obj.f1();
@@ -893,7 +892,7 @@ obj =
     {
         this.y = 1;
         this.x += y;
-        print(this.x);
+        printf("'this' in object: this.x=%v\n", this.x);
     }
 };
 obj.f1();
@@ -914,14 +913,14 @@ obj =
     }
 };
 obj2 = obj.f();
-print(obj2.x);
+printf("object: obj2.x=%v\n", obj2.x);
 
 obj =
 {
     'x': 2,
     f: function ()
     {
-        print(++this.x);
+        printf("unary op on object var: %v\n", ++this.x);
     }
 };
 obj.f();
@@ -932,7 +931,7 @@ obj =
     'x': 2,
     f: function ()
     {
-        print(++this.x);
+        print("unary op on object var: %v\n", ++this.x);
     }
 };
 ((obj)).f();
@@ -943,14 +942,14 @@ obj1 =
     x: 2,
     f: function ()
     {
-        print(++this.x);
+        print("unary op on object var: %v\n", ++this.x);
     }
 };
 obj2 =
 {
     f: function ()
     {
-        print('obj2f');
+        println('obj2f');
     }
 };
 function call_f(cond)
@@ -966,7 +965,7 @@ obj =
     x: 2,
     f: function ()
     {
-        print(++x);
+        printf("unary op on object var: %v\n", ++x);
     }
 };
 fn = obj.f;
@@ -980,7 +979,7 @@ objInner =
     x: 2,
     f: function ()
     {
-        print(++x);
+        printf("unary op on object var: %v\n", ++x);
     }
 };
 objOuter =
@@ -999,8 +998,7 @@ obj =
     },
     'f2': function ()
     {
-        print(x);
-        print(this.x);
+        printf("'this' in object: x=%v, this.x=%v\n", x, this.x);
     }
 };
 obj.f1();
@@ -1010,7 +1008,7 @@ obj =
     var: 2,
     fn: function ()
     {
-        print(var);
+        printf("object: var=%v\n", var);
     }
 };
 obj.fn();
@@ -1020,11 +1018,11 @@ obj =
     var: 2,
     fn: function ()
     {
-        print('fn');
+        println("object function call\n");
     },
-    '': function (a)
+    '__init__': function (a)
     {
-        print('Default', a);
+        println("object default function call\n");
     }
 };
 obj(3);
@@ -1032,13 +1030,13 @@ obj(3);
 class C
 {
     var: 1,
-    '': function (x)
+    __init__: function (x)
     {
         var = x;
     },
     print: function ()
     {
-        global.print("this.var=", this.var, "\n");
+        global.printf("using global name: this.var=%v\n", this.var);
     }
 }
 C(2);
@@ -1047,18 +1045,18 @@ C.print();
 class A
 {
     var: 1,
-    '': function (x)
+    __init__: function (x)
     {
         var = x;
     },
     print: function ()
     {
-        global.print("this.var=", this.var, "\n");
+        global.printf("using global name: this.var=%v\n", this.var);
     }
 }
 class B: A
 {
-    '': function (x)
+    __init__: function (x)
     {
         var = x + 1;
     }
@@ -1099,7 +1097,7 @@ o2 =
 print("o1['a']=", o1['a'], ", o1['b']=", o1['b'], ", o2.a=", o2.a, ", o2.b=", o2.b, "\n");
 
 try
-    print(math.abs());
+    println(math.abs());
 catch (ex)
     print("exception.message = ", ex.message, "\n");
 

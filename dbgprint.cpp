@@ -27,13 +27,13 @@ namespace MSL
 
         void EmptyStatement::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("Empty\n");
         }
 
         void Condition::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("If\n");
             ++idl;
             m_condexpr->debugPrint(dw, idl, "ConditionExpression: ");
@@ -59,7 +59,7 @@ namespace MSL
                 default:
                     assert(0);
             }
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString(name);
             dw.writeString("\n");
             ++idl;
@@ -69,7 +69,7 @@ namespace MSL
 
         void ForLoop::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("For\n");
             ++idl;
             if(m_initexpr)
@@ -78,7 +78,7 @@ namespace MSL
             }
             else
             {
-                printPrefix(dw, idl, getPlace(), prefix);
+                printPrefix(dw, idl, location(), prefix);
                 dw.writeString("(Init expression empty)\n");
             }
             if(m_condexpr)
@@ -87,7 +87,7 @@ namespace MSL
             }
             else
             {
-                printPrefix(dw, idl, getPlace(), prefix);
+                printPrefix(dw, idl, location(), prefix);
                 dw.writeString("(Condition expression empty)\n");
             }
             if(m_iterexpr)
@@ -96,7 +96,7 @@ namespace MSL
             }
             else
             {
-                printPrefix(dw, idl, getPlace(), prefix);
+                printPrefix(dw, idl, location(), prefix);
                 dw.writeString("(Iteration expression empty)\n");
             }
             m_body->debugPrint(dw, idl, "Body: ");
@@ -106,7 +106,7 @@ namespace MSL
         {
             if(!m_keyvar.empty())
             {
-                printPrefix(dw, idl, getPlace(), prefix);
+                printPrefix(dw, idl, location(), prefix);
                 dw.writeString("Range-based for: ");
                 dw.writeString(m_keyvar);
                 dw.writeString(", ");
@@ -115,7 +115,7 @@ namespace MSL
             }
             else
             {
-                printPrefix(dw, idl, getPlace(), prefix);
+                printPrefix(dw, idl, location(), prefix);
                 dw.writeString("Range-based for: ");
                 dw.writeString(m_valuevar);
                 dw.writeString("\n");
@@ -128,14 +128,14 @@ namespace MSL
         void LoopBreakStatement::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             static const char* LOOP_BREAK_TYPE_NAMES[] = { "Break", "Continue" };
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString(LOOP_BREAK_TYPE_NAMES[size_t(m_type)]);
             dw.writeString("\n");
         }
 
         void ReturnStatement::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("return\n");
             if(m_retvalue)
             {
@@ -145,7 +145,7 @@ namespace MSL
 
         void Block::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("Block\n");
             ++idl;
             for(const auto& stmtPtr : m_statements)
@@ -157,7 +157,7 @@ namespace MSL
         void SwitchStatement::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             size_t i;
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("switch\n");
             ++idl;
             m_cond->debugPrint(dw, idl, "Condition: ");
@@ -169,7 +169,7 @@ namespace MSL
                 }
                 else
                 {
-                    printPrefix(dw, idl, getPlace(), prefix);
+                    printPrefix(dw, idl, location(), prefix);
                     dw.writeString("Default\n");
                 }
                 if(m_itemblocks[i])
@@ -178,7 +178,7 @@ namespace MSL
                 }
                 else
                 {
-                    printPrefix(dw, idl, getPlace(), prefix);
+                    printPrefix(dw, idl, location(), prefix);
                     dw.writeString("(Empty block)\n");
                 }
             }
@@ -186,14 +186,14 @@ namespace MSL
 
         void ThrowStatement::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("throw\n");
             m_thrownexpr->debugPrint(dw, idl + 1, "ThrownExpression: ");
         }
 
         void TryStatement::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("try\n");
             ++idl;
             m_tryblock->debugPrint(dw, idl, "TryBlock: ");
@@ -213,13 +213,13 @@ namespace MSL
             {
                 case Value::Type::Null:
                     {
-                        printPrefix(dw, idl, getPlace(), prefix);
+                        printPrefix(dw, idl, location(), prefix);
                         dw.writeString("Constant null\n");
                     }
                     break;
                 case Value::Type::Number:
                     {
-                        printPrefix(dw, idl, getPlace(), prefix);
+                        printPrefix(dw, idl, location(), prefix);
                         dw.writeString("Constant number: ");
                         dw.writeNumber(m_val.number());
                         dw.writeString("\n");
@@ -227,7 +227,7 @@ namespace MSL
                     break;
                 case Value::Type::String:
                     {
-                        printPrefix(dw, idl, getPlace(), prefix);
+                        printPrefix(dw, idl, location(), prefix);
                         dw.writeString("Constant string: ");
                         dw.writeReprString(m_val.string());
                         dw.writeString("\n");
@@ -242,7 +242,7 @@ namespace MSL
         void Identifier::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
             static const char* PREFIX[] = { "", "local.", "global." };
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("Identifier: ");
             dw.writeString(PREFIX[size_t(m_scope)]);
             dw.writeString(m_ident);
@@ -251,7 +251,7 @@ namespace MSL
 
         void ThisExpression::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("This\n");
         }
 
@@ -260,7 +260,7 @@ namespace MSL
             static const char* UNARY_OPERATOR_TYPE_NAMES[]
             = { "Preincrementation", "Predecrementation", "Postincrementation", "Postdecrementation", "Plus", "Minus",
                 "Logical NOT",       "Bitwise NOT" };
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("UnaryOperator ");
             dw.writeString(UNARY_OPERATOR_TYPE_NAMES[uint32_t(m_type)]);
             dw.writeString("\n");
@@ -270,7 +270,7 @@ namespace MSL
 
         void MemberAccessOperator::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("MemberAccessOperator Member=");
             dw.writeString(m_membername);
             dw.writeString("\n");
@@ -312,7 +312,7 @@ namespace MSL
                 "Comma",
                 "Indexing",
             };
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("BinaryOperator ");
             dw.writeString(BINARY_OPERATOR_TYPE_NAMES[uint32_t(m_type)]);
             dw.writeString("\n");
@@ -323,7 +323,7 @@ namespace MSL
 
         void TernaryOperator::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("TernaryOperator\n");
             ++idl;
             m_condexpr->debugPrint(dw, idl, "ConditionExpression: ");
@@ -336,7 +336,7 @@ namespace MSL
         {
             size_t i;
             size_t count;
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("CallOperator\n");
             ++idl;
             m_oplist[0]->debugPrint(dw, idl, "Callee: ");
@@ -350,7 +350,7 @@ namespace MSL
         {
             size_t i;
             size_t count;
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("Function(");
             if(!m_paramlist.empty())
             {
@@ -367,7 +367,7 @@ namespace MSL
 
         void ObjectExpression::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("Object\n");
             ++idl;
             for(const auto& [name, value] : m_exprmap)
@@ -380,7 +380,7 @@ namespace MSL
         {
             size_t i;
             size_t count;
-            printPrefix(dw, idl, getPlace(), prefix);
+            printPrefix(dw, idl, location(), prefix);
             dw.writeString("Array\n");
             ++idl;
             for(i = 0, count = m_exprlist.size(); i < count; ++i)

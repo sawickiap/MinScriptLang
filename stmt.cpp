@@ -95,26 +95,26 @@ namespace MSL
     {
         auto obj = std::make_shared<Object>();
         obj->put("type", Value{ std::string(err.name()) });
-        obj->put("index", Value{ (double)err.getPlace().textindex });
-        obj->put("line", Value{ (double)err.getPlace().textline });
-        obj->put("column", Value{ (double)err.getPlace().textcolumn });
+        obj->put("index", Value{ (double)err.location().textindex });
+        obj->put("line", Value{ (double)err.location().textline });
+        obj->put("column", Value{ (double)err.location().textcolumn });
         obj->put("message", Value{ std::string{ err.message() } });
         return obj;
     }
 
     static inline void CheckNumberOperand(const AST::Expression* operand, const Value& value)
     {
-        MINSL_EXECUTION_CHECK(value.isNumber(), operand->getPlace(), "expected numeric value");
+        MINSL_EXECUTION_CHECK(value.isNumber(), operand->location(), "expected numeric value");
     }
 
     namespace AST
     {
-        ExecutionContext::LocalScopePush::LocalScopePush(ExecutionContext& ctx, Object* localScope, ThisType&& thisObj, const Location& place)
+        ExecutionContext::LocalScopePush::LocalScopePush(ExecutionContext& ctx, Object* localScope, ThisType&& thisObj, const Location& loc)
         : m_context{ ctx }
         {
             if(ctx.m_localscopes.size() == LOCAL_SCOPE_STACK_MAX_SIZE)
             {
-                throw Error::RuntimeError{ place, "stack overflow" };
+                throw Error::RuntimeError{ loc, "stack overflow" };
             }
             ctx.m_localscopes.push_back(localScope);
             ctx.m_thislist.push_back(std::move(thisObj));
@@ -166,7 +166,7 @@ namespace MSL
 
     namespace LeftValue
     {
-        Value* Getter::getValueRef(const Location& place) const
+        Value* Getter::getValueRef(const Location& loc) const
         {
             Value* val;
             const ObjectMember* leftmemberval;
@@ -178,18 +178,18 @@ namespace MSL
                 {
                     return val;
                 }
-                throw Error::RuntimeError(place, "cannot get reference to lvalue of non-existing members");
+                throw Error::RuntimeError(loc, "cannot get reference to lvalue of non-existing members");
             }
             leftarrayitem = std::get_if<ArrayItem>(this);
             if(leftarrayitem)
             {
-                MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), place, "index out of bounds");
+                MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), loc, "index out of bounds");
                 return &leftarrayitem->arrayval->at(leftarrayitem->indexval);
             }
-            throw Error::RuntimeError(place, "lvalue required");
+            throw Error::RuntimeError(loc, "lvalue required");
         }
 
-        Value Getter::getValue(const Location& place) const
+        Value Getter::getValue(const Location& loc) const
         {
             char ch;
             const Value* val;
@@ -203,19 +203,19 @@ namespace MSL
                 {
                     return *val;
                 }
-                throw Error::RuntimeError(place, "cannot get lvalue of non-existing member");
+                throw Error::RuntimeError(loc, "cannot get lvalue of non-existing member");
             }
             leftstrchar = std::get_if<StringCharacter>(this);
             if(leftstrchar)
             {
-                MINSL_EXECUTION_CHECK(leftstrchar->indexval < leftstrchar->stringval->length(), place, "index out of bounds");
+                MINSL_EXECUTION_CHECK(leftstrchar->indexval < leftstrchar->stringval->length(), loc, "index out of bounds");
                 ch = (*leftstrchar->stringval)[leftstrchar->indexval];
                 return Value{ std::string{ &ch, &ch + 1 } };
             }
             leftarrayitem = std::get_if<ArrayItem>(this);
             if(leftarrayitem)
             {
-                MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), place, "index out of bounds");
+                MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), loc, "index out of bounds");
                 return Value{ leftarrayitem->arrayval->at(leftarrayitem->indexval) };
             }
             assert(0);
@@ -225,7 +225,7 @@ namespace MSL
 
     namespace AST
     {
-        Block::Block(const Location& place) : Statement{ place }
+        Block::Block(const Location& loc) : Statement{ loc }
         {
         }
 
@@ -233,7 +233,7 @@ namespace MSL
         {
         }
 
-        Statement::Statement(const Location& place) : m_place{ place }
+        Statement::Statement(const Location& loc) : m_place{ loc }
         {
         }
 
@@ -241,7 +241,7 @@ namespace MSL
         {
         }
 
-        const Location& Statement::getPlace() const
+        const Location& Statement::location() const
         {
             return m_place;
         }
@@ -267,16 +267,16 @@ namespace MSL
             leftarrayitem = std::get_if<LeftValue::ArrayItem>(&lhs);
             if(leftarrayitem)
             {
-                MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), getPlace(), "index out of bounds");
+                MINSL_EXECUTION_CHECK(leftarrayitem->indexval < leftarrayitem->arrayval->size(), location(), "index out of bounds");
                 leftarrayitem->arrayval->at(leftarrayitem->indexval) = std::move(rhs);
                 return;
             }
             leftstrchar = std::get_if<LeftValue::StringCharacter>(&lhs);
             if(leftstrchar)
             {
-                MINSL_EXECUTION_CHECK(leftstrchar->indexval < leftstrchar->stringval->length(), getPlace(), "index out of bounds");
-                MINSL_EXECUTION_CHECK(rhs.isString(), getPlace(), "expected string");
-                MINSL_EXECUTION_CHECK(rhs.string().length() == 1, getPlace(), "character literal too long");
+                MINSL_EXECUTION_CHECK(leftstrchar->indexval < leftstrchar->stringval->length(), location(), "index out of bounds");
+                MINSL_EXECUTION_CHECK(rhs.isString(), location(), "expected string");
+                MINSL_EXECUTION_CHECK(rhs.string().length() == 1, location(), "character literal too long");
                 (*leftstrchar->stringval)[leftstrchar->indexval] = rhs.string()[0];
                 return;
             }
@@ -461,7 +461,7 @@ namespace MSL
             }
             else
             {
-                throw Error::RuntimeError(getPlace(), "range-based loop can not be used with this object");
+                throw Error::RuntimeError(location(), "range-based loop can not be used with this object");
             }
             if(usekey)
             {
@@ -499,11 +499,11 @@ namespace MSL
         {
             if(m_retvalue)
             {
-                throw ReturnException{ getPlace(), m_retvalue->evaluate(ctx, nullptr) };
+                throw ReturnException{ location(), m_retvalue->evaluate(ctx, nullptr) };
             }
             else
             {
-                throw ReturnException{ getPlace(), Value{} };
+                throw ReturnException{ location(), Value{} };
             }
             return {};
         }
@@ -687,11 +687,11 @@ namespace MSL
             }
             catch(BreakException)
             {
-                throw Error::RuntimeError{ getPlace(), "use of 'break' outside of a loop" };
+                throw Error::RuntimeError{ location(), "use of 'break' outside of a loop" };
             }
             catch(ContinueException)
             {
-                throw Error::RuntimeError{ getPlace(), "use of 'continue' outside of a loop" };
+                throw Error::RuntimeError{ location(), "use of 'continue' outside of a loop" };
             }
             return {};
         }
@@ -702,7 +702,7 @@ namespace MSL
             size_t count;
             Value* val;
             const std::shared_ptr<Object>* thisObj;
-            MINSL_EXECUTION_CHECK(m_scope != Identifier::Scope::Local || ctx.isLocal(), getPlace(), "no local scope");
+            MINSL_EXECUTION_CHECK(m_scope != Identifier::Scope::Local || ctx.isLocal(), location(), "no local scope");
             if(ctx.isLocal())
             {
                 // Local variable
@@ -758,7 +758,7 @@ namespace MSL
             bool islocal;
             const std::shared_ptr<Object>* thisObj;
             islocal = ctx.isLocal();
-            MINSL_EXECUTION_CHECK(m_scope != Identifier::Scope::Local || islocal, getPlace(), "no local scope");
+            MINSL_EXECUTION_CHECK(m_scope != Identifier::Scope::Local || islocal, location(), "no local scope");
 
             if(islocal)
             {
@@ -794,7 +794,7 @@ namespace MSL
         Value ThisExpression::evaluate(ExecutionContext& ctx, ThisType* othis)
         {
             (void)othis;
-            MINSL_EXECUTION_CHECK(ctx.isLocal() && std::get_if<std::shared_ptr<Object>>(&ctx.getThis()), getPlace(), "use of 'this' not possible in this context");
+            MINSL_EXECUTION_CHECK(ctx.isLocal() && std::get_if<std::shared_ptr<Object>>(&ctx.getThis()), location(), "use of 'this' not possible in this context");
             return Value{ std::shared_ptr<Object>{ *std::get_if<std::shared_ptr<Object>>(&ctx.getThis()) } };
         }
 
@@ -808,8 +808,8 @@ namespace MSL
             if(m_type == UnaryOperator::Type::Preincrementation || m_type == UnaryOperator::Type::Predecrementation
                || m_type == UnaryOperator::Type::Postincrementation || m_type == UnaryOperator::Type::Postdecrementation)
             {
-                pval = m_operand->getLeftValue(ctx).getValueRef(getPlace());
-                MINSL_EXECUTION_CHECK(pval->type() == Value::Type::Number, getPlace(), "expected numeric value");
+                pval = m_operand->getLeftValue(ctx).getValueRef(location());
+                MINSL_EXECUTION_CHECK(pval->type() == Value::Type::Number, location(), "expected numeric value");
                 switch(m_type)
                 {
                     case UnaryOperator::Type::Preincrementation:
@@ -851,7 +851,7 @@ namespace MSL
                     || m_type == UnaryOperator::Type::LogicalNot || m_type == UnaryOperator::Type::BitwiseNot)
             {
                 val = m_operand->evaluate(ctx, nullptr);
-                MINSL_EXECUTION_CHECK(val.isNumber(), getPlace(), "expected numeric value");
+                MINSL_EXECUTION_CHECK(val.isNumber(), location(), "expected numeric value");
                 switch(m_type)
                 {
                     case UnaryOperator::Type::Plus:
@@ -895,10 +895,10 @@ namespace MSL
             {
                 lval = m_operand->getLeftValue(ctx);
                 leftmemberval = std::get_if<LeftValue::ObjectMember>(&lval);
-                MINSL_EXECUTION_CHECK(leftmemberval, getPlace(), "lvalue required");
+                MINSL_EXECUTION_CHECK(leftmemberval, location(), "lvalue required");
                 val = leftmemberval->objectval->tryGet(leftmemberval->keyval);
-                MINSL_EXECUTION_CHECK(val != nullptr, getPlace(), "no such name");
-                MINSL_EXECUTION_CHECK(val->type() == Value::Type::Number, getPlace(), "expected numeric value");
+                MINSL_EXECUTION_CHECK(val != nullptr, location(), "no such name");
+                MINSL_EXECUTION_CHECK(val->type() == Value::Type::Number, location(), "expected numeric value");
                 switch(m_type)
                 {
                     case UnaryOperator::Type::Preincrementation:
@@ -920,7 +920,7 @@ namespace MSL
                         break;
                 }
             }
-            throw Error::RuntimeError(getPlace(), "lvalue required");
+            throw Error::RuntimeError(location(), "lvalue required");
         }
 
 
@@ -948,7 +948,7 @@ namespace MSL
                 }
                 if(get_property(stdobjproperties_object, m_membername, prop))
                 {
-                    return prop.func(ctx, getPlace(), std::move(vobj));
+                    return prop.func(ctx, location(), std::move(vobj));
                 }
                 else if(get_method(stdobjmethods_object, m_membername, meth))
                 {
@@ -964,13 +964,13 @@ namespace MSL
                 }
                 if(get_property(stdobjproperties_string, m_membername, prop))
                 {
-                    return prop.func(ctx, getPlace(), std::move(vobj));
+                    return prop.func(ctx, location(), std::move(vobj));
                 }
                 else if(get_method(stdobjmethods_string, m_membername, meth))
                 {
                     return Value{ meth.func };
                 }                
-                throw Error::TypeError(getPlace(), "no such String member");
+                throw Error::TypeError(location(), "no such String member");
             }
             if(vobj.isArray())
             {
@@ -980,22 +980,22 @@ namespace MSL
                 }
                 if(get_property(stdobjproperties_array, m_membername, prop))
                 {
-                    return prop.func(ctx, getPlace(), std::move(vobj));
+                    return prop.func(ctx, location(), std::move(vobj));
                 }
                 else if(get_method(stdobjmethods_array, m_membername, meth))
                 {
                     return Value{ meth.func };
                 }
-                throw Error::TypeError(getPlace(), "no such Array member");
+                throw Error::TypeError(location(), "no such Array member");
             }
-            throw Error::TypeError(getPlace(), "member access in something not an object");
+            throw Error::TypeError(location(), "member access in something not an object");
         }
 
         LeftValue::Getter MemberAccessOperator::getLeftValue(ExecutionContext& ctx) const
         {
             Value vobj;
             vobj = m_operand->evaluate(ctx, nullptr);
-            MINSL_EXECUTION_CHECK(vobj.isObject(), getPlace(), "expected object");
+            MINSL_EXECUTION_CHECK(vobj.isObject(), location(), "expected object");
             return LeftValue::Getter{ LeftValue::ObjectMember{ vobj.object(), m_membername } };
         }
 
@@ -1086,7 +1086,7 @@ namespace MSL
                 {
                     return Value{ left.string() + right.string() };
                 }
-                throw Error::TypeError(getPlace(), "incompatible types for '+'");
+                throw Error::TypeError(location(), "incompatible types for '+'");
             }
             if(m_type == BinaryOperator::Type::Equal)
             {
@@ -1100,7 +1100,7 @@ namespace MSL
                || m_type == BinaryOperator::Type::Greater || m_type == BinaryOperator::Type::GreaterEqual)
             {
                 result = false;
-                MINSL_EXECUTION_CHECK(typleft == typright, getPlace(), "incompatible types for comparison");
+                MINSL_EXECUTION_CHECK(typleft == typright, location(), "incompatible types for comparison");
                 if(typleft == Value::Type::Number)
                 {
                     switch(m_type)
@@ -1162,7 +1162,7 @@ namespace MSL
                 }
                 else
                 {
-                    throw Error::TypeError(getPlace(), "incompatible types for binary operation");
+                    throw Error::TypeError(location(), "incompatible types for binary operation");
                 }
                 return Value{ result ? 1.0 : 0.0 };
             }
@@ -1170,15 +1170,15 @@ namespace MSL
             {
                 if(typleft == Value::Type::String)
                 {
-                    MINSL_EXECUTION_CHECK(typright == Value::Type::Number, getPlace(), "expected numeric value");
+                    MINSL_EXECUTION_CHECK(typright == Value::Type::Number, location(), "expected numeric value");
                     index = 0;
-                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(index, right.number()), getPlace(), "string index out of bounds");
-                    MINSL_EXECUTION_CHECK(index < left.string().length(), getPlace(), "string index out of bounds");
+                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(index, right.number()), location(), "string index out of bounds");
+                    MINSL_EXECUTION_CHECK(index < left.string().length(), location(), "string index out of bounds");
                     return Value{ std::string(1, left.string()[index]) };
                 }
                 if(typleft == Value::Type::Object)
                 {
-                    MINSL_EXECUTION_CHECK(typright == Value::Type::String, getPlace(), "expected string value");
+                    MINSL_EXECUTION_CHECK(typright == Value::Type::String, location(), "expected string value");
                     auto val = left.object()->tryGet(right.string());
                     if(val)
                     {
@@ -1192,12 +1192,12 @@ namespace MSL
                 }
                 if(typleft == Value::Type::Array)
                 {
-                    MINSL_EXECUTION_CHECK(typright == Value::Type::Number, getPlace(), "expected numeric value");
+                    MINSL_EXECUTION_CHECK(typright == Value::Type::Number, location(), "expected numeric value");
                     MINSL_EXECUTION_CHECK(Util::NumberToIndex(index, right.number()) && index < left.array()->size(),
-                                          getPlace(), "array index out of bounds");
+                                          location(), "array index out of bounds");
                     return left.array()->at(index);
                 }
-                throw Error::TypeError(getPlace(), "cannot index this type");
+                throw Error::TypeError(location(), "cannot index this type");
             }
 
             // Remaining operators require numbers.
@@ -1266,23 +1266,23 @@ namespace MSL
             Value* leftref;
             if(m_type == BinaryOperator::Type::Indexing)
             {
-                leftref = m_leftoper->getLeftValue(ctx).getValueRef(getPlace());
+                leftref = m_leftoper->getLeftValue(ctx).getValueRef(location());
                 idxval = m_rightoper->evaluate(ctx, nullptr);
                 if(leftref->type() == Value::Type::String)
                 {
-                    MINSL_EXECUTION_CHECK(idxval.isNumber(), getPlace(), "expected numeric value");
-                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(charidx, idxval.number()), getPlace(), "string index out of bounds");
+                    MINSL_EXECUTION_CHECK(idxval.isNumber(), location(), "expected numeric value");
+                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(charidx, idxval.number()), location(), "string index out of bounds");
                     return LeftValue::Getter{ LeftValue::StringCharacter{ &leftref->string(), charidx } };
                 }
                 if(leftref->type() == Value::Type::Object)
                 {
-                    MINSL_EXECUTION_CHECK(idxval.isString(), getPlace(), "expected string value");
+                    MINSL_EXECUTION_CHECK(idxval.isString(), location(), "expected string value");
                     return LeftValue::Getter{ LeftValue::ObjectMember{ leftref->object(), idxval.string() } };
                 }
                 if(leftref->type() == Value::Type::Array)
                 {
-                    MINSL_EXECUTION_CHECK(idxval.isNumber(), getPlace(), "expected numeric value");
-                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(itemidx, idxval.number()), getPlace(), "array index out of bounds");
+                    MINSL_EXECUTION_CHECK(idxval.isNumber(), location(), "expected numeric value");
+                    MINSL_EXECUTION_CHECK(Util::NumberToIndex(itemidx, idxval.number()), location(), "array index out of bounds");
                     return LeftValue::Getter{ LeftValue::ArrayItem{ leftref->array(), itemidx } };
                 }
             }
@@ -1315,7 +1315,7 @@ namespace MSL
                 return std::move(rhs);
             }
             // Others require existing value.
-            leftvalptr = lhs.getValueRef(getPlace());
+            leftvalptr = lhs.getValueRef(location());
             if(m_type == BinaryOperator::Type::AssignmentAdd)
             {
                 if(leftvalptr->type() == Value::Type::Number && rhs.isNumber())
@@ -1328,13 +1328,13 @@ namespace MSL
                 }
                 else
                 {
-                    throw Error::TypeError(getPlace(), "incompatible types for '+='");
+                    throw Error::TypeError(location(), "incompatible types for '+='");
                 }
                 return *leftvalptr;
             }
             // Remaining ones work on numbers only.
-            MINSL_EXECUTION_CHECK(leftvalptr->type() == Value::Type::Number, getPlace(), "expected numeric value");
-            MINSL_EXECUTION_CHECK(rhs.isNumber(), getPlace(), "expected numeric value");
+            MINSL_EXECUTION_CHECK(leftvalptr->type() == Value::Type::Number, location(), "expected numeric value");
+            MINSL_EXECUTION_CHECK(rhs.isNumber(), location(), "expected numeric value");
             switch(m_type)
             {
                 case BinaryOperator::Type::AssignmentSub:
@@ -1398,36 +1398,6 @@ namespace MSL
                                                                   m_falseexpr->evaluate(ctx, othis);
         }
 
-        Value FunctionDefinition::call(ExecutionContext& ctx, Value::List&& args, ThisType& th)
-        {
-            size_t argidx;
-            Object ourlocalscope;
-            // Setup parameters
-            for(argidx = 0; argidx<args.size(); argidx++)
-            {
-                ourlocalscope.put(m_paramlist[argidx], std::move(args[argidx]));
-            }
-            ExecutionContext::LocalScopePush ourlocalcontext{ ctx, &ourlocalscope, std::move(th), getPlace() };
-            try
-            {
-                m_body.execute(ctx);
-            }
-            catch(ReturnException& returnEx)
-            {
-                return std::move(returnEx.thrownvalue);
-            }
-            catch(BreakException)
-            {
-                throw Error::RuntimeError(getPlace(), "use of 'break' outside of a loop");
-            }
-            catch(ContinueException)
-            {
-                throw Error::RuntimeError(getPlace(), "use of 'continue' outside of a loop");
-            }
-            return {};
-        }
-
-
         Value CallOperator::evaluate(ExecutionContext& ctx, ThisType* othis)
         {
             (void)othis;
@@ -1447,7 +1417,7 @@ namespace MSL
             if(callee.isObject())
             {
                 auto objcallee = callee.objectRef();
-                auto defval = objcallee->tryGet(std::string{}); 
+                auto defval = objcallee->tryGet("__init__"); 
                 if(defval && defval->type() == Value::Type::Function)
                 {
                     callee = *defval;
@@ -1457,39 +1427,12 @@ namespace MSL
             if(callee.type() == Value::Type::Function)
             {
                 auto funcdef = callee.scriptFunction();
-                MINSL_EXECUTION_CHECK(argcnt == funcdef->m_paramlist.size(), getPlace(), "inexact number of arguments");
-                /*
-                Object ourlocalscope;
-                // Setup parameters
-                for(argidx = 0; argidx != argcnt; ++argidx)
-                {
-                    ourlocalscope.put(funcdef->m_paramlist[argidx], std::move(arguments[argidx]));
-                }
-                ExecutionContext::LocalScopePush ourlocalcontext{ ctx, &ourlocalscope, std::move(th), getPlace() };
-                
-                try
-                {
-                    callee.scriptFunction()->m_body.execute(ctx);
-                }
-                catch(ReturnException& returnEx)
-                {
-                    return std::move(returnEx.thrownvalue);
-                }
-                catch(BreakException)
-                {
-                    throw Error::RuntimeError(getPlace(), "use of 'break' outside of a loop");
-                }
-                catch(ContinueException)
-                {
-                    throw Error::RuntimeError(getPlace(), "use of 'continue' outside of a loop");
-                }
-                return {};
-                */
+                MINSL_EXECUTION_CHECK(argcnt == funcdef->m_paramlist.size(), location(), "inexact number of arguments");
                 return callee.scriptFunction()->call(ctx, std::move(arguments), th);
             }
             if(callee.type() == Value::Type::HostFunction)
             {
-                return callee.hostFunction()(ctx.m_env.getOwner(), getPlace(), std::move(arguments));
+                return callee.hostFunction()(ctx.m_env.getOwner(), location(), std::move(arguments));
             }
             if(callee.type() == Value::Type::Type)
             {
@@ -1497,47 +1440,47 @@ namespace MSL
                 {
                     case Value::Type::Null:
                         {
-                            return Builtins::ctor_null(ctx, getPlace(), std::move(arguments));
+                            return Builtins::ctor_null(ctx, location(), std::move(arguments));
                         }
                         break;
                     case Value::Type::Number:
                         {
-                            return Builtins::ctor_number(ctx, getPlace(), std::move(arguments));
+                            return Builtins::ctor_number(ctx, location(), std::move(arguments));
                         }
                         break;
                     case Value::Type::String:
                         {
-                            return Builtins::ctor_string(ctx, getPlace(), std::move(arguments));
+                            return Builtins::ctor_string(ctx, location(), std::move(arguments));
                         }
                         break;
                     case Value::Type::Object:
                         {
-                            return Builtins::ctor_object(ctx, getPlace(), std::move(arguments));
+                            return Builtins::ctor_object(ctx, location(), std::move(arguments));
                         }
                         break;
                     case Value::Type::Array:
                         {
-                            return Builtins::ctor_array(ctx, getPlace(), std::move(arguments));
+                            return Builtins::ctor_array(ctx, location(), std::move(arguments));
                         }
                         break;
                     case Value::Type::Type:
                         {
-                            return Builtins::ctor_type(ctx, getPlace(), std::move(arguments));
+                            return Builtins::ctor_type(ctx, location(), std::move(arguments));
                         }
                         break;
                     case Value::Type::Function:
                         {
-                            return Builtins::ctor_function(ctx, getPlace(), std::move(arguments));
+                            return Builtins::ctor_function(ctx, location(), std::move(arguments));
                         }
                         break;
                     case Value::Type::MemberMethod:
                         {
-                            return callee.memberFunction()(ctx, getPlace(), th, std::move(arguments));
+                            return callee.memberFunction()(ctx, location(), th, std::move(arguments));
                         }
                         break;
                     case Value::Type::MemberProperty:
                         {
-                            return callee.propertyFunction()(ctx, getPlace(), std::move(callee));
+                            return callee.propertyFunction()(ctx, location(), std::move(callee));
                         }
                         break;
                     default:
@@ -1550,13 +1493,42 @@ namespace MSL
             }
             if(callee.type() == Value::Type::MemberMethod)
             {
-                return callee.memberFunction()(ctx, getPlace(), th, std::move(arguments));
+                return callee.memberFunction()(ctx, location(), th, std::move(arguments));
             }
             if(callee.type() == Value::Type::MemberProperty)
             {
-                return callee.propertyFunction()(ctx, getPlace(), std::move(callee));
+                return callee.propertyFunction()(ctx, location(), std::move(callee));
             }
-            throw Error::RuntimeError(getPlace(), "invalid function call");
+            throw Error::RuntimeError(location(), "invalid function call");
+        }
+
+        Value FunctionDefinition::call(ExecutionContext& ctx, Value::List&& args, ThisType& th)
+        {
+            size_t argidx;
+            Object ourlocalscope;
+            // Setup parameters
+            for(argidx = 0; argidx<args.size(); argidx++)
+            {
+                ourlocalscope.put(m_paramlist[argidx], std::move(args[argidx]));
+            }
+            ExecutionContext::LocalScopePush ourlocalcontext{ ctx, &ourlocalscope, std::move(th), location() };
+            try
+            {
+                m_body.execute(ctx);
+            }
+            catch(ReturnException& returnEx)
+            {
+                return std::move(returnEx.thrownvalue);
+            }
+            catch(BreakException)
+            {
+                throw Error::RuntimeError(location(), "use of 'break' outside of a loop");
+            }
+            catch(ContinueException)
+            {
+                throw Error::RuntimeError(location(), "use of 'continue' outside of a loop");
+            }
+            return {};
         }
 
         bool FunctionDefinition::areParamsUnique() const
@@ -1587,7 +1559,7 @@ namespace MSL
                 auto baseObj = m_baseexpr->evaluate(ctx, nullptr);
                 if(baseObj.type() != Value::Type::Object)
                 {
-                    throw Error::TypeError{ getPlace(), "base must be object" };
+                    throw Error::TypeError{ location(), "base must be object" };
                 }
                 obj = Util::CopyObject(*baseObj.object());
             }
