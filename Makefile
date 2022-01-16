@@ -1,8 +1,9 @@
 
 CXX = clang++ -std=c++20
-CFLAGS = -O0 -g3 -ggdb3
+# ricing intensifies
+CFLAGS = -Ofast -march=native -flto -ffast-math -funroll-loops
 CXXFLAGS = $(CFLAGS) -Wall -Wextra
-LDFLAGS = -ldl -lm  -lreadline
+LDFLAGS = -flto -ldl -lm  -lreadline
 target = run
 
 src = $(wildcard *.cpp)

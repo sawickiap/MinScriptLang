@@ -91,6 +91,14 @@ namespace MSL
         return get_thing<Type, sz>(ary, name, dest);
     }
 
+    static Value binaryBadTypes(const Location& loc, std::string_view opstr, Value::Type tleft, Value::Type tright)
+    {
+        throw Error::TypeError(loc,
+            Util::joinArgs("incompatible types ", Value::getTypename(tleft), ", ", Value::getTypename(tright), " for '", opstr, "'")
+        );
+        return Value{};
+    }
+
     static std::shared_ptr<Object> objectFromException(const Error::RuntimeError& err)
     {
         auto obj = std::make_shared<Object>();
@@ -809,7 +817,7 @@ namespace MSL
                || m_type == UnaryOperator::Type::Postincrementation || m_type == UnaryOperator::Type::Postdecrementation)
             {
                 pval = m_operand->getLeftValue(ctx).getValueRef(location());
-                MINSL_EXECUTION_CHECK(pval->type() == Value::Type::Number, location(), "expected numeric value");
+                MINSL_EXECUTION_CHECK(pval->isNumber(), location(), "expected numeric value");
                 switch(m_type)
                 {
                     case UnaryOperator::Type::Preincrementation:
@@ -898,7 +906,7 @@ namespace MSL
                 MINSL_EXECUTION_CHECK(leftmemberval, location(), "lvalue required");
                 val = leftmemberval->objectval->tryGet(leftmemberval->keyval);
                 MINSL_EXECUTION_CHECK(val != nullptr, location(), "no such name");
-                MINSL_EXECUTION_CHECK(val->type() == Value::Type::Number, location(), "expected numeric value");
+                MINSL_EXECUTION_CHECK(val->isNumber(), location(), "expected numeric value");
                 switch(m_type)
                 {
                     case UnaryOperator::Type::Preincrementation:
@@ -1086,7 +1094,14 @@ namespace MSL
                 {
                     return Value{ left.string() + right.string() };
                 }
-                throw Error::TypeError(location(), "incompatible types for '+'");
+                if(typleft == Value::Type::String && typright == Value::Type::Number)
+                {
+                    left.string().push_back(right.number());
+                    return Value{ std::move(left.string()) };
+                }
+
+
+                return binaryBadTypes(location(), "+", typleft, typright);
             }
             if(m_type == BinaryOperator::Type::Equal)
             {
@@ -1100,7 +1115,11 @@ namespace MSL
                || m_type == BinaryOperator::Type::Greater || m_type == BinaryOperator::Type::GreaterEqual)
             {
                 result = false;
-                MINSL_EXECUTION_CHECK(typleft == typright, location(), "incompatible types for comparison");
+                //MINSL_EXECUTION_CHECK(typleft == typright, location(), "incompatible types for comparison");
+                if(!(typleft == typright))
+                {
+                    return binaryBadTypes(location(), "comparison", typleft, typright);
+                }
                 if(typleft == Value::Type::Number)
                 {
                     switch(m_type)
@@ -1162,7 +1181,8 @@ namespace MSL
                 }
                 else
                 {
-                    throw Error::TypeError(location(), "incompatible types for binary operation");
+                    //throw Error::TypeError(location(), "incompatible types for binary operation");
+                    return binaryBadTypes(location(), "binary operation", typleft, typright);
                 }
                 return Value{ result ? 1.0 : 0.0 };
             }
@@ -1268,7 +1288,7 @@ namespace MSL
             {
                 leftref = m_leftoper->getLeftValue(ctx).getValueRef(location());
                 idxval = m_rightoper->evaluate(ctx, nullptr);
-                if(leftref->type() == Value::Type::String)
+                if(leftref->isString())
                 {
                     MINSL_EXECUTION_CHECK(idxval.isNumber(), location(), "expected numeric value");
                     MINSL_EXECUTION_CHECK(Util::NumberToIndex(charidx, idxval.number()), location(), "string index out of bounds");
@@ -1318,22 +1338,26 @@ namespace MSL
             leftvalptr = lhs.getValueRef(location());
             if(m_type == BinaryOperator::Type::AssignmentAdd)
             {
-                if(leftvalptr->type() == Value::Type::Number && rhs.isNumber())
+                if(leftvalptr->isNumber() && rhs.isNumber())
                 {
                     leftvalptr->setNumberValue(leftvalptr->number() + rhs.number());
                 }
-                else if(leftvalptr->type() == Value::Type::String && rhs.isString())
+                else if(leftvalptr->isString() && rhs.isString())
                 {
                     leftvalptr->string() += rhs.string();
                 }
+                else if(leftvalptr->isString() && rhs.isNumber())
+                {
+                    leftvalptr->string().push_back(int(rhs.number()));
+                }
                 else
                 {
-                    throw Error::TypeError(location(), "incompatible types for '+='");
+                    return binaryBadTypes(location(), "+=", leftvalptr->type(), rhs.type());
                 }
                 return *leftvalptr;
             }
             // Remaining ones work on numbers only.
-            MINSL_EXECUTION_CHECK(leftvalptr->type() == Value::Type::Number, location(), "expected numeric value");
+            MINSL_EXECUTION_CHECK(leftvalptr->isNumber(), location(), "expected numeric value");
             MINSL_EXECUTION_CHECK(rhs.isNumber(), location(), "expected numeric value");
             switch(m_type)
             {

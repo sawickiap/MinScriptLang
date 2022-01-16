@@ -7,7 +7,9 @@ maxiter = 32;
 dx = (xmax - xmin) / 79;
 dy = (ymax - ymin) / 24;
 cy = ymin;
-
+// NP. adding to, printing, and clearing a line appears to be faster
+// than writing each character directly.
+line = "";
 while(cy <= ymax)
 {
     cx = xmin;
@@ -30,10 +32,11 @@ while(cy <= ymax)
             y2 = ((y * y) >> 12);
             iter +=1;
         }
-        printf("%c", (32+iter));
+        line += (32 + iter);
         cx += dx;
     }
-    print("\n");
+    print(line, "\n");
+    line = "";
     cy += dy;
 }
 
