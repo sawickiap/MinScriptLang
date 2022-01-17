@@ -200,18 +200,26 @@ namespace MSL
 
         std::optional<std::string> readFile(const std::string& file, std::optional<unsigned long> maxrd)
         {
+            unsigned long avail;
+            unsigned long wanted;
             std::string data;
             std::fstream fh(file, std::ios::in | std::ios::binary);
             if(!fh.good())
             {
                 return {};
             }
-            fh.seekg(0, std::ios::end);   
-            data.reserve(fh.tellg());
+            fh.seekg(0, std::ios::end);
+            avail = fh.tellg();
+            data.reserve(avail);
             fh.seekg(0, std::ios::beg);
             if(maxrd)
             {
-                std::copy_n(std::istreambuf_iterator<char>(fh), maxrd.value(), std::back_inserter(data));
+                wanted = maxrd.value();
+                if(wanted > avail)
+                {
+                    wanted = avail;
+                }
+                std::copy_n(std::istreambuf_iterator<char>(fh), wanted, std::back_inserter(data));
             }
             else
             {
