@@ -1,7 +1,8 @@
 
 CXX = clang++ -std=c++20
 # ricing intensifies
-CFLAGS = -Ofast -march=native -flto -ffast-math -funroll-loops
+#CFLAGS = -Ofast -march=native -flto -ffast-math -funroll-loops
+CFLAGS = -Og -g3 -ggdb3
 CXXFLAGS = $(CFLAGS) -Wall -Wextra
 LDFLAGS = -flto -ldl -lm  -lreadline
 target = run

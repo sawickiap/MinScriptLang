@@ -6,16 +6,22 @@ namespace MSL
     struct SymTypePair
     {
         Token::Type type;
-        std::string_view sym;
+        std::string_view text;
     };
 
-    static constexpr auto g_symtable = std::to_array<SymTypePair>(
+    static constexpr auto g_symboltable = std::to_array<SymTypePair>(
     {
+        // blanko symbol
         { Token::Type::None, ""},
+
+        // type "identifiers" (i.e., String(), Array(), ...)
+        // these *must* be empty, as they're identified by type.
         { Token::Type::Identifier, ""},
         { Token::Type::Number, ""},
         { Token::Type::String, ""},
         { Token::Type::End, ""},
+
+        // single character operators
         { Token::Type::Comma, ","},
         { Token::Type::QuestionMark, "?"},
         { Token::Type::Colon, ":"},
@@ -40,6 +46,8 @@ namespace MSL
         { Token::Type::Caret, "^"},
         { Token::Type::Pipe, "|"},
         { Token::Type::Dot, "."},
+
+        // multi-character operators
         { Token::Type::DoublePlus, "++"},
         { Token::Type::DoubleDash, "--"},
         { Token::Type::PlusEquals, "+="},
@@ -60,6 +68,8 @@ namespace MSL
         { Token::Type::ExclamationEquals, "!="},
         { Token::Type::DoubleAmperstand, "&&"},
         { Token::Type::DoublePipe, "||"},
+
+        // keywords
         { Token::Type::Null, "null"},
         { Token::Type::False, "false"},
         { Token::Type::True, "true"},
@@ -83,9 +93,7 @@ namespace MSL
         { Token::Type::Try, "try"},
         { Token::Type::Catch, "catch"},
         { Token::Type::Finally, "finally"},
-
     });
-
 
     static inline bool IsDecimalNumber(char ch)
     {
@@ -601,12 +609,10 @@ namespace MSL
         // Multi char symbol
         for(i = (size_t)firstmulticharsym; i < (size_t)firstkwsym; ++i)
         {
-            //symlen = g_symbolstrings[i].length();
-            symlen = g_symtable[i].sym.length();
-            //if(currlen >= symlen && memcmp(g_symbolstrings[i].data(), currcode, symlen) == 0)
-            if(currlen >= symlen && memcmp(g_symtable[i].sym.data(), currcode, symlen) == 0)
+            symlen = g_symboltable[i].text.length();
+            if(currlen >= symlen && memcmp(g_symboltable[i].text.data(), currcode, symlen) == 0)
             {
-                out.type(g_symtable[i].type);
+                out.type(g_symboltable[i].type);
                 m_code.moveForward(symlen);
                 return;
             }
@@ -614,10 +620,9 @@ namespace MSL
         // symtype
         for(i = (size_t)firstsinglecharsym; i < (size_t)firstmulticharsym; ++i)
         {
-            //if(currcode[0] == g_symbolstrings[i][0])
-            if(currcode[0] == g_symtable[i].sym[0])
+            if(currcode[0] == g_symboltable[i].text[0])
             {
-                out.type(g_symtable[i].type);
+                out.type(g_symboltable[i].type);
                 m_code.moveForward();
                 return;
             }
@@ -633,12 +638,10 @@ namespace MSL
             // Keyword
             for(i = (size_t)firstkwsym; i < (size_t)Token::Type::Count; ++i)
             {
-                //kwlen = g_symbolstrings[i].length();
-                kwlen = g_symtable[i].sym.length();
-                //if(kwlen == tklen && memcmp(g_symbolstrings[i].data(), currcode, tklen) == 0)
-                if(kwlen == tklen && memcmp(g_symtable[i].sym.data(), currcode, tklen) == 0)
+                kwlen = g_symboltable[i].text.length();
+                if(kwlen == tklen && memcmp(g_symboltable[i].text.data(), currcode, tklen) == 0)
                 {
-                    out.type((Token::Type)i);
+                    out.type(g_symboltable[i].type);
                     m_code.moveForward(kwlen);
                     return;
                 }

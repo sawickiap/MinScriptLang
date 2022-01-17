@@ -11,28 +11,24 @@ namespace MSL
         {
             Value filefunc_readfile(Environment& env, const Location& loc, Value::List&& args)
             {
-                std::string data;
-                Value filename;
                 (void)env;
-                filename = Util::checkArgument(loc, "File.read", args, 0, {Value::Type::String});
-                std::fstream fh(filename.string(), std::ios::in | std::ios::binary);
-                if(!fh.good())
+                Util::ArgumentCheck ac(loc, args, "File.readFile");
+                auto filename = ac.checkArgument(0, {Value::Type::String});
+                auto sz = ac.checkOptional(1, {Value::Type::Number});
+                auto data = sz ? Util::readFile(filename.string(), sz->number()) : Util::readFile(filename.string());
+                if(!data)
                 {
-                    throw Error::IOError(loc, Util::joinArgs("failed to open '", filename.string(), "' for reading"));
+                    throw Error::IOError(loc, Util::joinArgs("failed to read from '", filename.string(), "'"));
                 }
-                fh.seekg(0, std::ios::end);   
-                data.reserve(fh.tellg());
-                fh.seekg(0, std::ios::beg);
-                data.assign((std::istreambuf_iterator<char>(fh)), std::istreambuf_iterator<char>());
-                fh.close();
-                return Value{std::move(data)};
+                return Value{std::move(data.value())};
             }
 
             Value filefunc_readdir(Environment& env, const Location& loc, Value::List&& args)
             {
                 Value path;
                 (void)env;
-                path = Util::checkArgument(loc, "File.readDirectory", args, 0, {Value::Type::String});
+                Util::ArgumentCheck ac(loc, args, "File.readDirectory");
+                path = ac.checkArgument(0, {Value::Type::String});
                 auto ary = std::make_shared<Array>();
                 try
                 {
@@ -53,7 +49,8 @@ namespace MSL
             {
                 Value path;
                 (void)env;
-                path = Util::checkArgument(loc, "File.exists", args, 0, {Value::Type::String});
+                Util::ArgumentCheck ac(loc, args, "File.exists");
+                path = ac.checkArgument(0, {Value::Type::String});
                 return Value(double(std::filesystem::exists(path.string())));
             }
 
@@ -63,7 +60,8 @@ namespace MSL
                 Value path;
                 (void)env;
                 std::error_code ec;
-                path = Util::checkArgument(loc, "File.size", args, 0, {Value::Type::String});
+                Util::ArgumentCheck ac(loc, args, "File.size");
+                path = ac.checkArgument(0, {Value::Type::String});
                 rs = double(std::filesystem::file_size(path.string(), ec));
                 if(ec)
                 {
@@ -77,7 +75,8 @@ namespace MSL
                 Value path;
                 (void)env;
                 std::error_code ec;
-                path = Util::checkArgument(loc, "File.readLink", args, 0, {Value::Type::String});
+                Util::ArgumentCheck ac(loc, args, "File.readLink");
+                path = ac.checkArgument(0, {Value::Type::String});
                 auto rs = std::filesystem::read_symlink(path.string(), ec);
                 if(ec)
                 {
@@ -94,7 +93,8 @@ namespace MSL
             {
                 Value path;
                 (void)env;
-                path = Util::checkArgument(loc, "File.basename", args, 0, {Value::Type::String});
+                Util::ArgumentCheck ac(loc, args, "File.basename");
+                path = ac.checkArgument(0, {Value::Type::String});
                 return Value(std::filesystem::path(path.string()).filename().string());
             }
 
@@ -102,7 +102,8 @@ namespace MSL
             {
                 Value path;
                 (void)env;
-                path = Util::checkArgument(loc, "File.dirname", args, 0, {Value::Type::String});
+                Util::ArgumentCheck ac(loc, args, "File.dirname");
+                path = ac.checkArgument(0, {Value::Type::String});
                 return Value(std::filesystem::path(path.string()).parent_path().string());
             }
 
@@ -110,7 +111,8 @@ namespace MSL
             {
                 Value path;
                 (void)env;
-                path = Util::checkArgument(loc, "File.extname", args, 0, {Value::Type::String});
+                Util::ArgumentCheck ac(loc, args, "File.extname");
+                path = ac.checkArgument(0, {Value::Type::String});
                 return Value(std::filesystem::path(path.string()).extension().string());
             }
 

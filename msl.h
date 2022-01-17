@@ -74,6 +74,8 @@ namespace MSL
         class /**/ThisType;
     }
     class /**/Value;
+    class /**/Number;
+    class /**/String;
     class /**/Object;
     class /**/Array;
     class /**/Environment;
@@ -83,6 +85,7 @@ namespace MSL
         std::shared_ptr<Object> CopyObject(const Object& src);
         std::shared_ptr<Array> CopyArray(const Array& src);
 
+        std::optional<std::string> readFile(const std::string& file, std::optional<unsigned long> maxrd={});
         bool NumberToIndex(size_t& outIndex, double number);
         void reprChar(std::ostream& os, int c);
         void reprString(std::ostream& os, std::string_view str);
@@ -419,6 +422,130 @@ namespace MSL
     using MemberMethodFunction   = std::function<Value(AST::ExecutionContext&, const Location&, AST::ThisType&, std::vector<Value>&&)>;
     using MemberPropertyFunction = std::function<Value(AST::ExecutionContext&, const Location&, Value&&)>;
 
+    class String
+    {
+        private:
+            std::string m_string;
+
+        public:
+            String()
+            {
+            }
+
+            String(const String& other): m_string(other.m_string)
+            {
+            }
+
+            String(String&& other): m_string(std::move(other.m_string))
+            {
+            }
+
+            String(std::string_view str): m_string(str)
+            {
+            }
+
+            String(int ch, size_t cnt): m_string(std::string(ch, cnt))
+            {
+            }
+
+            String& operator=(const String& other)
+            {
+                m_string = other.m_string;
+                return *this;
+            }
+
+            String& operator=(String&& other)
+            {
+                m_string = std::move(other.m_string);
+                return *this;
+            }
+
+            size_t size() const
+            {
+                return m_string.size();
+            }
+
+            size_t length() const
+            {
+                return m_string.length();
+            }
+
+            void push_back(int ch)
+            {
+                m_string.push_back(ch);
+            }
+
+            auto begin()
+            {
+                return m_string.begin();
+            }
+
+            auto begin() const
+            {
+                return m_string.begin();
+            }
+
+            auto end()
+            {
+                return m_string.end();
+            }
+
+            auto end() const
+            {
+                return m_string.end();
+            }
+
+            char& operator[](size_t i)
+            {
+                return m_string[i];
+            }
+
+            char operator[](size_t i) const
+            {
+                return m_string[i];
+            }
+
+            String& operator+=(const String& other)
+            {
+                m_string += other.m_string;
+                return *this;
+            }
+
+            String& operator+=(String&& other)
+            {
+                m_string += std::move(other.m_string);
+                return *this;
+            }
+
+            String& operator+=(int c)
+            {
+                m_string.push_back(c);
+                return *this;
+            }
+
+            String& operator+=(const std::string& str)
+            {
+                m_string += str;
+                return *this;
+            }
+
+            String& operator+=(std::string&& str)
+            {
+                m_string += std::move(str);
+                return *this;
+            }
+
+            bool operator==(const String& other) const
+            {
+                return (m_string == other.m_string);
+            }
+
+            bool operator==(const std::string& other) const
+            {
+                return (m_string == other);
+            }
+    };
+
     class Value: public GC::Collectable
     {
         public:
@@ -516,11 +643,11 @@ namespace MSL
             {
             }
 
-            inline explicit Value(std::string&& str) : m_type(Type::String), m_variant(std::move(str))
+            inline explicit Value(StringValType&& str) : m_type(Type::String), m_variant(std::move(str))
             {
             }
 
-            inline explicit Value(AST::FunctionDefinition* func) : m_type{ Type::Function }, m_variant{ func }
+            inline explicit Value(AstFuncValType func) : m_type{ Type::Function }, m_variant{ func }
             {
             }
 
@@ -537,11 +664,11 @@ namespace MSL
             {
             }        
 
-            inline explicit Value(std::shared_ptr<Object>&& obj) : m_type{ Type::Object }, m_variant(obj)
+            inline explicit Value(ObjectValType&& obj) : m_type{ Type::Object }, m_variant(obj)
             {
             }
 
-            inline explicit Value(std::shared_ptr<Array>&& arr) : m_type{ Type::Array }, m_variant(arr)
+            inline explicit Value(ArrayValType&& arr) : m_type{ Type::Array }, m_variant(arr)
             {
             }
 
@@ -692,14 +819,31 @@ namespace MSL
 
     namespace Util
     {
-        void checkArgumentCount(const Location& loc, std::string_view fname, size_t argcnt, size_t expect);
-        Value checkArgument(const Location& loc, std::string_view fname, const Value::List& args, size_t idx, std::initializer_list<Value::Type> type);
+        class ArgumentCheck
+        {
+            private:
+                const Location& m_location;
+                Value::List& m_args;
+                std::string_view m_fname;
+
+            public:
+                inline ArgumentCheck(const Location& loc, Value::List& va, std::string_view fname):
+                    m_location(loc), m_args(va), m_fname(fname)
+                {
+                }
+
+                bool checkCount(size_t expect, bool alsothrow=true);
+                std::optional<Value> checkOptional(size_t idx, std::initializer_list<Value::Type> types);
+                Value checkArgument(size_t idx, std::initializer_list<Value::Type> types);
+        };
     }
+
+
 
     class Object: public GC::Collectable
     {
         public:
-            using MapType = std::unordered_map<std::string, Value>;
+            using MapType = std::unordered_map<Value::StringValType, Value>;
 
         public:
             MapType m_entrymap;
@@ -845,6 +989,7 @@ namespace MSL
 
             ~Environment();
 
+            Value execute(std::string_view code, std::string_view filename);
             Value execute(std::string_view code);
 
             std::string_view getTypename(Value::Type type) const;
@@ -856,6 +1001,36 @@ namespace MSL
                 return m_globalscope.put(key, std::move(val));
             }
 
+    };
+
+    class EnvironmentPimpl
+    {
+        private:
+            Environment& m_owner;
+            Object& m_globalscope;
+
+        public:
+            EnvironmentPimpl(Environment& owner, Object& globalScope) : m_owner(owner), m_globalscope{ globalScope }
+            {
+            }
+
+            ~EnvironmentPimpl() = default;
+
+            Environment& getOwner()
+            {
+                return m_owner;
+            }
+
+            Value execute(std::string_view code, std::string_view file);
+            Value execute(std::string_view code);
+
+            std::string_view getTypename(Value::Type type) const;
+
+            void Print(std::string_view s)
+            {
+                //m_Output.append(s);
+                std::cout << s;
+            }
     };
 
     // I would like it to be higher, but above that, even at 128, it crashes with
@@ -1766,32 +1941,5 @@ namespace MSL
 
     };
 
-    class EnvironmentPimpl
-    {
-        private:
-            Environment& m_owner;
-            Object& m_globalscope;
 
-        public:
-            EnvironmentPimpl(Environment& owner, Object& globalScope) : m_owner(owner), m_globalscope{ globalScope }
-            {
-            }
-
-            ~EnvironmentPimpl() = default;
-
-            Environment& getOwner()
-            {
-                return m_owner;
-            }
-
-            Value execute(std::string_view code);
-
-            std::string_view getTypename(Value::Type type) const;
-
-            void Print(std::string_view s)
-            {
-                //m_Output.append(s);
-                std::cout << s;
-            }
-    };
 }

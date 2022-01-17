@@ -1,8 +1,6 @@
 
 #include "priv.h"
 
-
-
 namespace MSL
 {
     namespace Builtins
@@ -17,6 +15,27 @@ namespace MSL
             {
                 throw Error::TypeError(p, Util::joinArgs(n, "() expects a string as first argument"));
             }
+        }
+
+        Value func_eval(Environment& env, const Location& loc, Value::List&& args)
+        {
+            Value strv;
+            Util::ArgumentCheck ac(loc, args, "eval");
+            strv = ac.checkArgument(0, {Value::Type::String});
+            return env.execute(strv.string());
+        }
+
+        Value func_load(Environment& env, const Location& loc, Value::List&& args)
+        {
+            Value filev;
+            Util::ArgumentCheck ac(loc, args, "load");
+            filev = ac.checkArgument(0, {Value::Type::String});
+            auto d = Util::readFile(filev.string());
+            if(!d)
+            {
+                throw Error::IOError(loc, Util::joinArgs("failed to read file '", filev.string(), "' for 'load'"));
+            }
+            return env.execute(d.value(), filev.string());
         }
 
 

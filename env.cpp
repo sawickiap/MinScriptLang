@@ -21,7 +21,8 @@ namespace MSL
                     (void)ctx;
                     size_t rs;
                     rs = 0;
-                    Util::checkArgumentCount(loc, "write", args.size(), 1);
+                    Util::ArgumentCheck ac(loc, args, "write");
+                    ac.checkCount(1);
                     for(const auto& a: args)
                     {
                         auto tmpstr = a.toString();
@@ -50,7 +51,8 @@ namespace MSL
                     int rs;
                     Value ch;
                     (void)ctx;
-                    ch = Util::checkArgument(loc, "putchar", args, 0, {Value::Type::Number});
+                    Util::ArgumentCheck ac(loc, args, "putChar");
+                    ch = ac.checkArgument(0, {Value::Type::Number});
                     rs = fputc(int(ch.number()), m_stream);
                     if(rs == EOF)
                     {
@@ -131,10 +133,16 @@ namespace MSL
         setGlobal(name, Value{obj});
     }
 
+    Value Environment::execute(std::string_view code, std::string_view file)
+    {
+        return m_implenv->execute(code, file);
+    }
+
     Value Environment::execute(std::string_view code)
     {
-        return m_implenv->execute(code);
+        return m_implenv->execute(code, "<script>");
     }
+
 
     std::string_view Environment::getTypename(Value::Type type) const
     {
@@ -146,9 +154,9 @@ namespace MSL
         m_implenv->Print(s);
     }
 
-    Value EnvironmentPimpl::execute(std::string_view code)
+    Value EnvironmentPimpl::execute(std::string_view code, std::string_view filename)
     {
-        AST::Script script{ Location{ 0, 1, 1 } };
+        AST::Script script{ Location{ 0, 1, 1, filename} };
         Tokenizer tokenizer{ code };
         Parser parser{ tokenizer };
         parser.parseScript(script);
@@ -162,6 +170,11 @@ namespace MSL
             return std::move(returnEx.thrownvalue);
         }
         return {};
+    }
+
+    Value EnvironmentPimpl::execute(std::string_view code)
+    {
+        return execute(code, "<script>");
     }
 
     std::string_view EnvironmentPimpl::getTypename(Value::Type type) const

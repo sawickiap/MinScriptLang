@@ -1,4 +1,5 @@
 
+#include <fstream>
 #include "msl.h"
 
 namespace MSL
@@ -197,22 +198,72 @@ namespace MSL
             }
         }
 
-        void checkArgumentCount(const Location& loc, std::string_view fname, size_t argcnt, size_t expect)
+        std::optional<std::string> readFile(const std::string& file, std::optional<unsigned long> maxrd)
         {
-            if((expect > 0) && ((argcnt == 0) || (argcnt < expect)))
+            std::string data;
+            std::fstream fh(file, std::ios::in | std::ios::binary);
+            if(!fh.good())
             {
-                throw Error::ArgumentError(loc, Util::joinArgs("function '", fname, "' expects at least ", expect, " arguments"));
+                return {};
             }
+            fh.seekg(0, std::ios::end);   
+            data.reserve(fh.tellg());
+            fh.seekg(0, std::ios::beg);
+            if(maxrd)
+            {
+                std::copy_n(std::istreambuf_iterator<char>(fh), maxrd.value(), std::back_inserter(data));
+            }
+            else
+            {
+                data.assign((std::istreambuf_iterator<char>(fh)), std::istreambuf_iterator<char>());
+            }
+            fh.close();
+            return data;
         }
 
-        Value checkArgument(const Location& loc, std::string_view name, const Value::List& args, size_t idx, std::initializer_list<Value::Type> types)
+        bool ArgumentCheck::checkCount(size_t expect, bool alsothrow)
+        {
+            size_t argcnt;
+            argcnt = m_args.size();
+            if((argcnt == 0) || (argcnt <= expect))
+            {
+                if(alsothrow)
+                {
+                    throw Error::ArgumentError(m_location, Util::joinArgs("function '", m_fname, "' expects at least ", expect+1, " arguments"));
+                }
+                return false;
+            }
+            return true;
+        }
+
+        std::optional<Value> ArgumentCheck::checkOptional(size_t idx, std::initializer_list<Value::Type> types)
         {
             size_t i;
             Value r;
+            if(checkCount(idx, false))
+            {
+                r = m_args[idx];
+                for(i=0; i<types.size(); i++)
+                {
+                    if(types.begin()[i] == r.type())
+                    {
+                        return r;
+                    }
+                }
+            }
+            return {};
+        }
+
+        Value ArgumentCheck::checkArgument(size_t idx, std::initializer_list<Value::Type> types)
+        {
+            size_t i;
             std::stringstream emsg;
-            checkArgumentCount(loc, name, args.size(), idx);
-            r = args[idx];
-            // using Value::Type::Null means any type
+            Value r;
+            if(!checkCount(idx, true))
+            {
+                return Value{};
+            }
+            r = m_args[idx];
             for(i=0; i<types.size(); i++)
             {
                 if(types.begin()[i] == r.type())
@@ -232,10 +283,9 @@ namespace MSL
                 }
             }
             emsg << ", but got " << gtype << " instead";
-            throw Error::TypeError(loc, emsg.str());
-            return r;
+            throw Error::TypeError(m_location, emsg.str());
+            return {};
         }
-
     }
 }
 

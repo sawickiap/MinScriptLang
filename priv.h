@@ -213,9 +213,11 @@ namespace MSL
         Value func_max(Environment& ctx, const Location& loc, Value::List&& args);
         Value func_min(Environment& ctx, const Location& loc, Value::List&& args);
         Value func_typeof(Environment& env, const Location& loc, Value::List&& args);
+        Value func_eval(Environment& env, const Location& loc, Value::List&& args);
+        Value func_load(Environment& env, const Location& loc, Value::List&& args);
+
 
         void makeFileNamespace(Environment& env);
-
 
         Value ctor_null(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args);
         Value ctor_number(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args);

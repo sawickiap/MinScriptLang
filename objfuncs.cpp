@@ -16,7 +16,8 @@ namespace MSL
         Value ctor_number(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
         {
             (void)ctx;
-            auto val = Util::checkArgument(loc, "Number", args, 0, {Value::Type::Number});
+            Util::ArgumentCheck ac(loc, args, "Number");
+            auto val = ac.checkArgument(0, {Value::Type::Number});
             return Value{ val };
         }
 
@@ -27,7 +28,8 @@ namespace MSL
             {
                 return Value{ std::string{} };
             }
-            auto strv = Util::checkArgument(loc, "String", args, 0, {Value::Type::String});
+            Util::ArgumentCheck ac(loc, args, "String");
+            auto strv = ac.checkArgument(0, {Value::Type::String});
             return Value{ std::move(strv.string()) };
         }
 
@@ -197,7 +199,8 @@ namespace MSL
             {
                 throw Error::TypeError(loc, "expected array object");
             }
-            auto vfunc = Util::checkArgument(loc, "Array.each", args, 0, {Value::Type::Function, Value::Type::HostFunction});
+            Util::ArgumentCheck ac(loc, args, "Array.each");
+            auto vfunc = ac.checkArgument(0, {Value::Type::Function, Value::Type::HostFunction});
             auto newarr = std::make_shared<Array>();
             for(i=0; i<arr->size(); i++)
             {
@@ -225,7 +228,8 @@ namespace MSL
             {
                 throw Error::TypeError(loc, "expected array object");
             }
-            auto vfunc = Util::checkArgument(loc, "Array.map", args, 0, {Value::Type::Function, Value::Type::HostFunction});
+            Util::ArgumentCheck ac(loc, args, "Array.map");
+            auto vfunc = ac.checkArgument(0, {Value::Type::Function, Value::Type::HostFunction});
             auto newarr = std::make_shared<Array>();
             for(i=0; i<arr->size(); i++)
             {
@@ -323,7 +327,8 @@ namespace MSL
         {
             (void)ctx;
             const auto& self = th.string();
-            auto findme = Util::checkArgument(loc, "Strings.endsWith", args, 0, {Value::Type::String});
+            Util::ArgumentCheck ac(loc, args, "String.endsWith");
+            auto findme = ac.checkArgument(0, {Value::Type::String});
             auto sf = findme.string();
             if(sf.size() > self.size())
             {
