@@ -69,10 +69,8 @@ namespace MSL
         makeStdHandle({}, "$stdin", stdin);
         makeStdHandle({}, "$stdout", stdout);
         makeStdHandle({}, "$stderr", stderr);
-        #if 0
         setGlobal("eval", Value{Builtins::func_eval});
         setGlobal("load", Value{Builtins::func_load});
-        #endif
         setGlobal("min", Value{Builtins::func_min});
         setGlobal("max", Value{Builtins::func_max});
         setGlobal("typeOf", Value{Builtins::func_typeof});
