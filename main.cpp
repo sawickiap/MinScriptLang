@@ -243,7 +243,7 @@ int main(int argc, char* argv[])
     catch(OptionParser::Error& e)
     {
         std::cerr << "failed to process options: " << e.what() << std::endl;
-        return 0;
+        return 1;
     }
     rest = prs.positional();
     setARGV(env, rest);
@@ -266,6 +266,7 @@ int main(int argc, char* argv[])
             catch(MSL::Error::Exception& e)
             {
                 printException(e);
+                return 1;
             }
         }
         return 0;
@@ -286,12 +287,13 @@ int main(int argc, char* argv[])
             catch(MSL::Error::Exception& e)
             {
                 printException(e);
+                return 1;
             }
         }
         else
         {
             fprintf(stderr, "failed to read file '%s'\n", filename.data());
-            return 0;
+            return 1;
         }
     }
     else
@@ -309,7 +311,7 @@ int main(int argc, char* argv[])
             return repl(env);
         #endif
     }
-    return 1;
+    return 0;
 }
 
 

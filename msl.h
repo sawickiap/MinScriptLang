@@ -628,6 +628,7 @@ namespace MSL
 
         private:
             Type m_type = Type::Null;
+            Location m_location;
             VariantType m_variant;
 
         private:
@@ -635,164 +636,66 @@ namespace MSL
             virtual void markChildren() override;
 
         public:
-            inline Value()
-            {
-            }
+            /**
+            * constructors.
+            */
+            Value();
+            explicit Value(double number);
+            explicit Value(StringValType&& str);
+            explicit Value(AstFuncValType func);
+            explicit Value(HostFunction func);
+            explicit Value(MemberMethodFunction func);
+            explicit Value(MemberPropertyFunction func);
+            explicit Value(ObjectValType&& obj);
+            explicit Value(ArrayValType&& arr);
+            explicit Value(Type typeVal);
 
-            inline explicit Value(double number) : m_type(Type::Number), m_variant(number)
-            {
-            }
+            /**
+            * returns current type.
+            * default type is always Type::Null.
+            */
+            Type type() const;
 
-            inline explicit Value(StringValType&& str) : m_type(Type::String), m_variant(std::move(str))
-            {
-            }
+            /**
+            * read/modify currently stored location information.
+            * by default, it is empty.
+            */
+            const Location& location() const;
+            Location& location();
 
-            inline explicit Value(AstFuncValType func) : m_type{ Type::Function }, m_variant{ func }
-            {
-            }
+            /**
+            * value accessor functions
+            */
+            NumberValType number() const;
+            StringValType& string();
+            const StringValType& string() const;
+            AstFuncValType scriptFunction();
+            AstFuncValType scriptFunction() const;
+            HostFuncValType hostFunction() const;
+            MemberFuncValType memberFunction() const;
+            MemberPropValType propertyFunction() const;
+            Object* object() const;
+            ObjectValType objectRef() const;
+            Array* array() const;
+            ArrayValType arrayRef() const;
+            Type getTypeValue() const;
 
-            inline explicit Value(HostFunction func) : m_type{ Type::HostFunction }, m_variant{ func }
-            {
-                assert(func);
-            }
+            /**
+            * explicitly sets a number value, for both the
+            * internal variant, as well as the type.
+            */
+            void setNumberValue(double number);
 
-            inline explicit Value(MemberMethodFunction func): m_type{Type::MemberMethod}, m_variant{func}
-            {
-            }
-
-            inline explicit Value(MemberPropertyFunction func): m_type{Type::MemberProperty}, m_variant{func}
-            {
-            }        
-
-            inline explicit Value(ObjectValType&& obj) : m_type{ Type::Object }, m_variant(obj)
-            {
-            }
-
-            inline explicit Value(ArrayValType&& arr) : m_type{ Type::Array }, m_variant(arr)
-            {
-            }
-
-            inline explicit Value(Type typeVal) : m_type{ Type::Type }, m_variant(typeVal)
-            {
-            }
-
-            inline Type type() const
-            {
-                return m_type;
-            }
-
-            inline NumberValType number() const
-            {
-                assert(m_type == Type::Number);
-                return std::get<NumberValType>(m_variant);
-            }
-
-            inline StringValType& string()
-            {
-                assert(m_type == Type::String);
-                return std::get<StringValType>(m_variant);
-            }
-
-            inline const StringValType& string() const
-            {
-                assert(m_type == Type::String);
-                return std::get<StringValType>(m_variant);
-            }
-
-            inline AstFuncValType scriptFunction()
-            {
-                assert(m_type == Type::Function && std::get<AstFuncValType>(m_variant));
-                return std::get<AstFuncValType>(m_variant);
-            }
-
-            inline AstFuncValType scriptFunction() const
-            {
-                assert(m_type == Type::Function && std::get<AstFuncValType>(m_variant));
-                return std::get<AstFuncValType>(m_variant);
-            }
-
-            inline HostFuncValType hostFunction() const
-            {
-                assert(m_type == Type::HostFunction);
-                return std::get<HostFuncValType>(m_variant);
-            }
-
-            inline MemberFuncValType memberFunction() const
-            {
-                assert(m_type == Type::MemberMethod);
-                return std::get<MemberFuncValType>(m_variant);
-            }
-
-            inline MemberPropValType propertyFunction() const
-            {
-                assert(m_type == Type::MemberProperty);
-                return std::get<MemberPropValType>(m_variant);
-            }
-
-            inline Object* object() const
-            {
-                assert(m_type == Type::Object && std::get<ObjectValType>(m_variant));
-                return std::get<ObjectValType>(m_variant).get();
-            }
-
-            inline ObjectValType objectRef() const
-            {
-                assert(m_type == Type::Object && std::get<ObjectValType>(m_variant));
-                return std::get<ObjectValType>(m_variant);
-            }
-
-            inline Array* array() const
-            {
-                assert(m_type == Type::Array && std::get<ArrayValType>(m_variant));
-                return std::get<ArrayValType>(m_variant).get();
-            }
-
-            inline ArrayValType arrayRef() const
-            {
-                assert(m_type == Type::Array && std::get<ArrayValType>(m_variant));
-                return std::get<ArrayValType>(m_variant);
-            }
-
-            inline Type getTypeValue() const
-            {
-                assert(m_type == Type::Type);
-                return std::get<TypeValType>(m_variant);
-            }
-
-            inline void setNumberValue(double number)
-            {
-                assert(m_type == Type::Number);
-                m_variant = number;
-            }
-
+            /**
+            * comparison functions.
+            */
             bool isEqual(const Value& rhs) const;
-
             bool isTrue() const;
-
-            inline bool isNull() const
-            {
-                return (m_type == Type::Null);
-            }
-
-            inline bool isObject() const
-            {
-                return (m_type == Type::Object);
-            }
-
-            inline bool isNumber() const
-            {
-                return (m_type == Type::Number);
-            }
-
-            inline bool isString() const
-            {
-                return (m_type == Type::String);
-            }
-
-            inline bool isArray() const
-            {
-                return (m_type == Type::Array);
-            }
+            bool isNull() const;
+            bool isObject() const;
+            bool isNumber() const;
+            bool isString() const;
+            bool isArray() const;
 
             template<typename CharT, typename TraitsT>
             std::basic_ostream<CharT, TraitsT>& toStream(std::basic_ostream<CharT,TraitsT>& os, bool repr) const
@@ -815,6 +718,32 @@ namespace MSL
 
             std::string toString() const;
             std::string toRepr() const;
+
+            /**
+            * value operator abstraction methods - just to avoid
+            * having to write stuff akin to `Value::operator<<()` ... you get the idea.
+            */
+
+            // operations that create a new value
+            Value opPlus(const Value& other);
+            Value opMinus(const Value& other);
+            Value opMul(const Value& other);
+            Value opDiv(const Value& other);
+            Value opMod(const Value& other);
+            Value opBinaryOr(const Value& other);
+            Value opBinaryAnd(const Value& other);
+            Value opShiftRight(const Value& other);
+            Value opShiftLeft(const Value& other);
+
+            // operations that modify this value
+            Value& opPlusAssign(const Value& other);
+            Value& opMinusAssign(const Value& other);
+            Value& opMulAssign(const Value& other);
+            Value& opDivAssign(const Value& other);
+            Value& opModAssign(const Value& other);
+            Value& opShiftLeftAssign(const Value& other);
+            Value& opShiftRightAssign(const Value& other);
+
     };
 
     namespace Util
@@ -916,6 +845,11 @@ namespace MSL
             }
 
             void push_back(Value&& v)
+            {
+                m_arrayitems.push_back(v);
+            }
+
+            void push_back(const Value& v)
             {
                 m_arrayitems.push_back(v);
             }

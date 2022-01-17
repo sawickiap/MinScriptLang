@@ -117,15 +117,15 @@ namespace MSL
 
     namespace AST
     {
-        ExecutionContext::LocalScopePush::LocalScopePush(ExecutionContext& ctx, Object* localScope, ThisType&& thisObj, const Location& loc)
+        ExecutionContext::LocalScopePush::LocalScopePush(ExecutionContext& ctx, Object* localscope, ThisType&& thisobj, const Location& loc)
         : m_context{ ctx }
         {
             if(ctx.m_localscopes.size() == LOCAL_SCOPE_STACK_MAX_SIZE)
             {
                 throw Error::RuntimeError{ loc, "stack overflow" };
             }
-            ctx.m_localscopes.push_back(localScope);
-            ctx.m_thislist.push_back(std::move(thisObj));
+            ctx.m_localscopes.push_back(localscope);
+            ctx.m_thislist.push_back(std::move(thisobj));
         }
 
         ExecutionContext::LocalScopePush::~LocalScopePush()
@@ -399,15 +399,15 @@ namespace MSL
             usekey = !m_keyvar.empty();
             if(rangeval.isString())
             {
-                const auto& rangeStr = rangeval.string();
-                count = rangeStr.length();
+                const auto& rangestr = rangeval.string();
+                count = rangestr.length();
                 for(i = 0; i < count; ++i)
                 {
                     if(usekey)
                     {
                         assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_keyvar } }, Value{ (double)i });
                     }
-                    ch = rangeStr[i];
+                    ch = rangestr[i];
                     assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_valuevar } }, Value{ std::string{ &ch, &ch + 1 } });
                     try
                     {
@@ -709,7 +709,7 @@ namespace MSL
             size_t i;
             size_t count;
             Value* val;
-            const std::shared_ptr<Object>* thisObj;
+            const std::shared_ptr<Object>* thisobj;
             MINSL_EXECUTION_CHECK(m_scope != Identifier::Scope::Local || ctx.isLocal(), location(), "no local scope");
             if(ctx.isLocal())
             {
@@ -724,15 +724,15 @@ namespace MSL
                 // This
                 if(m_scope == Identifier::Scope::None)
                 {
-                    thisObj = std::get_if<std::shared_ptr<Object>>(&ctx.getThis());
-                    if(thisObj)
+                    thisobj = std::get_if<std::shared_ptr<Object>>(&ctx.getThis());
+                    if(thisobj)
                     {
-                        val = (*thisObj)->tryGet(m_ident);
+                        val = (*thisobj)->tryGet(m_ident);
                         if(val)
                         {
                             if(othis)
                             {
-                                *othis = ThisType{ *thisObj };
+                                *othis = ThisType{ *thisobj };
                             }
                             return *val;
                         }
@@ -764,7 +764,7 @@ namespace MSL
         LeftValue::Getter Identifier::getLeftValue(ExecutionContext& ctx) const
         {
             bool islocal;
-            const std::shared_ptr<Object>* thisObj;
+            const std::shared_ptr<Object>* thisobj;
             islocal = ctx.isLocal();
             MINSL_EXECUTION_CHECK(m_scope != Identifier::Scope::Local || islocal, location(), "no local scope");
 
@@ -778,10 +778,10 @@ namespace MSL
                 // This
                 if(m_scope == Identifier::Scope::None)
                 {
-                    thisObj = std::get_if<std::shared_ptr<Object>>(&ctx.getThis());
-                    if(thisObj && (*thisObj)->hasKey(m_ident))
+                    thisobj = std::get_if<std::shared_ptr<Object>>(&ctx.getThis());
+                    if(thisobj && (*thisobj)->hasKey(m_ident))
                     {
-                        return LeftValue::Getter{ LeftValue::ObjectMember{ (*thisObj).get(), m_ident } };
+                        return LeftValue::Getter{ LeftValue::ObjectMember{ (*thisobj).get(), m_ident } };
                     }
                 }
             }
@@ -1086,6 +1086,7 @@ namespace MSL
             // These ones support various types.
             if(m_type == BinaryOperator::Type::Add)
             {
+                /*
                 if(typleft == Value::Type::Number && typright == Value::Type::Number)
                 {
                     return Value{ left.number() + right.number() };
@@ -1114,6 +1115,10 @@ namespace MSL
                     return Value{std::move(nary)};
                 }
                 return binaryBadTypes(location(), "+", typleft, typright);
+                */
+                //return left + right;
+                left.location() = location();
+                return left.opPlus(right);
             }
             if(m_type == BinaryOperator::Type::Equal)
             {
@@ -1350,6 +1355,7 @@ namespace MSL
             leftvalptr = lhs.getValueRef(location());
             if(m_type == BinaryOperator::Type::AssignmentAdd)
             {
+                /*
                 if(leftvalptr->isNumber() && rhs.isNumber())
                 {
                     leftvalptr->setNumberValue(leftvalptr->number() + rhs.number());
@@ -1380,6 +1386,9 @@ namespace MSL
                     return binaryBadTypes(location(), "+=", leftvalptr->type(), rhs.type());
                 }
                 return *leftvalptr;
+                */
+                leftvalptr->location() = location();
+                return leftvalptr->opPlusAssign(std::move(rhs));
             }
             // Remaining ones work on numbers only.
             MINSL_EXECUTION_CHECK(leftvalptr->isNumber(), location(), "expected numeric value");
@@ -1605,20 +1614,20 @@ namespace MSL
             (void)othis;
             if(m_baseexpr)
             {
-                auto baseObj = m_baseexpr->evaluate(ctx, nullptr);
-                if(baseObj.type() != Value::Type::Object)
+                auto baseobj = m_baseexpr->evaluate(ctx, nullptr);
+                if(baseobj.type() != Value::Type::Object)
                 {
                     throw Error::TypeError{ location(), "base must be object" };
                 }
-                obj = Util::CopyObject(*baseObj.object());
+                obj = Util::CopyObject(*baseobj.object());
             }
             else
             {
                 obj = std::make_shared<Object>();
             }
-            for(const auto& [name, valueExpr] : m_exprmap)
+            for(const auto& [name, valexpr] : m_exprmap)
             {
-                auto val = valueExpr->evaluate(ctx, nullptr);
+                auto val = valexpr->evaluate(ctx, nullptr);
                 if(val.type() != Value::Type::Null)
                 {
                     obj->put(name, std::move(val));

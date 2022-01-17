@@ -1,25 +1,82 @@
 
-#define print(...) __VA_ARGS__,
 
-[
-print(123)
-print(-00444)
-print(+0xaF250)
-print(-0xFF)
-print(0xAA00FF5544CD)
-print(01.00)
-print(10.5)
-print(23.)
-print(.25)
-print(1e3)
-print(1e+2)
-print(.001e-1)
-print(3.E+0)
-print(2 + 6 - 3)
-print(2 + 3 * 4)
-print(2 - 10 / 2 + 7 % 3)
-print(60 / 3 * 2)
-print(2 + 3 * ((4)))
-print((2 + 3) * 4)
+words=[
+                "Mul",
+                "Div",
+                "Mod",
+                "Add",
+                "Sub",
+                "Shift left",
+                "Shift right",
+                "Assignment",
+                "AssignmentAdd",
+                "AssignmentSub",
+                "AssignmentMul",
+                "AssignmentDiv",
+                "AssignmentMod",
+                "AssignmentShiftLeft",
+                "AssignmentShiftRight",
+                "AssignmentBitwiseAnd",
+                "AssignmentBitwiseXor",
+                "AssignmentBitwiseOr",
+                "Less",
+                "Greater",
+                "LessEqual",
+                "GreaterEqual",
+                "Equal",
+                "NotEqual",
+                "BitwiseAnd",
+                "BitwiseXor",
+                "BitwiseOr",
+                "LogicalAnd",
+                "LogicalOr",
+                "Comma",
+                "Indexing",
 ]
+
+
+src=<<'__eos__'
+                    Mul,
+                    Div,
+                    Mod,
+                    Add,
+                    Sub,
+                    ShiftLeft,
+                    ShiftRight,
+                    Assignment,
+                    AssignmentAdd,
+                    AssignmentSub,
+                    AssignmentMul,
+                    AssignmentDiv,
+                    AssignmentMod,
+                    AssignmentShiftLeft,
+                    AssignmentShiftRight,
+                    AssignmentBitwiseAnd,
+                    AssignmentBitwiseXor,
+                    AssignmentBitwiseOr,
+                    Less,
+                    Greater,
+                    LessEqual,
+                    GreaterEqual,
+                    Equal,
+                    NotEqual,
+                    BitwiseAnd,
+                    BitwiseXor,
+                    BitwiseOr,
+                    LogicalAnd,
+                    LogicalOr,
+                    Comma,
+                    Indexing,
+                    Count
+__eos__
+
+enumnames = src.strip.split(",").map(&:strip).reject(&:empty?)
+
+i = 0
+while i < words.length do
+  word = words[i]
+  enum = enumnames[i]
+  printf("    {  BinaryOperator::Type::%s, %p },\n", enum, word)
+  i += 1
+end
 

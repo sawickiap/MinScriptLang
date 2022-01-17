@@ -64,6 +64,7 @@ namespace MSL
         }
     }
 
+
     void Array::markChildren()
     {
         for(auto& itm: m_arrayitems)
@@ -80,14 +81,179 @@ namespace MSL
     {
     }
 
+    Value::Value()
+    {
+    }
+
+    Value::Value(double number) : m_type(Value::Type::Number), m_variant(number)
+    {
+    }
+
+    Value::Value(Value::StringValType&& str) : m_type(Value::Type::String), m_variant(std::move(str))
+    {
+    }
+
+    Value::Value(Value::AstFuncValType func) : m_type{ Value::Type::Function }, m_variant{ func }
+    {
+    }
+
+    Value::Value(HostFunction func) : m_type{ Value::Type::HostFunction }, m_variant{ func }
+    {
+        assert(func);
+    }
+
+    Value::Value(MemberMethodFunction func): m_type{Value::Type::MemberMethod}, m_variant{func}
+    {
+    }
+
+    Value::Value(MemberPropertyFunction func): m_type{Value::Type::MemberProperty}, m_variant{func}
+    {
+    }        
+
+    Value::Value(Value::ObjectValType&& obj) : m_type{ Value::Type::Object }, m_variant(obj)
+    {
+    }
+
+    Value::Value(Value::ArrayValType&& arr) : m_type{ Value::Type::Array }, m_variant(arr)
+    {
+    }
+
+    Value::Value(Value::Type typeVal) : m_type{ Value::Type::Type }, m_variant(typeVal)
+    {
+    }
+
+    Value::Type Value::type() const
+    {
+        return m_type;
+    }
+
+    const Location& Value::location() const
+    {
+        return m_location;
+    }
+
+    Location& Value::location()
+    {
+        return m_location;
+    }
+
+    Value::NumberValType Value::number() const
+    {
+        assert(m_type == Value::Type::Number);
+        return std::get<Value::NumberValType>(m_variant);
+    }
+
+    Value::StringValType& Value::string()
+    {
+        assert(m_type == Value::Type::String);
+        return std::get<Value::StringValType>(m_variant);
+    }
+
+    const Value::StringValType& Value::string() const
+    {
+        assert(m_type == Value::Type::String);
+        return std::get<Value::StringValType>(m_variant);
+    }
+
+    Value::AstFuncValType Value::scriptFunction()
+    {
+        assert(m_type == Value::Type::Function && std::get<Value::AstFuncValType>(m_variant));
+        return std::get<Value::AstFuncValType>(m_variant);
+    }
+
+    Value::AstFuncValType Value::scriptFunction() const
+    {
+        assert(m_type == Value::Type::Function && std::get<Value::AstFuncValType>(m_variant));
+        return std::get<Value::AstFuncValType>(m_variant);
+    }
+
+    Value::HostFuncValType Value::hostFunction() const
+    {
+        assert(m_type == Value::Type::HostFunction);
+        return std::get<Value::HostFuncValType>(m_variant);
+    }
+
+    Value::MemberFuncValType Value::memberFunction() const
+    {
+        assert(m_type == Value::Type::MemberMethod);
+        return std::get<Value::MemberFuncValType>(m_variant);
+    }
+
+    Value::MemberPropValType Value::propertyFunction() const
+    {
+        assert(m_type == Value::Type::MemberProperty);
+        return std::get<Value::MemberPropValType>(m_variant);
+    }
+
+    Object* Value::object() const
+    {
+        assert(m_type == Value::Type::Object && std::get<Value::ObjectValType>(m_variant));
+        return std::get<Value::ObjectValType>(m_variant).get();
+    }
+
+    Value::ObjectValType Value::objectRef() const
+    {
+        assert(m_type == Value::Type::Object && std::get<Value::ObjectValType>(m_variant));
+        return std::get<Value::ObjectValType>(m_variant);
+    }
+
+    Array* Value::array() const
+    {
+        assert(m_type == Value::Type::Array && std::get<Value::ArrayValType>(m_variant));
+        return std::get<Value::ArrayValType>(m_variant).get();
+    }
+
+    Value::ArrayValType Value::arrayRef() const
+    {
+        assert(m_type == Value::Type::Array && std::get<Value::ArrayValType>(m_variant));
+        return std::get<Value::ArrayValType>(m_variant);
+    }
+
+    Value::Type Value::getTypeValue() const
+    {
+        assert(m_type == Value::Type::Type);
+        return std::get<Value::TypeValType>(m_variant);
+    }
+
+    void Value::setNumberValue(double number)
+    {
+        assert(m_type == Value::Type::Number);
+        m_variant = number;
+    }
+
+    bool Value::isNull() const
+    {
+        return (m_type == Value::Type::Null);
+    }
+
+    bool Value::isObject() const
+    {
+        return (m_type == Value::Type::Object);
+    }
+
+    bool Value::isNumber() const
+    {
+        return (m_type == Value::Type::Number);
+    }
+
+    bool Value::isString() const
+    {
+        return (m_type == Value::Type::String);
+    }
+
+    bool Value::isArray() const
+    {
+        return (m_type == Value::Type::Array);
+    }
+
     void Value::markChildren()
     {
         switch(m_type)
         {
-            case Type::Object:
+            case Value::Type::Object:
                 objectRef()->mark();
                 break;
-            case Type::Array:
+            case Value::Type::Array:
                 arrayRef()->mark();
                 break;
             default:
@@ -110,33 +276,33 @@ namespace MSL
                 }
             case Value::Type::Number:
                 {
-                    return std::get<NumberValType>(m_variant) == std::get<NumberValType>(rhs.m_variant);
+                    return std::get<Value::NumberValType>(m_variant) == std::get<Value::NumberValType>(rhs.m_variant);
                 }
             case Value::Type::String:
                 {
-                    return std::get<StringValType>(m_variant) == std::get<StringValType>(rhs.m_variant);
+                    return std::get<Value::StringValType>(m_variant) == std::get<Value::StringValType>(rhs.m_variant);
                 }
             #if 0
             case Value::Type::Function:
                 {
-                    return std::get<AstFuncValType>(m_variant) == std::get<AstFuncValType>(rhs.m_variant);
+                    return std::get<Value::AstFuncValType>(m_variant) == std::get<Value::AstFuncValType>(rhs.m_variant);
                 }
             case Value::Type::HostFunction:
                 {
-                    return std::get<HostFuncValType>(m_variant) == std::get<HostFuncValType>(rhs.m_variant);
+                    return std::get<Value::HostFuncValType>(m_variant) == std::get<Value::HostFuncValType>(rhs.m_variant);
                 }
             #endif
             case Value::Type::Object:
                 {
-                    return std::get<ObjectValType>(m_variant).get() == std::get<ObjectValType>(rhs.m_variant).get();
+                    return std::get<Value::ObjectValType>(m_variant).get() == std::get<Value::ObjectValType>(rhs.m_variant).get();
                 }
             case Value::Type::Array:
                 {
-                    return std::get<ArrayValType>(m_variant).get() == std::get<ArrayValType>(rhs.m_variant).get();
+                    return std::get<Value::ArrayValType>(m_variant).get() == std::get<Value::ArrayValType>(rhs.m_variant).get();
                 }
             case Value::Type::Type:
                 {
-                    return std::get<TypeValType>(m_variant) == std::get<TypeValType>(rhs.m_variant);
+                    return std::get<Value::TypeValType>(m_variant) == std::get<Value::TypeValType>(rhs.m_variant);
                 }
             default:
                 {
@@ -158,12 +324,12 @@ namespace MSL
                 break;
             case Value::Type::Number:
                 {
-                    return std::get<NumberValType>(m_variant) != 0.f;
+                    return std::get<Value::NumberValType>(m_variant) != 0.f;
                 }
                 break;
             case Value::Type::String:
                 {
-                    return !std::get<StringValType>(m_variant).empty();
+                    return !std::get<Value::StringValType>(m_variant).empty();
                 }
                 break;
             case Value::Type::Function:

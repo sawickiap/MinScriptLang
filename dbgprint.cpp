@@ -279,6 +279,40 @@ namespace MSL
 
         void BinaryOperator::debugPrint(DebugWriter& dw, uint32_t idl, std::string_view prefix) const
         {
+/*
+    {  BinaryOperator::Type::Mul, "Mul" },
+    {  BinaryOperator::Type::Div, "Div" },
+    {  BinaryOperator::Type::Mod, "Mod" },
+    {  BinaryOperator::Type::Add, "Add" },
+    {  BinaryOperator::Type::Sub, "Sub" },
+    {  BinaryOperator::Type::ShiftLeft, "Shift left" },
+    {  BinaryOperator::Type::ShiftRight, "Shift right" },
+    {  BinaryOperator::Type::Assignment, "Assignment" },
+    {  BinaryOperator::Type::AssignmentAdd, "AssignmentAdd" },
+    {  BinaryOperator::Type::AssignmentSub, "AssignmentSub" },
+    {  BinaryOperator::Type::AssignmentMul, "AssignmentMul" },
+    {  BinaryOperator::Type::AssignmentDiv, "AssignmentDiv" },
+    {  BinaryOperator::Type::AssignmentMod, "AssignmentMod" },
+    {  BinaryOperator::Type::AssignmentShiftLeft, "AssignmentShiftLeft" },
+    {  BinaryOperator::Type::AssignmentShiftRight, "AssignmentShiftRight" },
+    {  BinaryOperator::Type::AssignmentBitwiseAnd, "AssignmentBitwiseAnd" },
+    {  BinaryOperator::Type::AssignmentBitwiseXor, "AssignmentBitwiseXor" },
+    {  BinaryOperator::Type::AssignmentBitwiseOr, "AssignmentBitwiseOr" },
+    {  BinaryOperator::Type::Less, "Less" },
+    {  BinaryOperator::Type::Greater, "Greater" },
+    {  BinaryOperator::Type::LessEqual, "LessEqual" },
+    {  BinaryOperator::Type::GreaterEqual, "GreaterEqual" },
+    {  BinaryOperator::Type::Equal, "Equal" },
+    {  BinaryOperator::Type::NotEqual, "NotEqual" },
+    {  BinaryOperator::Type::BitwiseAnd, "BitwiseAnd" },
+    {  BinaryOperator::Type::BitwiseXor, "BitwiseXor" },
+    {  BinaryOperator::Type::BitwiseOr, "BitwiseOr" },
+    {  BinaryOperator::Type::LogicalAnd, "LogicalAnd" },
+    {  BinaryOperator::Type::LogicalOr, "LogicalOr" },
+    {  BinaryOperator::Type::Comma, "Comma" },
+    {  BinaryOperator::Type::Indexing, "Indexing" },
+
+*/
             static const char* BINARY_OPERATOR_TYPE_NAMES[] = {
                 "Mul",
                 "Div",

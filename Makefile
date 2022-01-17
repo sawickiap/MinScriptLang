@@ -36,3 +36,6 @@ cleandep:
 .PHONY: rebuild
 rebuild: clean cleandep $(target)
 
+.PHONY: sanity
+sanity:
+	./run sanity.msl
