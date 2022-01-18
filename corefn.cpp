@@ -53,8 +53,8 @@ namespace MSL
         {
             size_t i;
             size_t argCount;
-            double result;
-            double argNum;
+            Value::NumberValType result;
+            Value::NumberValType argNum;
             (void)ctx;
             argCount = args.size();
             if(argCount == 0)
@@ -81,8 +81,8 @@ namespace MSL
         {
             size_t i;
             size_t argCount;
-            double argNum;
-            double result;
+            Value::NumberValType argNum;
+            Value::NumberValType result;
             (void)ctx;
             argCount = args.size();
             if(argCount == 0)

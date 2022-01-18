@@ -5,7 +5,7 @@ namespace MSL
 {
     namespace Builtins
     {
-        Value ctor_null(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
+        Value ctor_null(Context& ctx, const Location& loc, Value::List&& args)
         {
             (void)ctx;
             (void)loc;
@@ -13,7 +13,7 @@ namespace MSL
             return {};
         }
 
-        Value ctor_number(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
+        Value ctor_number(Context& ctx, const Location& loc, Value::List&& args)
         {
             (void)ctx;
             Util::ArgumentCheck ac(loc, args, "Number");
@@ -21,7 +21,7 @@ namespace MSL
             return Value{ val };
         }
 
-        Value ctor_string(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
+        Value ctor_string(Context& ctx, const Location& loc, Value::List&& args)
         {
             (void)ctx;
             if(args.empty())
@@ -33,7 +33,7 @@ namespace MSL
             return Value{ std::move(strv.string()) };
         }
 
-        Value ctor_object(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
+        Value ctor_object(Context& ctx, const Location& loc, Value::List&& args)
         {
             (void)ctx;
             if(args.empty())
@@ -47,7 +47,7 @@ namespace MSL
             return Value{ Util::CopyObject(*args[0].object()) };
         }
 
-        Value ctor_array(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
+        Value ctor_array(Context& ctx, const Location& loc, Value::List&& args)
         {
             (void)ctx;
             if(args.empty())
@@ -61,7 +61,7 @@ namespace MSL
             return Value{ Util::CopyArray(*args[0].array()) };
         }
 
-        Value ctor_function(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
+        Value ctor_function(Context& ctx, const Location& loc, Value::List&& args)
         {
             (void)ctx;
             if((args.size() == 0) || ((args[0].type() != Value::Type::Function) && (args[0].type() != Value::Type::MemberMethod)))
@@ -71,7 +71,7 @@ namespace MSL
             return Value{ args[0] };
         }
 
-        Value ctor_type(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
+        Value ctor_type(Context& ctx, const Location& loc, Value::List&& args)
         {
             (void)ctx;
             if((args.size() == 0) || (args[0].type() != Value::Type::Type))
@@ -82,7 +82,7 @@ namespace MSL
             return Value{ args[0] };
         }
 
-        Value protofn_object_count(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal)
+        Value protofn_object_count(Context& ctx, const Location& loc, Value&& objVal)
         {
             (void)ctx;
             Object* obj;
@@ -90,10 +90,10 @@ namespace MSL
             {
                 throw Error::TypeError(loc, "Object() requires an object");
             }
-            return Value{ (double)obj->size() };
+            return Value{ (Value::NumberValType)obj->size() };
         }
 
-        Value protofn_array_length(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal)
+        Value protofn_array_length(Context& ctx, const Location& loc, Value&& objVal)
         {
             (void)ctx;
             Array* arr;
@@ -101,11 +101,11 @@ namespace MSL
             {
                 throw Error::TypeError(loc, "Array.length called on something not an Array");
             }
-            return Value{ (double)objVal.array()->size() };
+            return Value{ (Value::NumberValType)objVal.array()->size() };
         }
 
 
-        Value memberfn_array_push(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args)
+        Value memberfn_array_push(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args)
         {
             size_t i;
             Array* arr;
@@ -127,7 +127,7 @@ namespace MSL
             return {};
         }
 
-        Value memberfn_array_pop(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args)
+        Value memberfn_array_pop(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args)
         {
             Array* arr;
             (void)ctx;
@@ -143,7 +143,7 @@ namespace MSL
             return popped;
         }
 
-        Value memberfn_array_insert(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args)
+        Value memberfn_array_insert(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args)
         {
             Array* arr;
             (void)ctx;
@@ -166,7 +166,7 @@ namespace MSL
             return {};
         }
 
-        Value memberfn_array_remove(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args)
+        Value memberfn_array_remove(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args)
         {
             Array* arr;
             (void)ctx;
@@ -188,7 +188,7 @@ namespace MSL
             return {};
         }
 
-        Value memberfn_array_each(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args)
+        Value memberfn_array_each(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args)
         {
             size_t i;
             Array* arr;
@@ -217,7 +217,7 @@ namespace MSL
             return {};
         }
 
-        Value memberfn_array_map(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args)
+        Value memberfn_array_map(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args)
         {
             size_t i;
             Array* arr;
@@ -247,17 +247,17 @@ namespace MSL
             return Value{std::move(newarr)};
         }
 
-        Value protofn_string_length(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal)
+        Value protofn_string_length(Context& ctx, const Location& loc, Value&& objVal)
         {
             (void)ctx;
             if(!objVal.isString())
             {
                 throw Error::TypeError(loc, "expected string object");
             }
-            return Value{ (double)objVal.string().length() };
+            return Value{ (Value::NumberValType)objVal.string().length() };
         }
 
-        Value protofn_string_chars(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal)
+        Value protofn_string_chars(Context& ctx, const Location& loc, Value&& objVal)
         {
             
             (void)ctx;
@@ -268,12 +268,12 @@ namespace MSL
             auto res = std::make_shared<Array>();
             for(auto ch: objVal.string())
             {
-                res->push_back(Value{double(ch)});
+                res->push_back(Value{Value::NumberValType(ch)});
             }
             return Value{ std::move(res) };
         }
 
-        Value protofn_string_stripleft(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal)
+        Value protofn_string_stripleft(Context& ctx, const Location& loc, Value&& objVal)
         {
             (void)ctx;
             (void)loc;
@@ -282,7 +282,7 @@ namespace MSL
             return Value{std::move(self)};
         }
 
-        Value protofn_string_stripright(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal)
+        Value protofn_string_stripright(Context& ctx, const Location& loc, Value&& objVal)
         {
             (void)ctx;
             (void)loc;
@@ -291,7 +291,7 @@ namespace MSL
             return Value{std::move(self)};
         }
 
-        Value protofn_string_strip(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal)
+        Value protofn_string_strip(Context& ctx, const Location& loc, Value&& objVal)
         {
             (void)ctx;
             (void)loc;
@@ -300,7 +300,7 @@ namespace MSL
             return Value{std::move(self)};
         }
 
-        Value memberfn_string_resize(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args)
+        Value memberfn_string_resize(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args)
         {
             // TODO
             (void)ctx;
@@ -310,9 +310,9 @@ namespace MSL
             return Value{};
         }
 
-        Value memberfn_string_startswith(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args)
+        Value memberfn_string_startswith(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args)
         {
-            double res;
+            Value::NumberValType res;
             (void)ctx;
             if(args.size() == 0)
             {
@@ -323,7 +323,7 @@ namespace MSL
             return Value{res};
         }
 
-        Value memberfn_string_endswith(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args)
+        Value memberfn_string_endswith(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args)
         {
             (void)ctx;
             const auto& self = th.string();
@@ -332,9 +332,9 @@ namespace MSL
             auto sf = findme.string();
             if(sf.size() > self.size())
             {
-                return Value{double(0)};
+                return Value{Value::NumberValType(0)};
             }
-            return Value{double(std::equal(sf.rbegin(), sf.rend(), self.rbegin()))};
+            return Value{Value::NumberValType(std::equal(sf.rbegin(), sf.rend(), self.rbegin()))};
         }
     }
 }

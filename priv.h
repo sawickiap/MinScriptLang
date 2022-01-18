@@ -219,36 +219,36 @@ namespace MSL
 
         void makeFileNamespace(Environment& env);
 
-        Value ctor_null(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args);
-        Value ctor_number(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args);
-        Value ctor_string(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args);
-        Value ctor_object(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args);
-        Value ctor_array(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args);
-        Value ctor_function(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args);
-        Value ctor_type(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args);
+        Value ctor_null(Context& ctx, const Location& loc, Value::List&& args);
+        Value ctor_number(Context& ctx, const Location& loc, Value::List&& args);
+        Value ctor_string(Context& ctx, const Location& loc, Value::List&& args);
+        Value ctor_object(Context& ctx, const Location& loc, Value::List&& args);
+        Value ctor_array(Context& ctx, const Location& loc, Value::List&& args);
+        Value ctor_function(Context& ctx, const Location& loc, Value::List&& args);
+        Value ctor_type(Context& ctx, const Location& loc, Value::List&& args);
 
 
-        Value protofn_object_count(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal);
+        Value protofn_object_count(Context& ctx, const Location& loc, Value&& objVal);
 
-        Value protofn_string_length(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal);
-        Value protofn_string_chars(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal);
-        Value protofn_string_stripleft(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal);
-        Value protofn_string_stripright(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal);
-        Value protofn_string_strip(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal);
+        Value protofn_string_length(Context& ctx, const Location& loc, Value&& objVal);
+        Value protofn_string_chars(Context& ctx, const Location& loc, Value&& objVal);
+        Value protofn_string_stripleft(Context& ctx, const Location& loc, Value&& objVal);
+        Value protofn_string_stripright(Context& ctx, const Location& loc, Value&& objVal);
+        Value protofn_string_strip(Context& ctx, const Location& loc, Value&& objVal);
 
-        Value memberfn_string_resize(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args);
-        Value memberfn_string_startswith(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args);
-        Value memberfn_string_endswith(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args);
-        Value memberfn_string_includes(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args);
-        Value memberfn_string_split(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args);
+        Value memberfn_string_resize(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args);
+        Value memberfn_string_startswith(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args);
+        Value memberfn_string_endswith(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args);
+        Value memberfn_string_includes(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args);
+        Value memberfn_string_split(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args);
 
-        Value protofn_array_length(AST::ExecutionContext& ctx, const Location& loc, Value&& objVal);
-        Value memberfn_array_push(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args);
-        Value memberfn_array_pop(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args);
-        Value memberfn_array_insert(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args);
-        Value memberfn_array_remove(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args);
-        Value memberfn_array_each(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args);
-        Value memberfn_array_map(AST::ExecutionContext& ctx, const Location& loc, AST::ThisType& th, Value::List&& args);
+        Value protofn_array_length(Context& ctx, const Location& loc, Value&& objVal);
+        Value memberfn_array_push(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args);
+        Value memberfn_array_pop(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args);
+        Value memberfn_array_insert(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args);
+        Value memberfn_array_remove(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args);
+        Value memberfn_array_each(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args);
+        Value memberfn_array_map(Context& ctx, const Location& loc, ThisObject& th, Value::List&& args);
 
     }
 

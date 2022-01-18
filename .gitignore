@@ -25,6 +25,7 @@ CMakeFiles*
 CMakeFiles*/*
 cmakefiles*
 CMakeFiles*/*
+misc/*
 
 # generated files from rt inspection
 *.log

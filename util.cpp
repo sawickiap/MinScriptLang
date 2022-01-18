@@ -24,14 +24,14 @@ namespace MSL
             return dst;
         }
 
-        bool NumberToIndex(size_t& outIndex, double number)
+        bool NumberToIndex(size_t& outIndex, Value::NumberValType number)
         {
             if(!std::isfinite(number) || number < 0.f)
             {
                 return false;
             }
             outIndex = (size_t)number;
-            return ((double)outIndex == number);
+            return ((Value::NumberValType)outIndex == number);
         }
 
         void reprChar(std::ostream& os, int c)

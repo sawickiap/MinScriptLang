@@ -17,7 +17,7 @@
 #include "msl.h"
 #include "optionparser.h"
 
-struct StdoutWriter: public MSL::AST::DebugWriter
+struct StdoutWriter: public MSL::Runtime::DebugWriter
 {
     StdoutWriter()
     {
@@ -48,7 +48,7 @@ struct StdoutWriter: public MSL::AST::DebugWriter
         std::cout << char(ch);
     }
 
-    void writeNumber(double n) override
+    void writeNumber(MSL::Value::NumberValType n) override
     {
         std::cout << n;
     }
@@ -172,7 +172,7 @@ int dumpSyntaxTreeCode(MSL::Environment& env, std::string_view code)
 {
     (void)env;
     StdoutWriter sw;
-    MSL::AST::Script ast(MSL::Location{});
+    MSL::Runtime::Script ast(MSL::Location{});
     try
     {
         MSL::Tokenizer tkz(code); 

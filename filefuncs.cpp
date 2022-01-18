@@ -51,18 +51,18 @@ namespace MSL
                 (void)env;
                 Util::ArgumentCheck ac(loc, args, "File.exists");
                 path = ac.checkArgument(0, {Value::Type::String});
-                return Value(double(std::filesystem::exists(path.string())));
+                return Value(Value::NumberValType(std::filesystem::exists(path.string())));
             }
 
             Value filefunc_size(Environment& env, const Location& loc, Value::List&& args)
             {
-                double rs;
+                Value::NumberValType rs;
                 Value path;
                 (void)env;
                 std::error_code ec;
                 Util::ArgumentCheck ac(loc, args, "File.size");
                 path = ac.checkArgument(0, {Value::Type::String});
-                rs = double(std::filesystem::file_size(path.string(), ec));
+                rs = Value::NumberValType(std::filesystem::file_size(path.string(), ec));
                 if(ec)
                 {
                     throw Error::OSError(loc, ec.message());

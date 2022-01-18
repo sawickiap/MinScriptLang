@@ -2,6 +2,9 @@
 #include <sstream>
 #include "msl.h"
 
+#undef assert
+#define assert(...)
+
 namespace MSL
 {
     namespace
@@ -64,7 +67,7 @@ namespace MSL
         }
     }
 
-
+    /*
     void Array::markChildren()
     {
         for(auto& itm: m_arrayitems)
@@ -72,6 +75,7 @@ namespace MSL
             itm.mark();
         }
     }
+    */
 
     Array::Array()
     {
@@ -85,7 +89,7 @@ namespace MSL
     {
     }
 
-    Value::Value(double number) : m_type(Value::Type::Number), m_variant(number)
+    Value::Value(Value::NumberValType number) : m_type(Value::Type::Number), m_variant(number)
     {
     }
 
@@ -215,7 +219,7 @@ namespace MSL
         return std::get<Value::TypeValType>(m_variant);
     }
 
-    void Value::setNumberValue(double number)
+    void Value::setNumberValue(Value::NumberValType number)
     {
         assert(m_type == Value::Type::Number);
         m_variant = number;
@@ -246,6 +250,7 @@ namespace MSL
         return (m_type == Value::Type::Array);
     }
 
+    /*
     void Value::markChildren()
     {
         switch(m_type)
@@ -260,7 +265,7 @@ namespace MSL
                 break;
         }
     }
-
+    */
 
     bool Value::isEqual(const Value& rhs) const
     {

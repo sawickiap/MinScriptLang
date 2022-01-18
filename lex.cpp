@@ -42,7 +42,7 @@ namespace MSL
         { Token::Type::Tilde, "~"},
         { Token::Type::Less, "<"},
         { Token::Type::Greater, ">"},
-        { Token::Type::Amperstand, "&"},
+        { Token::Type::Ampersand, "&"},
         { Token::Type::Caret, "^"},
         { Token::Type::Pipe, "|"},
         { Token::Type::Dot, "."},
@@ -50,24 +50,24 @@ namespace MSL
         // multi-character operators
         { Token::Type::DoublePlus, "++"},
         { Token::Type::DoubleDash, "--"},
-        { Token::Type::PlusEquals, "+="},
-        { Token::Type::DashEquals, "-="},
-        { Token::Type::AsteriskEquals, "*="},
-        { Token::Type::SlashEquals, "/="},
-        { Token::Type::PercentEquals, "%="},
-        { Token::Type::DoubleLessEquals, "<<="},
-        { Token::Type::DoubleGreaterEquals, ">>="},
-        { Token::Type::AmperstandEquals, "&="},
-        { Token::Type::CaretEquals, "^="},
-        { Token::Type::PipeEquals, "|="},
-        { Token::Type::DoubleLess, "<<"},
-        { Token::Type::DoubleGreater, ">>"},
-        { Token::Type::LessEquals, "<="},
-        { Token::Type::GreaterEquals, ">="},
-        { Token::Type::DoubleEquals, "=="},
-        { Token::Type::ExclamationEquals, "!="},
-        { Token::Type::DoubleAmperstand, "&&"},
-        { Token::Type::DoublePipe, "||"},
+        { Token::Type::PlusAssign, "+="},
+        { Token::Type::MinusAssign, "-="},
+        { Token::Type::MulAssign, "*="},
+        { Token::Type::DivAssign, "/="},
+        { Token::Type::ModAssign, "%="},
+        { Token::Type::ShiftLeftAssign, "<<="},
+        { Token::Type::ShiftRightAssign, ">>="},
+        { Token::Type::BitwiseAndAssign, "&="},
+        { Token::Type::BitwiseXorAssign, "^="},
+        { Token::Type::BitwiseOrAssign, "|="},
+        { Token::Type::ShiftLeftOper, "<<"},
+        { Token::Type::ShiftRightOper, ">>"},
+        { Token::Type::LessThanAssign, "<="},
+        { Token::Type::GreaterThanAssign, ">="},
+        { Token::Type::CompareEqual, "=="},
+        { Token::Type::CompareNotEqual, "!="},
+        { Token::Type::LogicalAndOper, "&&"},
+        { Token::Type::LogicalOrOper, "||"},
 
         // keywords
         { Token::Type::Null, "null"},
@@ -343,7 +343,7 @@ namespace MSL
                 parseHexChar(val, currcode[i]);
                 n = (n << 4) | val;
             }
-            out.number() = (double)n;
+            out.number() = (Value::NumberValType)n;
         }
         else
         {

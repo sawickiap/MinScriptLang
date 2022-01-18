@@ -9,7 +9,7 @@ bottom_edge = -300;
 x_step      =    7;
 y_step      =   15;
 /* how many iterations to do. higher values increase precision, but take longer, obviously. */
-max_iter    =  5000;
+max_iter    =  500;
 y0 = top_edge;
 while(y0 > bottom_edge)
 {
@@ -40,7 +40,8 @@ while(y0 > bottom_edge)
             x = x_x - y_y + x0;
             i = i + 1;
         }
-        print("" + the_char);
+        //print("" + the_char);
+        printf("%c", the_char);
         x0 = x0 + x_step;
     }
     println();

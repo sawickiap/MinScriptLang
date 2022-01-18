@@ -16,7 +16,7 @@ namespace MSL
                 {
                 }
 
-                Value io_write(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
+                Value io_write(Context& ctx, const Location& loc, Value::List&& args)
                 {
                     (void)ctx;
                     size_t rs;
@@ -29,10 +29,10 @@ namespace MSL
                         rs += std::fwrite(tmpstr.data(), sizeof(char), tmpstr.size(), m_stream);
                         fflush(m_stream);
                     }
-                    return Value{double(rs)};
+                    return Value{Value::NumberValType(rs)};
                 }
 
-                Value io_getchar(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
+                Value io_getchar(Context& ctx, const Location& loc, Value::List&& args)
                 {
                     int ch;
                     (void)ctx;
@@ -43,10 +43,10 @@ namespace MSL
                         throw Error::EOFError(loc, "EOF");
                     }
                     fflush(m_stream);
-                    return Value{double(ch)};
+                    return Value{Value::NumberValType(ch)};
                 }
 
-                Value io_putchar(AST::ExecutionContext& ctx, const Location& loc, Value::List&& args)
+                Value io_putchar(Context& ctx, const Location& loc, Value::List&& args)
                 {
                     int rs;
                     Value ch;
@@ -59,12 +59,12 @@ namespace MSL
                         throw Error::EOFError(loc, "EOF");
                     }
                     fflush(m_stream);
-                    return Value{double(rs)};
+                    return Value{Value::NumberValType(rs)};
                 }
         };
     }
 
-    Environment::Environment() : m_implenv{ new EnvironmentPimpl{ *this, m_globalscope } }
+    Environment::Environment() : m_implenv{ new Environment::Impl{ *this, m_globalscope } }
     {
         makeStdHandle({}, "$stdin", stdin);
         makeStdHandle({}, "$stdout", stdout);
@@ -113,7 +113,7 @@ namespace MSL
         /// todo: abstract this noise away? somehow?
         #define do_entry(expname, classmethod) \
             {\
-                obj->put(expname, Value{[weak](AST::ExecutionContext& ctx, const Location& loc, AST::ThisType&, Value::List&& args)\
+                obj->put(expname, Value{[weak](Context& ctx, const Location& loc, ThisObject&, Value::List&& args)\
                 {\
                     auto hereobj = weak.lock(); \
                     return hereobj->classmethod(ctx, loc, std::move(args)); \
@@ -141,26 +141,20 @@ namespace MSL
         return m_implenv->execute(code, "<script>");
     }
 
-
     std::string_view Environment::getTypename(Value::Type type) const
     {
         return m_implenv->getTypename(type);
     }
 
-    void Environment::Print(std::string_view s)
+    Value Environment::Impl::execute(std::string_view code, std::string_view filename)
     {
-        m_implenv->Print(s);
-    }
-
-    Value EnvironmentPimpl::execute(std::string_view code, std::string_view filename)
-    {
-        AST::Script script{ Location{ 0, 1, 1, filename} };
+        Runtime::Script script{ Location{ 0, 1, 1, filename} };
         Tokenizer tokenizer{ code };
         Parser parser{ tokenizer };
         parser.parseScript(script);
         try
         {
-            AST::ExecutionContext executeContext{ *this, m_globalscope };
+            Context executeContext{ *this, m_globalscope };
             return script.execute(executeContext);
         }
         catch(ReturnException& returnEx)
@@ -170,12 +164,12 @@ namespace MSL
         return {};
     }
 
-    Value EnvironmentPimpl::execute(std::string_view code)
+    Value Environment::Impl::execute(std::string_view code)
     {
         return execute(code, "<script>");
     }
 
-    std::string_view EnvironmentPimpl::getTypename(Value::Type type) const
+    std::string_view Environment::Impl::getTypename(Value::Type type) const
     {
         //return VALUE_TYPE_NAMES[(size_t)type];
         // TODO support custom types

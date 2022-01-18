@@ -67,11 +67,9 @@ SOFTWARE.
 
 namespace MSL
 {
-    namespace AST
+    namespace Runtime
     {
         class /**/FunctionDefinition;
-        class /**/ExecutionContext;
-        class /**/ThisType;
     }
     class /**/Value;
     class /**/Number;
@@ -79,6 +77,8 @@ namespace MSL
     class /**/Object;
     class /**/Array;
     class /**/Environment;
+    class /**/Context;
+    class /**/ThisObject;
 
     namespace Util
     {
@@ -86,7 +86,6 @@ namespace MSL
         std::shared_ptr<Array> CopyArray(const Array& src);
 
         std::optional<std::string> readFile(const std::string& file, std::optional<unsigned long> maxrd={});
-        bool NumberToIndex(size_t& outIndex, double number);
         void reprChar(std::ostream& os, int c);
         void reprString(std::ostream& os, std::string_view str);
         std::string vformatString(const char* format, va_list argList);
@@ -215,7 +214,8 @@ namespace MSL
         class ParsingError : public Exception
         {
             private:
-                const std::string_view m_message;// Externally owned
+                // Externally owned
+                const std::string_view m_message;
 
             public:
                 inline ParsingError(const Location& loc, std::string_view message) : Exception{ loc }, m_message{ message }
@@ -419,8 +419,8 @@ namespace MSL
     }
 
     using HostFunction           = std::function<Value(Environment&, const Location&, std::vector<Value>&&)>;
-    using MemberMethodFunction   = std::function<Value(AST::ExecutionContext&, const Location&, AST::ThisType&, std::vector<Value>&&)>;
-    using MemberPropertyFunction = std::function<Value(AST::ExecutionContext&, const Location&, Value&&)>;
+    using MemberMethodFunction   = std::function<Value(Context&, const Location&, ThisObject&, std::vector<Value>&&)>;
+    using MemberPropertyFunction = std::function<Value(Context&, const Location&, Value&&)>;
 
     class String
     {
@@ -546,7 +546,7 @@ namespace MSL
             }
     };
 
-    class Value: public GC::Collectable
+    class Value/*: public GC::Collectable*/
     {
         public:
             enum class Type
@@ -566,7 +566,7 @@ namespace MSL
             using List = std::vector<Value>;
             using NumberValType = double;
             using StringValType = std::string;
-            using AstFuncValType = AST::FunctionDefinition*;
+            using AstFuncValType = Runtime::FunctionDefinition*;
             using HostFuncValType = HostFunction;
             using MemberFuncValType = MemberMethodFunction;
             using MemberPropValType = MemberPropertyFunction;
@@ -633,14 +633,21 @@ namespace MSL
 
         private:
             void actualToStream(std::ostream& os, bool repr) const;
-            virtual void markChildren() override;
+            //virtual void markChildren() override;
 
         public:
             /**
             * constructors.
             */
             Value();
-            explicit Value(double number);
+            inline Value(const Value& other)
+            {
+                m_type = other.m_type;
+                m_location = other.m_location;
+                m_variant = other.m_variant;
+            }
+
+            explicit Value(NumberValType number);
             explicit Value(StringValType&& str);
             explicit Value(AstFuncValType func);
             explicit Value(HostFunction func);
@@ -649,6 +656,14 @@ namespace MSL
             explicit Value(ObjectValType&& obj);
             explicit Value(ArrayValType&& arr);
             explicit Value(Type typeVal);
+
+            inline Value& operator=(const Value& other)
+            {
+                m_type = other.m_type;
+                m_variant = other.m_variant;
+                m_location = other.m_location;
+                return *this;
+            }
 
             /**
             * returns current type.
@@ -667,8 +682,8 @@ namespace MSL
             * value accessor functions
             */
             NumberValType number() const;
-            StringValType& string();
             const StringValType& string() const;
+            StringValType& string();
             AstFuncValType scriptFunction();
             AstFuncValType scriptFunction() const;
             HostFuncValType hostFunction() const;
@@ -684,7 +699,7 @@ namespace MSL
             * explicitly sets a number value, for both the
             * internal variant, as well as the type.
             */
-            void setNumberValue(double number);
+            void setNumberValue(NumberValType number);
 
             /**
             * comparison functions.
@@ -724,30 +739,89 @@ namespace MSL
             * having to write stuff akin to `Value::operator<<()` ... you get the idea.
             */
 
+            // comparison ops
+            bool opCompareLessThan(const Value& rhs);
+            bool opCompareLessEqual(const Value& rhs);
+            bool opCompareGreaterThan(const Value& rhs);
+            bool opCompareGreaterEqual(const Value& rhs);
+
             // operations that create a new value
-            Value opPlus(const Value& other);
-            Value opMinus(const Value& other);
-            Value opMul(const Value& other);
-            Value opDiv(const Value& other);
-            Value opMod(const Value& other);
-            Value opBinaryOr(const Value& other);
-            Value opBinaryAnd(const Value& other);
-            Value opShiftRight(const Value& other);
-            Value opShiftLeft(const Value& other);
+            Value opPlus(const Value& rhs);
+            Value opMinus(const Value& rhs);
+            Value opMul(const Value& rhs);
+            Value opDiv(const Value& rhs);
+            Value opMod(const Value& rhs);
+            Value opBinaryOr(const Value& rhs);
+            Value opBinaryAnd(const Value& rhs);
+            Value opShiftRight(const Value& rhs);
+            Value opShiftLeft(const Value& rhs);
+            Value opBitwiseAnd(const Value& rhs);
+            Value opBitwiseXor(const Value& rhs);
+            Value opBitwiseOr(const Value& rhs);
 
             // operations that modify this value
-            Value& opPlusAssign(const Value& other);
-            Value& opMinusAssign(const Value& other);
-            Value& opMulAssign(const Value& other);
-            Value& opDivAssign(const Value& other);
-            Value& opModAssign(const Value& other);
-            Value& opShiftLeftAssign(const Value& other);
-            Value& opShiftRightAssign(const Value& other);
+            Value& opPlusAssign(const Value& rhs);
+            Value& opMinusAssign(const Value& rhs);
+            Value& opMulAssign(const Value& rhs);
+            Value& opDivAssign(const Value& rhs);
+            Value& opModAssign(const Value& rhs);
+            Value& opShiftLeftAssign(const Value& rhs);
+            Value& opShiftRightAssign(const Value& rhs);
+            Value& opBitwiseAndAssign(const Value& rhs);
+            Value& opBitwiseOrAssign(const Value& rhs);
+            Value& opBitwiseXorAssign(const Value& rhs);
 
+            // specialty operations, like indexing, etc
+            Value&& opIndex(const Value& rhs, ThisObject* othis);
+    };
+
+    using ThisVariant = std::variant<
+        std::monostate,
+        std::shared_ptr<Object>,
+        std::shared_ptr<Array>,
+        Value::StringValType
+    >;
+
+    class ThisObject : public ThisVariant
+    {
+        public:
+            inline bool isEmpty() const
+            {
+                return std::get_if<std::monostate>(this) != nullptr;
+            }
+
+            inline Object* object() const
+            {
+                auto objectPtr = std::get_if<std::shared_ptr<Object>>(this);
+                return objectPtr ? objectPtr->get() : nullptr;
+            }
+
+            inline Array* array() const
+            {
+                auto arrayPtr = std::get_if<std::shared_ptr<Array>>(this);
+                return arrayPtr ? arrayPtr->get() : nullptr;
+            }
+
+            inline Value::StringValType& string()
+            {
+                return std::get<Value::StringValType>(*this);
+            }
+
+            inline const Value::StringValType& string() const
+            {
+                return std::get<Value::StringValType>(*this);
+            }
+
+            inline void clear()
+            {
+                *this = ThisObject{};
+            }
     };
 
     namespace Util
     {
+        bool NumberToIndex(size_t& outIndex, Value::NumberValType number);
+
         class ArgumentCheck
         {
             private:
@@ -767,9 +841,7 @@ namespace MSL
         };
     }
 
-
-
-    class Object: public GC::Collectable
+    class Object/*: public GC::Collectable*/
     {
         public:
             using MapType = std::unordered_map<Value::StringValType, Value>;
@@ -778,7 +850,7 @@ namespace MSL
             MapType m_entrymap;
 
         private:
-            virtual void markChildren() override;
+            //virtual void markChildren() override;
 
         public:
             Object();
@@ -811,22 +883,21 @@ namespace MSL
             bool removeEntry(const std::string& key);
     };
 
-    class Array: public GC::Collectable
+    class Array/*: public GC::Collectable*/
     {
         private:
             Value::List m_arrayitems;
 
         private:
-            virtual void markChildren() override;
+            //virtual void markChildren() override;
             
         public:
             Array();
 
             virtual ~Array();
 
-            inline Array(size_t cnt)
+            inline Array(size_t cnt): m_arrayitems(Value::List(cnt))
             {
-                m_arrayitems = Value::List(cnt);
             }
 
             inline size_t size() const
@@ -907,11 +978,35 @@ namespace MSL
             }
     };
 
-    class /**/EnvironmentPimpl;
     class Environment
     {
+        public:
+            class Impl
+            {
+                private:
+                    Environment& m_owner;
+                    Object& m_globalscope;
+
+                public:
+                    Impl(Environment& owner, Object& globalScope) : m_owner(owner), m_globalscope{ globalScope }
+                    {
+                    }
+
+                    ~Impl() = default;
+
+                    Environment& getOwner()
+                    {
+                        return m_owner;
+                    }
+
+                    Value execute(std::string_view code, std::string_view file);
+                    Value execute(std::string_view code);
+
+                    std::string_view getTypename(Value::Type type) const;
+            };
+
         private:
-            EnvironmentPimpl* m_implenv;
+            Impl* m_implenv;
         public:
             Object m_globalscope;
 
@@ -928,8 +1023,6 @@ namespace MSL
 
             std::string_view getTypename(Value::Type type) const;
 
-            void Print(std::string_view s);
-
             inline void setGlobal(const std::string& key, Value&& val)
             {
                 return m_globalscope.put(key, std::move(val));
@@ -937,35 +1030,43 @@ namespace MSL
 
     };
 
-    class EnvironmentPimpl
+    class Context
     {
+        public:
+            class PushLocalScope
+            {
+                private:
+                    Context& m_context;
+
+                public:
+                    PushLocalScope(Context& ctx, Object* localScope, ThisObject&& thisObj, const Location& loc);
+                    ~PushLocalScope();
+            };
+
         private:
-            Environment& m_owner;
+            std::vector<Object*> m_localscopes;
+            std::vector<ThisObject> m_thislist;
+
+        public:
+            Environment::Impl& m_env;
             Object& m_globalscope;
 
         public:
-            EnvironmentPimpl(Environment& owner, Object& globalScope) : m_owner(owner), m_globalscope{ globalScope }
-            {
-            }
+            Context(Environment::Impl& env, Object& globalScope);
 
-            ~EnvironmentPimpl() = default;
+            Environment::Impl& env();
 
-            Environment& getOwner()
-            {
-                return m_owner;
-            }
+            Environment::Impl& env() const;
 
-            Value execute(std::string_view code, std::string_view file);
-            Value execute(std::string_view code);
+            bool isLocal() const;
 
-            std::string_view getTypename(Value::Type type) const;
+            Object* getCurrentLocalScope();
 
-            void Print(std::string_view s)
-            {
-                //m_Output.append(s);
-                std::cout << s;
-            }
+            const ThisObject& getThis();
+
+            Object& getInnermostScope() const;
     };
+
 
     // I would like it to be higher, but above that, even at 128, it crashes with
     // native "stack overflow" in Debug configuration.
@@ -976,59 +1077,106 @@ namespace MSL
         public:
             enum class Type
             {
-                // Token types
+                /* Token types -- */
                 None,
                 Identifier,
                 Number,
                 String,
                 End,
-                // Symbols
-                Comma,// ,
-                QuestionMark,// ?
-                Colon,// :
-                Semicolon,// ;
-                RoundBracketOpen,// (
-                RoundBracketClose,// )
-                SquareBracketOpen,// [
-                SquareBracketClose,// ]
-                CurlyBracketOpen,// {
-                CurlyBracketClose,// }
-                Asterisk,// *
-                Slash,// /
-                Percent,// %
-                Plus,// +
-                Dash,// -
-                Equals,// =
-                ExclamationMark,// !
-                Tilde,// ~
-                Less,// <
-                Greater,// >
-                Amperstand,// &
-                Caret,// ^
-                Pipe,// |
-                Dot,// .
-                // Multiple character symbols
-                DoublePlus,// ++
-                DoubleDash,// --
-                PlusEquals,// +=
-                DashEquals,// -=
-                AsteriskEquals,// *=
-                SlashEquals,// /=
-                PercentEquals,// %=
-                DoubleLessEquals,// <<=
-                DoubleGreaterEquals,// >>=
-                AmperstandEquals,// &=
-                CaretEquals,// ^=
-                PipeEquals,// |=
-                DoubleLess,// <<
-                DoubleGreater,// >>
-                LessEquals,// <=
-                GreaterEquals,// >=
-                DoubleEquals,// ==
-                ExclamationEquals,// !=
-                DoubleAmperstand,// &&
-                DoublePipe,// ||
-                // Keywords
+
+                /* -- Symbols -- */
+                // ,
+                Comma,
+                // ?
+                QuestionMark,
+                // :
+                Colon,
+                // ;
+                Semicolon,
+                // (
+                RoundBracketOpen,
+                // )
+                RoundBracketClose,
+                // [
+                SquareBracketOpen,
+                // ]
+                SquareBracketClose,
+                // {
+                CurlyBracketOpen,
+                // }
+                CurlyBracketClose,
+                // *
+                Asterisk,
+                // /
+                Slash,
+                // %
+                Percent,
+                // +
+                Plus,
+                // -
+                Dash,
+                // =
+                Equals,
+                // !
+                ExclamationMark,
+                // ~
+                Tilde,
+                // <
+                Less,
+                // >
+                Greater,
+                // &
+                Ampersand,
+                // ^
+                Caret,
+                // |
+                Pipe,
+                // .
+                Dot,
+
+                /* --  Multiple character symbols -- */
+                // ++
+                DoublePlus,
+                // --
+                DoubleDash,
+                // +=
+                PlusAssign,
+                // -=
+                MinusAssign,
+                // *=
+                MulAssign,
+                // /=
+                DivAssign,
+                // %=
+                ModAssign,
+                // <<=
+                ShiftLeftAssign,
+                // >>=
+                ShiftRightAssign,
+                // &=
+                BitwiseAndAssign,
+                // ^=
+                BitwiseXorAssign,
+                // |=
+                BitwiseOrAssign,
+                // <<
+                ShiftLeftOper,
+                // >>
+                ShiftRightOper,
+                // <=
+                LessThanAssign,
+                // >=
+                GreaterThanAssign,
+                // ==
+                CompareEqual,
+                // !=
+                CompareNotEqual,
+                // &&
+                LogicalAndOper,
+                // ||
+                LogicalOrOper,
+
+                /* -- Keywords -- */
                 Null,
                 False,
                 True,
@@ -1059,7 +1207,7 @@ namespace MSL
             Location m_place;
             Type m_symtype = Type::None;
             // Only when symtype == Type::Number
-            double m_numberval = 0;
+            Value::NumberValType m_numberval = 0;
             // Only when symtype == Type::Identifier or String
             std::string m_stringval = {};
 
@@ -1103,12 +1251,12 @@ namespace MSL
                 m_symtype = t;
             }
 
-            double& number()
+            Value::NumberValType& number()
             {
                 return m_numberval;
             }
 
-            const double& number() const
+            const Value::NumberValType& number() const
             {
                 return m_numberval;
             }
@@ -1152,9 +1300,6 @@ namespace MSL
             void moveForward(size_t n);
     };
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // Tokenizer definition
-
     class Tokenizer
     {
         public:
@@ -1175,11 +1320,6 @@ namespace MSL
             {
             }
             void getNextToken(Token& out);
-    };
-
-    static constexpr std::string_view SYSTEM_FUNCTION_NAMES[] =
-    {
-        "resize", "add", "insert", "remove",
     };
     
     namespace LeftValue
@@ -1222,18 +1362,8 @@ namespace MSL
             Value thrownvalue;
     };
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // namespace AST
-
-    namespace AST
+    namespace Runtime
     {
-        using ThisVariant = std::variant<
-            std::monostate,
-            std::shared_ptr<Object>,
-            std::shared_ptr<Array>,
-            Value::StringValType
-        >;
-
         class DebugWriter
         {
             public:
@@ -1241,84 +1371,11 @@ namespace MSL
                 virtual void writeString(std::string_view str) = 0;
                 virtual void writeReprString(std::string_view str) = 0;
                 virtual void writeChar(int ch) = 0;
-                virtual void writeNumber(double n) = 0;
+                virtual void writeNumber(Value::NumberValType n) = 0;
 
                 inline virtual void flush()
                 {
                 }
-        };
-
-        class ThisType : public ThisVariant
-        {
-            public:
-                inline bool isEmpty() const
-                {
-                    return std::get_if<std::monostate>(this) != nullptr;
-                }
-
-                inline Object* object() const
-                {
-                    auto objectPtr = std::get_if<std::shared_ptr<Object>>(this);
-                    return objectPtr ? objectPtr->get() : nullptr;
-                }
-
-                inline Array* array() const
-                {
-                    auto arrayPtr = std::get_if<std::shared_ptr<Array>>(this);
-                    return arrayPtr ? arrayPtr->get() : nullptr;
-                }
-
-                inline Value::StringValType& string()
-                {
-                    return std::get<Value::StringValType>(*this);
-                }
-
-                inline const Value::StringValType& string() const
-                {
-                    return std::get<Value::StringValType>(*this);
-                }
-
-                inline void clear()
-                {
-                    *this = ThisType{};
-                }
-        };
-
-        class ExecutionContext
-        {
-            public:
-                class LocalScopePush
-                {
-                    private:
-                        ExecutionContext& m_context;
-
-                    public:
-                        LocalScopePush(ExecutionContext& ctx, Object* localScope, ThisType&& thisObj, const Location& loc);
-                        ~LocalScopePush();
-                };
-
-            private:
-                std::vector<Object*> m_localscopes;
-                std::vector<ThisType> m_thislist;
-
-            public:
-                EnvironmentPimpl& m_env;
-                Object& m_globalscope;
-
-            public:
-                ExecutionContext(EnvironmentPimpl& env, Object& globalScope);
-
-                EnvironmentPimpl& env();
-
-                EnvironmentPimpl& env() const;
-
-                bool isLocal() const;
-
-                Object* getCurrentLocalScope();
-
-                const ThisType& getThis();
-
-                Object& getInnermostScope() const;
         };
 
         class Statement
@@ -1338,7 +1395,7 @@ namespace MSL
 
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const = 0;
 
-                virtual Value execute(ExecutionContext& ctx) = 0;
+                virtual Value execute(Context& ctx) = 0;
         };
 
         class EmptyStatement : public Statement
@@ -1348,9 +1405,9 @@ namespace MSL
                 {
                 }
 
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
 
-                virtual Value execute(ExecutionContext&)
+                virtual Value execute(Context&) override
                 {
                     return {};
                 }
@@ -1371,9 +1428,9 @@ namespace MSL
                 {
                 }
 
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
 
-                virtual Value execute(ExecutionContext& ctx);
+                virtual Value execute(Context& ctx) override;
         };
 
         class WhileLoop : public Statement
@@ -1390,8 +1447,8 @@ namespace MSL
                 explicit WhileLoop(const Location& loc, Type type) : Statement{ loc }, m_type{ type }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value execute(Context& ctx) override;
         };
 
         class ForLoop : public Statement
@@ -1409,8 +1466,8 @@ namespace MSL
                 explicit ForLoop(const Location& loc) : Statement{ loc }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value execute(Context& ctx) override;
         };
 
         class RangeBasedForLoop : public Statement
@@ -1427,8 +1484,8 @@ namespace MSL
                 explicit RangeBasedForLoop(const Location& loc) : Statement{ loc }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value execute(Context& ctx) override;
         };
 
         class LoopBreakStatement : public Statement
@@ -1448,8 +1505,8 @@ namespace MSL
                 explicit LoopBreakStatement(const Location& loc, Type type) : Statement{ loc }, m_type{ type }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value execute(Context& ctx) override;
         };
 
         class ReturnStatement : public Statement
@@ -1462,8 +1519,8 @@ namespace MSL
                 explicit ReturnStatement(const Location& loc) : Statement{ loc }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value execute(Context& ctx) override;
         };
 
         class Block : public Statement
@@ -1474,8 +1531,8 @@ namespace MSL
             public:
                 explicit Block(const Location& loc);
                 virtual ~Block();
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value execute(Context& ctx) override;
         };
 
         class /**/ConstantValue;
@@ -1485,16 +1542,16 @@ namespace MSL
             public:
                 std::unique_ptr<Expression> m_cond;
                 // null means default block.
-                std::vector<std::unique_ptr<AST::ConstantValue>> m_itemvals;
+                std::vector<std::unique_ptr<Runtime::ConstantValue>> m_itemvals;
                 // Can be null if empty.
-                std::vector<std::unique_ptr<AST::Block>> m_itemblocks;
+                std::vector<std::unique_ptr<Runtime::Block>> m_itemblocks;
 
             public:
                 explicit SwitchStatement(const Location& loc) : Statement{ loc }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value execute(Context& ctx) override;
         };
 
         class ThrowStatement : public Statement
@@ -1506,8 +1563,8 @@ namespace MSL
                 explicit ThrowStatement(const Location& loc) : Statement{ loc }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value execute(Context& ctx) override;
         };
 
         class TryStatement : public Statement
@@ -1522,8 +1579,8 @@ namespace MSL
                 explicit TryStatement(const Location& loc) : Statement{ loc }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value execute(ExecutionContext& ctx);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value execute(Context& ctx) override;
         };
 
         class Script: public Block
@@ -1532,7 +1589,7 @@ namespace MSL
                 explicit Script(const Location& loc) : Block{ loc }
                 {
                 }
-                virtual Value execute(ExecutionContext& ctx);
+                virtual Value execute(Context& ctx) override;
         };
 
         class Expression: public Statement
@@ -1542,19 +1599,19 @@ namespace MSL
                 {
                 }
 
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis)
+                virtual Value evaluate(Context& ctx, ThisObject* outThis)
                 {
                     (void)outThis;
                     return getLeftValue(ctx).getValue(location());
                 }
 
-                virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const
+                virtual LeftValue::Getter getLeftValue(Context& ctx) const
                 {
                     (void)ctx;
                     throw Error::RuntimeError(location(), "expected lvalue to expression");
                 }
 
-                virtual Value execute(ExecutionContext& ctx)
+                virtual Value execute(Context& ctx) override
                 {
                     return evaluate(ctx, nullptr);
                 }
@@ -1582,7 +1639,7 @@ namespace MSL
 
                 virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
 
-                virtual Value evaluate(ExecutionContext&, ThisType*) override
+                virtual Value evaluate(Context&, ThisObject*) override
                 {
                     return Value{ m_val };
                 }
@@ -1607,9 +1664,9 @@ namespace MSL
                 Identifier(const Location& loc, Scope scope, std::string&& s): ConstantExpression{ loc }, m_scope(scope), m_ident(std::move(s))
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
-                virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value evaluate(Context& ctx, ThisObject* outThis) override;
+                virtual LeftValue::Getter getLeftValue(Context& ctx) const override;
         };
 
         class ThisExpression: public ConstantExpression
@@ -1618,8 +1675,8 @@ namespace MSL
                 ThisExpression(const Location& loc) : ConstantExpression{ loc }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value evaluate(Context& ctx, ThisObject* outThis) override;
         };
 
         class Operator: public Expression
@@ -1657,9 +1714,9 @@ namespace MSL
                 UnaryOperator(const Location& loc, Type type) : Operator{ loc }, m_type(type)
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
-                virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value evaluate(Context& ctx, ThisObject* outThis) override;
+                virtual LeftValue::Getter getLeftValue(Context& ctx) const override;
         };
 
         class MemberAccessOperator: public Operator
@@ -1672,9 +1729,9 @@ namespace MSL
                 MemberAccessOperator(const Location& loc) : Operator{ loc }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
-                virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value evaluate(Context& ctx, ThisObject* outThis) override;
+                virtual LeftValue::Getter getLeftValue(Context& ctx) const override;
         };
 
         class BinaryOperator: public Operator
@@ -1730,9 +1787,9 @@ namespace MSL
                 BinaryOperator(const Location& loc, Type type) : Operator{ loc }, m_type(type)
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
-                virtual LeftValue::Getter getLeftValue(ExecutionContext& ctx) const;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value evaluate(Context& ctx, ThisObject* outThis) override;
+                virtual LeftValue::Getter getLeftValue(Context& ctx) const override;
         };
 
         class TernaryOperator: public Operator
@@ -1746,8 +1803,8 @@ namespace MSL
                 explicit TernaryOperator(const Location& loc) : Operator{ loc }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value evaluate(Context& ctx, ThisObject* outThis) override;
         };
 
         class CallOperator: public Operator
@@ -1759,8 +1816,8 @@ namespace MSL
                 CallOperator(const Location& loc) : Operator{ loc }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value evaluate(Context& ctx, ThisObject* outThis) override;
         };
 
         class FunctionDefinition : public Expression
@@ -1774,16 +1831,16 @@ namespace MSL
                 {
                 }
 
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
 
-                virtual Value evaluate(ExecutionContext&, ThisType*)
+                virtual Value evaluate(Context&, ThisObject*) override
                 {
                     return Value{ this };
                 }
 
                 bool areParamsUnique() const;
 
-                Value call(ExecutionContext& ctx, Value::List&& args, ThisType& th);
+                Value call(Context& ctx, Value::List&& args, ThisObject& th);
         };
 
         class ObjectExpression : public Expression
@@ -1799,8 +1856,8 @@ namespace MSL
                 ObjectExpression(const Location& loc) : Expression{ loc }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value evaluate(Context& ctx, ThisObject* outThis) override;
         };
 
         class ArrayExpression : public Expression
@@ -1812,16 +1869,11 @@ namespace MSL
                 ArrayExpression(const Location& loc) : Expression{ loc }
                 {
                 }
-                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const;
-                virtual Value evaluate(ExecutionContext& ctx, ThisType* outThis);
+                virtual void debugPrint(DebugWriter& dw, uint32_t indentLevel, std::string_view prefix) const override;
+                virtual Value evaluate(Context& ctx, ThisObject* outThis) override;
         };
 
-    }// namespace AST
-
-
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // Parser definition
+    }
 
     class Parser
     {
@@ -1831,36 +1883,38 @@ namespace MSL
             size_t m_tokidx = 0;
 
         private:
-            void parseBlock(AST::Block& outBlock);
-            bool tryParseSwitchItem(AST::SwitchStatement& switchStatement);
-            void parseFuncDef(AST::FunctionDefinition& funcDef);
+            void parseBlock(Runtime::Block& outBlock);
+            bool tryParseSwitchItem(Runtime::SwitchStatement& switchStatement);
+            void parseFuncDef(Runtime::FunctionDefinition& funcDef);
             bool peekSymbols(std::initializer_list<Token::Type> arr);
-            std::unique_ptr<AST::Statement> tryParseStatement();
-            std::unique_ptr<AST::ConstantValue> tryParseConstVal();
-            std::unique_ptr<AST::Identifier> tryParseIdentVal();
-            std::unique_ptr<AST::ConstantExpression> tryParseConstExpr();
-            std::pair<std::string, std::unique_ptr<AST::FunctionDefinition>> tryParseFuncSynSugar();
-            std::unique_ptr<AST::Expression> tryParseClassSynSugar();
-            std::unique_ptr<AST::Expression> tryParseObjMember(std::string& outMemberName);
-            std::unique_ptr<AST::ObjectExpression> tryParseObject();
-            std::unique_ptr<AST::ArrayExpression> tryParseArray();
-            std::unique_ptr<AST::Expression> tryParseParentheses();
-            std::unique_ptr<AST::Expression> tryParseUnary();
-            std::unique_ptr<AST::Expression> tryParseOperator();
-            std::unique_ptr<AST::Expression> tryParseBinary();
-            std::unique_ptr<AST::Expression> tryParseAddSub();
-            std::unique_ptr<AST::Expression> tryParseAngleSign();
-            std::unique_ptr<AST::Expression> tryParseAngleCompare();
-            std::unique_ptr<AST::Expression> tryParseEquals();
-            std::unique_ptr<AST::Expression> TryParseExpr11();
-            std::unique_ptr<AST::Expression> TryParseExpr12();
-            std::unique_ptr<AST::Expression> TryParseExpr13();
-            std::unique_ptr<AST::Expression> TryParseExpr14();
-            std::unique_ptr<AST::Expression> TryParseExpr15();
-            std::unique_ptr<AST::Expression> TryParseExpr16();
-            std::unique_ptr<AST::Expression> TryParseExpr17();
+            std::unique_ptr<Runtime::Statement> tryParseStatement();
+            std::unique_ptr<Runtime::ConstantValue> tryParseConstVal();
+            std::unique_ptr<Runtime::Identifier> tryParseIdentVal();
+            std::unique_ptr<Runtime::ConstantExpression> tryParseConstExpr();
+            std::pair<std::string, std::unique_ptr<Runtime::FunctionDefinition>> tryParseFuncSynSugar();
+            std::unique_ptr<Runtime::Expression> tryParseClassSynSugar();
+            std::unique_ptr<Runtime::Expression> tryParseObjMember(std::string& outMemberName);
+            std::unique_ptr<Runtime::ObjectExpression> tryParseObject();
+            std::unique_ptr<Runtime::ArrayExpression> tryParseArray();
+            std::unique_ptr<Runtime::Expression> tryParseParentheses();
+            std::unique_ptr<Runtime::Expression> tryParseUnary();
+            std::unique_ptr<Runtime::Expression> tryParseOperator();
+            std::unique_ptr<Runtime::Expression> tryParseBinary();
+            std::unique_ptr<Runtime::Expression> tryParseAddSub();
+            std::unique_ptr<Runtime::Expression> tryParseAngleSign();
+            std::unique_ptr<Runtime::Expression> tryParseAngleCompare();
+            std::unique_ptr<Runtime::Expression> tryParseEquals();
+            std::unique_ptr<Runtime::Expression> TryParseExpr11();
+            std::unique_ptr<Runtime::Expression> TryParseExpr12();
+            std::unique_ptr<Runtime::Expression> TryParseExpr13();
+            std::unique_ptr<Runtime::Expression> TryParseExpr14();
+            std::unique_ptr<Runtime::Expression> TryParseExpr15();
+            std::unique_ptr<Runtime::Expression> TryParseExpr16();
+            std::unique_ptr<Runtime::Expression> TryParseExpr17();
             bool tryParseSymbol(Token::Type symbol);
-            std::string tryParseIdentifier();// If failed, returns empty string.
+
+            // If failed, returns empty string.
+            std::string tryParseIdentifier();
 
             const Location& currentTokenLocation() const
             {
@@ -1871,9 +1925,6 @@ namespace MSL
             Parser(Tokenizer& tokenizer) : m_tokenizer(tokenizer)
             {
             }
-            void parseScript(AST::Script& outScript);
-
+            void parseScript(Runtime::Script& outScript);
     };
-
-
 }

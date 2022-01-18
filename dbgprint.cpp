@@ -3,7 +3,7 @@
 
 namespace MSL
 {
-    namespace AST
+    namespace Runtime
     {
         static const char* getIndent(uint32_t idl)
         {
