@@ -90,7 +90,7 @@ namespace MSL
             {
                 throw Error::TypeError(loc, "Object() requires an object");
             }
-            return Value{ (Value::NumberValType)obj->size() };
+            return Value{ Number::makeInteger(obj->size()) };
         }
 
         Value protofn_array_length(Context& ctx, const Location& loc, Value&& objVal)
@@ -101,7 +101,7 @@ namespace MSL
             {
                 throw Error::TypeError(loc, "Array.length called on something not an Array");
             }
-            return Value{ (Value::NumberValType)objVal.array()->size() };
+            return Value{ Number::makeInteger(objVal.array()->size()) };
         }
 
 
@@ -254,7 +254,7 @@ namespace MSL
             {
                 throw Error::TypeError(loc, "expected string object");
             }
-            return Value{ (Value::NumberValType)objVal.string().length() };
+            return Value{ Number::makeInteger(objVal.string().length()) };
         }
 
         Value protofn_string_chars(Context& ctx, const Location& loc, Value&& objVal)
@@ -268,7 +268,7 @@ namespace MSL
             auto res = std::make_shared<Array>();
             for(auto ch: objVal.string())
             {
-                res->push_back(Value{Value::NumberValType(ch)});
+                res->push_back(Value{Number::makeInteger(ch)});
             }
             return Value{ std::move(res) };
         }
@@ -319,7 +319,7 @@ namespace MSL
                 throw Error::ArgumentError(loc, "String.startsWith() needs exactly 1 argument");
             }
             auto findme = args[0];
-            res = (th.string().rfind(findme.string(), 0) == 0);
+            res = Number::makeInteger(th.string().rfind(findme.string(), 0) == 0);
             return Value{res};
         }
 
@@ -332,9 +332,9 @@ namespace MSL
             auto sf = findme.string();
             if(sf.size() > self.size())
             {
-                return Value{Value::NumberValType(0)};
+                return Value{Number::makeInteger(0)};
             }
-            return Value{Value::NumberValType(std::equal(sf.rbegin(), sf.rend(), self.rbegin()))};
+            return Value{Number::makeInteger(std::equal(sf.rbegin(), sf.rend(), self.rbegin()))};
         }
     }
 }

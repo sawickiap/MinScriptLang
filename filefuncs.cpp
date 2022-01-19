@@ -15,7 +15,7 @@ namespace MSL
                 Util::ArgumentCheck ac(loc, args, "File.readFile");
                 auto filename = ac.checkArgument(0, {Value::Type::String});
                 auto sz = ac.checkOptional(1, {Value::Type::Number});
-                auto data = sz ? Util::readFile(filename.string(), sz->number()) : Util::readFile(filename.string());
+                auto data = sz ? Util::readFile(filename.string(), sz->number().toInteger()) : Util::readFile(filename.string());
                 if(!data)
                 {
                     throw Error::IOError(loc, Util::joinArgs("failed to read from '", filename.string(), "'"));
@@ -51,18 +51,17 @@ namespace MSL
                 (void)env;
                 Util::ArgumentCheck ac(loc, args, "File.exists");
                 path = ac.checkArgument(0, {Value::Type::String});
-                return Value(Value::NumberValType(std::filesystem::exists(path.string())));
+                return Value(Number::makeInteger(std::filesystem::exists(path.string())));
             }
 
             Value filefunc_size(Environment& env, const Location& loc, Value::List&& args)
             {
-                Value::NumberValType rs;
                 Value path;
                 (void)env;
                 std::error_code ec;
                 Util::ArgumentCheck ac(loc, args, "File.size");
                 path = ac.checkArgument(0, {Value::Type::String});
-                rs = Value::NumberValType(std::filesystem::file_size(path.string(), ec));
+                auto rs = Number::makeInteger(std::filesystem::file_size(path.string(), ec));
                 if(ec)
                 {
                     throw Error::OSError(loc, ec.message());

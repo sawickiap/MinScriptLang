@@ -64,6 +64,16 @@ SOFTWARE.
 #define MINSL_EXECUTION_FAIL(loc, errorMessage) \
     throw Error::RuntimeError((loc), (errorMessage));
 
+namespace MSL
+{
+    class /**/Number;
+    class /**/String;
+}
+
+template<typename CharT>
+std::basic_ostream<CharT>& operator<<(std::basic_ostream<CharT>& os, const MSL::Number& n);
+template<typename CharT>
+std::basic_ostream<CharT>& operator<<(std::basic_ostream<CharT>& os, const MSL::String& s);
 
 namespace MSL
 {
@@ -79,6 +89,7 @@ namespace MSL
     class /**/Environment;
     class /**/Context;
     class /**/ThisObject;
+    class JitCompiler;
 
     namespace Util
     {
@@ -495,6 +506,16 @@ namespace MSL
                 return m_string.end();
             }
 
+            inline const std::string& string() const
+            {
+                return m_string;
+            }
+
+            inline std::string& string()
+            {
+                return m_string;
+            }
+
             char& operator[](size_t i)
             {
                 return m_string[i];
@@ -546,6 +567,355 @@ namespace MSL
             }
     };
 
+    class Number
+    {
+        public:
+            enum class Type
+            {
+                None,
+                Integer,
+                Float,
+            };
+            using IntegerValueType = long;
+            using FloatingPointValueType = float;
+            using VariantType = std::variant<std::monostate, IntegerValueType, FloatingPointValueType>;
+
+        private:
+            Type m_type = Type::None;
+            VariantType m_variant;
+
+        public:
+            inline static Number makeFloat(FloatingPointValueType v)
+            {
+                return Number(Type::Float, v);
+            }
+
+            inline static Number makeInteger(IntegerValueType v)
+            {
+                return Number(Type::Integer, v);
+            }
+
+        private:
+            void postInitCheck(bool wascopy);
+
+        public:
+            inline explicit Number()
+            {
+                postInitCheck(false);
+            }
+
+            inline Number(const Number& other)
+            {
+                m_type = other.m_type;
+                m_variant = other.m_variant;
+                postInitCheck(true);
+            }
+
+            template<typename InputT>
+            inline explicit Number(Type t, InputT val): m_type(t)
+            {
+                if(t == Type::Integer)
+                {
+                    m_variant = IntegerValueType(val);
+                }
+                else if(t == Type::Float)
+                {
+                    m_variant = FloatingPointValueType(val);
+                }
+                postInitCheck(false);
+            }
+
+            inline bool isEmpty()
+            {
+                return (m_type == Type::None);
+            }
+
+            inline bool isInteger() const
+            {
+                return (m_type == Type::Integer);
+            }
+
+            inline bool isFloat() const
+            {
+                return (m_type == Type::Float);
+            }
+
+            inline IntegerValueType toInteger() const
+            {
+                if(isInteger())
+                {
+                    return std::get<IntegerValueType>(m_variant);
+                }
+                return IntegerValueType(std::get<FloatingPointValueType>(m_variant));
+            }
+
+            inline FloatingPointValueType toFloat() const
+            {
+                if(isFloat())
+                {
+                    return std::get<FloatingPointValueType>(m_variant);
+                }
+                return FloatingPointValueType(std::get<IntegerValueType>(m_variant));
+            }
+
+            inline Number doPlus(const IntegerValueType& v) const
+            {
+                return makeFloat(toInteger() + v);
+            }
+
+            inline Number doPlus(const FloatingPointValueType& v) const
+            {
+                return makeFloat(toFloat() + v);
+            }
+
+            inline Number doMinus(const IntegerValueType& v) const
+            {
+                return makeInteger(toInteger() - v);
+            }
+
+            inline Number doMinus(const FloatingPointValueType& v) const
+            {
+                return makeFloat(toFloat() - v);
+            }
+
+            inline Number doMultiply(const IntegerValueType& v) const
+            {
+                return makeInteger(toInteger() * v);
+            }
+
+            inline Number doMultiply(const FloatingPointValueType& v) const
+            {
+                return makeFloat(toFloat() * v);
+            }
+
+            inline Number doDivide(const IntegerValueType& v) const
+            {
+                return makeInteger(toInteger() / v);
+            }
+
+            inline Number doDivide(const FloatingPointValueType& v) const
+            {
+                return makeFloat(toFloat() / v);
+            }
+
+            inline Number doModulo(const IntegerValueType& v) const
+            {
+                return makeInteger(toInteger() % v);
+            }
+
+            inline Number doModulo(const FloatingPointValueType& v) const
+            {
+                return makeFloat(std::fmod(toFloat(), v));
+            }
+
+            inline Number doBinaryAnd(const IntegerValueType& v) const
+            {
+                return makeInteger(toInteger() & v);
+            }
+
+            inline Number doBinaryOr(const IntegerValueType& v) const
+            {
+                return makeInteger(toInteger() | v);
+            }
+
+            inline Number& operator=(const Number& other)
+            {
+                m_type = other.m_type;
+                m_variant = other.m_variant;
+                return *this;
+            }
+
+            inline Number& operator=(const IntegerValueType& i)
+            {
+                m_type = Type::Integer;
+                m_variant = i;
+                return *this;
+            }
+
+            inline Number& operator=(const FloatingPointValueType& i)
+            {
+                m_type = Type::Float;
+                m_variant = i;
+                return *this;
+            }
+
+            inline bool operator<(const Number& other) const
+            {
+                if(isInteger())
+                {
+                    return toInteger() < other.toInteger();
+                }
+                return toFloat() < other.toFloat();
+            }
+
+            inline bool operator>(const Number& other) const
+            {
+                if(isInteger())
+                {
+                    return toInteger() > other.toInteger();
+                }
+                return toFloat() > other.toFloat();
+            }
+
+            inline bool operator==(const Number& other) const
+            {
+                if(isInteger())
+                {
+                    return toInteger() == other.toInteger();
+                }
+                return toFloat() == other.toFloat();
+            }
+
+            inline bool operator>=(const Number& other) const
+            {
+                if(isInteger())
+                {
+                    return toInteger() >= other.toInteger();
+                }
+                return toFloat() >= other.toFloat();
+            }
+
+            inline bool operator<=(const Number& other) const
+            {
+                if(isInteger())
+                {
+                    return toInteger() <= other.toInteger();
+                }
+                return toFloat() <= other.toFloat();
+            }
+
+            inline bool operator!=(const Number& other) const
+            {
+                if(isInteger())
+                {
+                    if(other.isInteger())
+                    {
+                        return toInteger() != other.toInteger();
+                    }
+                    else if(other.isFloat())
+                    {
+                        return toFloat() != other.toFloat();
+                    }
+                }
+                return toFloat() != other.toFloat();
+            }
+
+            inline bool operator!=(const FloatingPointValueType& other) const
+            {
+                return (toFloat() != other);
+            }
+
+            inline bool operator!=(const IntegerValueType& other) const
+            {
+                return (toInteger() != other);
+            }
+
+            inline Number operator&(const Number& other) const
+            {
+                return doBinaryAnd(other.toInteger());
+            }
+
+            inline Number operator|(const Number& other) const
+            {
+                return doBinaryOr(other.toInteger());
+            }
+
+            inline Number operator+(const Number& other) const
+            {
+                if(isInteger())
+                {
+                    return doPlus(other.toInteger());
+                }
+                return doPlus(other.toFloat());
+            }
+
+            inline Number operator+(const IntegerValueType& other) const
+            {
+                return doPlus(other);
+            }
+
+            inline Number operator+(const FloatingPointValueType& other) const
+            {
+                return doPlus(other);
+            }
+
+            inline Number operator-(const Number& other) const
+            {
+                if(isInteger())
+                {
+                    return doMinus(other.toInteger());
+                }
+                return doMinus(other.toFloat());
+            }
+
+            inline Number operator-(const IntegerValueType& other) const
+            {
+                return doMinus(other);
+            }
+
+            inline Number operator-(const FloatingPointValueType& other) const
+            {
+                return doMinus(other);
+            }
+
+            inline Number operator*(const Number& other) const
+            {
+                if(isInteger())
+                {
+                    return doMultiply(other.toInteger());
+                }
+                return doMultiply(other.toFloat());
+            }
+
+            inline Number operator*(const IntegerValueType& other) const
+            {
+                return doMultiply(other);
+            }
+
+            inline Number operator*(const FloatingPointValueType& other) const
+            {
+                return doMultiply(other);
+            }
+
+            inline Number operator/(const Number& other) const
+            {
+                if(isInteger())
+                {
+                    return doDivide(other.toInteger());
+                }
+                return doDivide(other.toFloat());
+            }
+
+            inline Number operator/(const IntegerValueType& other) const
+            {
+                return doDivide(other);
+            }
+
+            inline Number operator/(const FloatingPointValueType& other) const
+            {
+                return doDivide(other);
+            }
+
+            inline Number operator%(const Number& other) const
+            {
+                if(isInteger())
+                {
+                    return doModulo(other.toInteger());
+                }
+                return doModulo(other.toFloat());
+            }
+
+            inline Number operator%(const IntegerValueType& other) const
+            {
+                return doModulo(other);
+            }
+
+            inline Number operator%(const FloatingPointValueType& other) const
+            {
+                return doModulo(other);
+            }
+    };
+
     class Value/*: public GC::Collectable*/
     {
         public:
@@ -564,7 +934,7 @@ namespace MSL
                 Count
             };
             using List = std::vector<Value>;
-            using NumberValType = double;
+            using NumberValType = Number;
             using StringValType = std::string;
             using AstFuncValType = Runtime::FunctionDefinition*;
             using HostFuncValType = HostFunction;
@@ -681,7 +1051,7 @@ namespace MSL
             /**
             * value accessor functions
             */
-            NumberValType number() const;
+            const Number& number() const;
             const StringValType& string() const;
             StringValType& string();
             AstFuncValType scriptFunction();
@@ -699,7 +1069,7 @@ namespace MSL
             * explicitly sets a number value, for both the
             * internal variant, as well as the type.
             */
-            void setNumberValue(NumberValType number);
+            void setNumberValue(Number number);
 
             /**
             * comparison functions.
@@ -820,7 +1190,7 @@ namespace MSL
 
     namespace Util
     {
-        bool NumberToIndex(size_t& outIndex, Value::NumberValType number);
+        bool NumberToIndex(size_t& outIndex, const Number& number);
 
         class ArgumentCheck
         {
@@ -1006,7 +1376,9 @@ namespace MSL
             };
 
         private:
+            std::shared_ptr<JitCompiler> m_compiler;
             Impl* m_implenv;
+
         public:
             Object m_globalscope;
 
@@ -1207,7 +1579,7 @@ namespace MSL
             Location m_place;
             Type m_symtype = Type::None;
             // Only when symtype == Type::Number
-            Value::NumberValType m_numberval = 0;
+            Number m_numberval;
             // Only when symtype == Type::Identifier or String
             std::string m_stringval = {};
 
@@ -1371,7 +1743,7 @@ namespace MSL
                 virtual void writeString(std::string_view str) = 0;
                 virtual void writeReprString(std::string_view str) = 0;
                 virtual void writeChar(int ch) = 0;
-                virtual void writeNumber(Value::NumberValType n) = 0;
+                virtual void writeNumber(const Number& n) = 0;
 
                 inline virtual void flush()
                 {
@@ -1927,4 +2299,25 @@ namespace MSL
             }
             void parseScript(Runtime::Script& outScript);
     };
+}
+
+template<typename CharT>
+std::basic_ostream<CharT>& operator<<(std::basic_ostream<CharT>& os, const MSL::Number& n)
+{ 
+    if(n.isInteger())
+    {
+        os << n.toInteger();
+    }
+    else
+    {
+        os << n.toFloat();
+    }
+    return os;
+}
+
+template<typename CharT>
+std::basic_ostream<CharT>& operator<<(std::basic_ostream<CharT>& os, const MSL::String& s)
+{ 
+    os << s.string();
+    return os;
 }

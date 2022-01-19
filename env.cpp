@@ -29,7 +29,7 @@ namespace MSL
                         rs += std::fwrite(tmpstr.data(), sizeof(char), tmpstr.size(), m_stream);
                         fflush(m_stream);
                     }
-                    return Value{Value::NumberValType(rs)};
+                    return Value{Number::makeInteger(rs)};
                 }
 
                 Value io_getchar(Context& ctx, const Location& loc, Value::List&& args)
@@ -43,7 +43,7 @@ namespace MSL
                         throw Error::EOFError(loc, "EOF");
                     }
                     fflush(m_stream);
-                    return Value{Value::NumberValType(ch)};
+                    return Value{Number::makeInteger(ch)};
                 }
 
                 Value io_putchar(Context& ctx, const Location& loc, Value::List&& args)
@@ -53,13 +53,13 @@ namespace MSL
                     (void)ctx;
                     Util::ArgumentCheck ac(loc, args, "putChar");
                     ch = ac.checkArgument(0, {Value::Type::Number});
-                    rs = fputc(int(ch.number()), m_stream);
+                    rs = fputc(int(ch.number().toInteger()), m_stream);
                     if(rs == EOF)
                     {
                         throw Error::EOFError(loc, "EOF");
                     }
                     fflush(m_stream);
-                    return Value{Value::NumberValType(rs)};
+                    return Value{Number::makeInteger(rs)};
                 }
         };
     }

@@ -48,9 +48,16 @@ struct StdoutWriter: public MSL::Runtime::DebugWriter
         std::cout << char(ch);
     }
 
-    void writeNumber(MSL::Value::NumberValType n) override
+    void writeNumber(const MSL::Number& n) override
     {
-        std::cout << n;
+        if(n.isInteger())
+        {
+            std::cout << n.toInteger();
+        }
+        else if(n.isFloat())
+        {
+            std::cout << n.toFloat();
+        }
     }
     
 };

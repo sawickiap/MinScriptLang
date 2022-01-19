@@ -13,21 +13,21 @@ namespace MSL
     }
 
     template<typename InT>
-    static int64_t shiftLeft(const InT& lhs, const InT& rhs)
+    static Number::IntegerValueType shiftLeft(const InT& lhs, const InT& rhs)
     {
-        const int64_t leftnum = (int64_t)lhs;
-        const int64_t rightnum = (int64_t)rhs;
-        const int64_t resval = leftnum << rightnum;
-        return ((int64_t)resval);
+        const Number::IntegerValueType leftnum = (Number::IntegerValueType)lhs;
+        const Number::IntegerValueType rightnum = (Number::IntegerValueType)rhs;
+        const Number::IntegerValueType resval = leftnum << rightnum;
+        return ((Number::IntegerValueType)resval);
     }
 
     template<typename InT>
-    static int64_t shiftRight(const InT& lhs, const InT& rhs)
+    static Number::IntegerValueType shiftRight(const InT& lhs, const InT& rhs)
     {
-        const int64_t leftnum = (int64_t)lhs;
-        const int64_t rightnum = (int64_t)rhs;
-        const int64_t resval = leftnum >> rightnum;
-        return ((int64_t)resval);
+        const Number::IntegerValueType leftnum = (Number::IntegerValueType)lhs;
+        const Number::IntegerValueType rightnum = (Number::IntegerValueType)rhs;
+        const Number::IntegerValueType resval = leftnum >> rightnum;
+        return ((Number::IntegerValueType)resval);
     }
 
     bool Value::opCompareLessThan(const Value& rhs)
@@ -102,7 +102,7 @@ namespace MSL
             }
             else if(typright == Value::Type::Number)
             {
-                string().push_back(right.number());
+                string().push_back(right.number().toInteger());
                 return Value{ std::move(string()) };
             }
             else
@@ -154,7 +154,7 @@ namespace MSL
         {
             return binaryBadTypes(location(), "%", type(), rhs.type());
         }
-        return Value{ fmod(number(), rhs.number()) };
+        return Value{ number() % rhs.number() };
     }
 
     Value Value::opShiftLeft(const Value& rhs)
@@ -163,7 +163,7 @@ namespace MSL
         {
             return binaryBadTypes(location(), "<<", type(), rhs.type());
         }
-        return Value{ Value::NumberValType(int64_t(number()) << int64_t(rhs.number())) };
+        return Value{ Number::makeInteger(number().toInteger() << rhs.number().toInteger()) };
     }
 
     Value Value::opShiftRight(const Value& rhs)
@@ -172,7 +172,7 @@ namespace MSL
         {
             return binaryBadTypes(location(), ">>", type(), rhs.type());
         }
-        return Value{ Value::NumberValType(int64_t(number()) >> int64_t(rhs.number())) };
+        return Value{ Number::makeInteger(number().toInteger() >> rhs.number().toInteger()) };
     }
 
     Value Value::opBitwiseAnd(const Value& rhs)
@@ -181,7 +181,7 @@ namespace MSL
         {
             return binaryBadTypes(location(), "&", type(), rhs.type());
         }
-        return Value{ Value::NumberValType(int64_t(number()) & int64_t(rhs.number())) };
+        return Value{ number() & rhs.number() };
     }
 
     Value Value::opBitwiseXor(const Value& rhs)
@@ -190,7 +190,7 @@ namespace MSL
         {
             return binaryBadTypes(location(), "^", type(), rhs.type());
         }
-        return Value{ Value::NumberValType(int64_t(number()) ^ int64_t(rhs.number())) };
+        return Value{ Number::makeInteger(number().toInteger() ^ rhs.number().toInteger()) };
     }
 
     Value Value::opBitwiseOr(const Value& rhs)
@@ -199,7 +199,7 @@ namespace MSL
         {
             return binaryBadTypes(location(), "|", type(), rhs.type());
         }
-        return Value{ Value::NumberValType(int64_t(number()) | int64_t(rhs.number())) };
+        return Value{ number() | rhs.number() };
     }
 
     Value& Value::opPlusAssign(const Value& rhs)
@@ -216,7 +216,7 @@ namespace MSL
             }
             else if(rhs.isNumber())
             {
-                string().push_back(int(rhs.number()));
+                string().push_back(int(rhs.number().toInteger()));
             }
             else
             {
@@ -265,7 +265,6 @@ namespace MSL
         {
             binaryBadTypes(location(), "/=", type(), rhs.type());
         }
-        //number() /= rhs.number();
         setNumberValue(number() / rhs.number());
         return *this;
     }
@@ -276,8 +275,7 @@ namespace MSL
         {
             binaryBadTypes(location(), "%=", type(), rhs.type());
         }
-        //number() = fmod(number(), rhs.number());
-        setNumberValue(fmod(number(), rhs.number()));
+        setNumberValue(number() % rhs.number());
         return *this;
     }
 
@@ -287,8 +285,7 @@ namespace MSL
         {
             binaryBadTypes(location(), "<<=", type(), rhs.type());
         }
-        //number() = shiftLeft(number(), rhs.number());
-        setNumberValue(shiftLeft(number(), rhs.number()));
+        setNumberValue(Number::makeInteger(shiftLeft(number().toInteger(), rhs.number().toInteger())));
         return *this;
     }
 
@@ -298,8 +295,7 @@ namespace MSL
         {
             binaryBadTypes(location(), ">>=", type(), rhs.type());
         }
-        //number() = shiftRight(number(), rhs.number());
-        setNumberValue(shiftRight(number(), rhs.number()));
+        setNumberValue(Number::makeInteger(shiftRight(number().toInteger(), rhs.number().toInteger())));
         return *this;
     }
 
@@ -307,10 +303,9 @@ namespace MSL
     {
         if(!isNumber() || !rhs.isNumber())
         {
-            binaryBadTypes(location(), ">>=", type(), rhs.type());
+            binaryBadTypes(location(), "&=", type(), rhs.type());
         }
-        //number() = int64_t(number()) & int64_t(rhs.number());
-        setNumberValue(int64_t(number()) & int64_t(rhs.number()));
+        setNumberValue(number() & rhs.number());
         return *this;
     }
 
@@ -318,10 +313,9 @@ namespace MSL
     {
         if(!isNumber() || !rhs.isNumber())
         {
-            binaryBadTypes(location(), ">>=", type(), rhs.type());
+            binaryBadTypes(location(), "|=", type(), rhs.type());
         }
-        //number() = int64_t(number()) | int64_t(rhs.number());
-        setNumberValue(int64_t(number()) | int64_t(rhs.number()));
+        setNumberValue(number() | rhs.number());
         return *this;
     }
 
@@ -329,10 +323,9 @@ namespace MSL
     {
         if(!isNumber() || !rhs.isNumber())
         {
-            binaryBadTypes(location(), ">>=", type(), rhs.type());
+            binaryBadTypes(location(), "^=", type(), rhs.type());
         }
-        //number() = int64_t(number()) ^ int64_t(rhs.number());
-        setNumberValue(int64_t(number()) ^ int64_t(rhs.number()));
+        setNumberValue(Number::makeInteger(number().toInteger() ^ rhs.number().toInteger()));
         return *this;
     }
 

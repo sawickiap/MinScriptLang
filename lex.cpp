@@ -343,7 +343,7 @@ namespace MSL
                 parseHexChar(val, currcode[i]);
                 n = (n << 4) | val;
             }
-            out.number() = (Value::NumberValType)n;
+            out.number() = Number::makeInteger(n);
         }
         else
         {
@@ -390,7 +390,7 @@ namespace MSL
             }
             memcpy(sz, currcode, tklen);
             sz[tklen] = 0;
-            out.number() = atof(sz);
+            out.number() = Number::makeFloat(atof(sz));
         }
         // Letters straight after number are invalid.
         if(tklen < currlen && IsAlpha(currcode[tklen]))

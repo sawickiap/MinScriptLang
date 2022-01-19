@@ -61,7 +61,7 @@ namespace MSL
             {
                 throw Error::ArgumentError(loc, "Built-in function min requires at least 1 argument.");
             }
-            result = 0.0;
+            result = Number::makeFloat(0.0);
             for(i = 0; i < argCount; ++i)
             {
                 if(!args[i].isNumber())
@@ -89,7 +89,7 @@ namespace MSL
             {
                 throw Error::ArgumentError(loc, "Built-in function min requires at least 1 argument.");
             }
-            result = 0.0;
+            result = Number::makeFloat(0.0);
             for(i = 0; i < argCount; ++i)
             {
                 if(!args[i].isNumber())

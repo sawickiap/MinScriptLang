@@ -147,7 +147,7 @@ namespace MSL
                                         {
                                             if(av.isNumber())
                                             {
-                                                os << char(av.number());
+                                                os << char(av.number().toInteger());
                                                 if(shouldflush)
                                                 {
                                                     os << std::flush;
@@ -160,12 +160,16 @@ namespace MSL
                                         }
                                         break;
                                     case 'd':
+                                        {
+                                            os << av.number().toInteger();
+                                        }
+                                        break;
                                     case 'f':
                                     case 'g':
                                         {
                                             if(av.isNumber())
                                             {
-                                                os << av.number();
+                                                os << av.number().toFloat();
                                                 if(shouldflush)
                                                 {
                                                     os << std::flush;
@@ -173,7 +177,7 @@ namespace MSL
                                             }
                                             else
                                             {
-                                                throw Error::TypeError(m_place, "format directive expected number");
+                                                throw Error::TypeError(m_place, "directives '%g', '%f' expect float");
                                             }
                                         }
                                         break;
@@ -203,6 +207,14 @@ namespace MSL
                 }
         };
     }
+
+    class JitCompiler
+    {
+        public:
+            JitCompiler()
+            {
+            }
+    };
 
     namespace Builtins
     {

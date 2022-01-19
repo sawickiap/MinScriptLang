@@ -95,9 +95,9 @@ namespace MSL
     {
         auto obj = std::make_shared<Object>();
         obj->put("type", Value{ std::string(err.name()) });
-        obj->put("index", Value{ (Value::NumberValType)err.location().textindex });
-        obj->put("line", Value{ (Value::NumberValType)err.location().textline });
-        obj->put("column", Value{ (Value::NumberValType)err.location().textcolumn });
+        obj->put("index", Value{ Number::makeInteger(err.location().textindex) });
+        obj->put("line", Value{ Number::makeInteger(err.location().textline) });
+        obj->put("column", Value{ Number::makeInteger(err.location().textcolumn) });
         obj->put("message", Value{ std::string{ err.message() } });
         return obj;
     }
@@ -389,7 +389,7 @@ namespace MSL
                 {
                     if(usekey)
                     {
-                        assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_keyvar } }, Value{ (Value::NumberValType)i });
+                        assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_keyvar } }, Value{ Number::makeInteger(i) });
                     }
                     ch = rangestr[i];
                     assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_valuevar } }, Value{ std::string{ &ch, &ch + 1 } });
@@ -435,7 +435,7 @@ namespace MSL
                 {
                     if(usekey)
                     {
-                        assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_keyvar } }, Value{ (Value::NumberValType)i });
+                        assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_keyvar } }, Value{ Number::makeInteger(i) });
                     }
                     assign(LeftValue::Getter{ LeftValue::ObjectMember{ &innermostctx, m_valuevar } }, Value{ arr->at(i) });
                     try
@@ -802,31 +802,65 @@ namespace MSL
             {
                 pval = m_operand->getLeftValue(ctx).getValueRef(location());
                 MINSL_EXECUTION_CHECK(pval->isNumber(), location(), "expected numeric value");
+                auto r = pval->number();
                 switch(m_type)
                 {
                     case UnaryOperator::Type::Preincrementation:
                         {
-                            pval->setNumberValue(pval->number() + 1.0);
+                            if(r.isInteger())
+                            {
+                                pval->setNumberValue(Number::makeInteger(r.toInteger() + 1));
+                            }
+                            else
+                            {
+                                //pval->setNumberValue(pval->number() + 1.0);
+                                pval->setNumberValue(Number::makeFloat(r.toFloat() + 1.0));
+                            }
                             return *pval;
                         }
                         break;
                     case UnaryOperator::Type::Predecrementation:
                         {
-                            pval->setNumberValue(pval->number() - 1.0);
+                            //pval->setNumberValue(pval->number() - 1.0);
+                            if(r.isInteger())
+                            {
+                                pval->setNumberValue(Number::makeInteger(r.toInteger() - 1));
+                            }
+                            else
+                            {
+                                pval->setNumberValue(Number::makeFloat(r.toFloat() - 1));
+                            }
                             return *pval;
                         }
                         break;
                     case UnaryOperator::Type::Postincrementation:
                         {
                             result = *pval;
-                            pval->setNumberValue(pval->number() + 1.0);
+                            //pval->setNumberValue(pval->number() + 1.0);
+                            if(r.isInteger())
+                            {
+                                pval->setNumberValue(Number::makeInteger(pval->number().toInteger() + 1));
+                            }
+                            else
+                            {
+                                pval->setNumberValue(Number::makeFloat(pval->number().toFloat() + 1.0));
+                                
+                            }
                             return result;
                         }
                         break;
                     case UnaryOperator::Type::Postdecrementation:
                         {
                             result = *pval;
-                            pval->setNumberValue(pval->number() - 1.0);
+                            //pval->setNumberValue(pval->number() - 1.0);
+                            if(r.isInteger())
+                            {
+                                pval->setNumberValue(Number::makeInteger(pval->number().toInteger() - 1));
+                            }
+                            else
+                            {
+                                pval->setNumberValue(Number::makeFloat(pval->number().toFloat() - 1.0));
+                            }
                             return result;
                         }
                         break;
@@ -853,12 +887,16 @@ namespace MSL
                         break;
                     case UnaryOperator::Type::Minus:
                         {
-                            return Value{ -val.number() };
+                            if(val.number().isInteger())
+                            {
+                                return Value{ Number::makeInteger(-val.number().toInteger()) };
+                            }
+                            return Value{ Number::makeFloat(-val.number().toFloat()) };
                         }
                         break;
                     case UnaryOperator::Type::LogicalNot:
                         {
-                            return Value{ val.isTrue() ? 0.0 : 1.0 };
+                            return Value{ Number::makeInteger(val.isTrue() ? 0 : 1) };
                         }
                         break;
                     case UnaryOperator::Type::BitwiseNot:
@@ -895,13 +933,27 @@ namespace MSL
                 {
                     case UnaryOperator::Type::Preincrementation:
                         {
-                            val->setNumberValue(val->number() + 1.0);
+                            if(val->number().isInteger())
+                            {
+                                val->setNumberValue(Number::makeInteger(val->number().toInteger() + 1));
+                            }
+                            else
+                            {
+                                val->setNumberValue(Number::makeFloat(val->number().toFloat() + 1.0));
+                            }
                             return lval;
                         }
                         break;
                     case UnaryOperator::Type::Predecrementation:
                         {
-                            val->setNumberValue(val->number() - 1.0);
+                            if(val->number().isInteger())
+                            {
+                                val->setNumberValue(Number::makeInteger(val->number().toInteger() - 1));
+                            }
+                            else
+                            {
+                                val->setNumberValue(Number::makeFloat(val->number().toFloat() - 1.0));
+                            }
                             return lval;
                         }
                         break;
@@ -993,11 +1045,11 @@ namespace MSL
 
         Value UnaryOperator::BitwiseNot(Value&& operand) const
         {
-            int64_t operval;
-            int64_t resval;
-            operval = (int64_t)operand.number();
+            Number::IntegerValueType operval;
+            Number::IntegerValueType resval;
+            operval = operand.number().toInteger();
             resval = ~operval;
-            return Value{ (Value::NumberValType)resval };
+            return Value{ Number::makeInteger(resval) };
         }
 
         Value BinaryOperator::evaluate(Context& ctx, ThisObject* othis)
@@ -1077,118 +1129,41 @@ namespace MSL
             {
                 if(left.isEqual(right))
                 {
-                    return Value{1.0};
+                    return Value{Number::makeInteger(1)};
                 }
-                return Value{0.0};
+                return Value{Number::makeInteger(0)};
             }
             if(m_type == BinaryOperator::Type::NotEqual)
             {
                 if(!left.isEqual(right))
                 {
-                    return Value{1.0};
+                    return Value{Number::makeInteger(1)};
                 }
-                return Value{0.0};
+                return Value{Number::makeInteger(0)};
             }
             if(m_type == BinaryOperator::Type::Less || m_type == BinaryOperator::Type::LessEqual
                || m_type == BinaryOperator::Type::Greater || m_type == BinaryOperator::Type::GreaterEqual)
             {
                 result = false;
-                //MINSL_EXECUTION_CHECK(typleft == typright, location(), "incompatible types for comparison");
-                /*
-                if(!(typleft == typright))
-                {
-                    return binaryBadTypes(location(), "comparison", typleft, typright);
-                }
-                if(typleft == Value::Type::Number)
-                {
-                    switch(m_type)
-                    {
-                        case BinaryOperator::Type::Less:
-                            {
-                                result = left.number() < right.number();
-                            }
-                            break;
-                        case BinaryOperator::Type::LessEqual:
-                            {
-                                result = left.number() <= right.number();
-                            }
-                            break;
-                        case BinaryOperator::Type::Greater:
-                            {
-                                result = left.number() > right.number();
-                            }
-                            break;
-                        case BinaryOperator::Type::GreaterEqual:
-                            {
-                                result = left.number() >= right.number();
-                            }
-                            break;
-                        default:
-                            {
-                                assert(0);
-                            }
-                            break;
-                    }
-                }
-                else if(typleft == Value::Type::String)
-                {
-                    switch(m_type)
-                    {
-                        case BinaryOperator::Type::Less:
-                            {
-                                result = left.string() < right.string();
-                            }
-                            break;
-                        case BinaryOperator::Type::LessEqual:
-                            {
-                                result = left.string() <= right.string();
-                            }
-                            break;
-                        case BinaryOperator::Type::Greater:
-                            {
-                                result = left.string() > right.string();
-                            }
-                            break;
-                        case BinaryOperator::Type::GreaterEqual:
-                            {
-                                result = left.string() >= right.string();
-                            }
-                            break;
-                        default:
-                            assert(0);
-                    }
-                }
-                else
-                {
-                    //throw Error::TypeError(location(), "incompatible types for binary operation");
-                    return binaryBadTypes(location(), "binary operation", typleft, typright);
-                }
-                return Value{ result ? 1.0 : 0.0 };
-                */
-
                 switch(m_type)
                 {
                     case BinaryOperator::Type::Less:
                         {
-                            //result = left.string() < right.string();
                             result = left.opCompareLessThan(right);
                         }
                         break;
                     case BinaryOperator::Type::LessEqual:
                         {
-                            //result = left.string() <= right.string();
                             result = left.opCompareLessEqual(right);
                         }
                         break;
                     case BinaryOperator::Type::Greater:
                         {
-                            //result = left.string() > right.string();
                             result = left.opCompareGreaterThan(right);
                         }
                         break;
                     case BinaryOperator::Type::GreaterEqual:
                         {
-                            //result = left.string() >= right.string();
                             result = left.opCompareGreaterEqual(right);
                         }
                         break;
@@ -1197,9 +1172,9 @@ namespace MSL
                 }
                 if(result)
                 {
-                    return Value{1.0};
+                    return Value{Number::makeInteger(1)};
                 }
-                return Value{0.0};
+                return Value{Number::makeInteger(0)};
             }
             if(m_type == BinaryOperator::Type::Indexing)
             {
@@ -1234,66 +1209,51 @@ namespace MSL
                     return left.array()->at(index);
                 }
                 throw Error::TypeError(location(), "cannot index this type");
-                
-                //return left.opIndex(right, othis);
             }
-
-            // Remaining operators require numbers.
-            //CheckNumberOperand(m_leftoper.get(), left);
-            //CheckNumberOperand(m_rightoper.get(), right);
 
             switch(m_type)
             {
                 case BinaryOperator::Type::Mul:
                     {
-                        //return Value{ left.number() * right.number() };
                         return left.opMul(right);
                     }
                     break;
                 case BinaryOperator::Type::Div:
                     {
-                        //return Value{ left.number() / right.number() };
                         return left.opDiv(right);
                     }
                     break;
                 case BinaryOperator::Type::Mod:
                     {
-                        //return Value{ fmod(left.number(), right.number()) };
                         return left.opMod(right);
                     }
                     break;
                 case BinaryOperator::Type::Sub:
                     {
-                        //return Value{ left.number() - right.number() };
                         return left.opMinus(right);
                     }
                     break;
                 case BinaryOperator::Type::ShiftLeft:
                     {
-                        //return ShiftLeft(std::move(left), std::move(right));
                         return left.opShiftLeft(right);
                     }
                     break;
                 case BinaryOperator::Type::ShiftRight:
                     {
-                        //return ShiftRight(std::move(left), std::move(right));
                         return left.opShiftRight(right);
                     }
                     break;
                 case BinaryOperator::Type::BitwiseAnd:
                     {
-                        //return Value{ (Value::NumberValType)((int64_t)left.number() & (int64_t)right.number()) };
                         return left.opBitwiseAnd(right);
                     }
                     break;
                 case BinaryOperator::Type::BitwiseXor:
                     {
-                        //return Value{ (Value::NumberValType)((int64_t)left.number() ^ (int64_t)right.number()) };
                         return left.opBitwiseXor(right);
                     }
                 case BinaryOperator::Type::BitwiseOr:
                     {
-                        //return Value{ (Value::NumberValType)((int64_t)left.number() | (int64_t)right.number()) };
                         return left.opBitwiseOr(right);
                     }
                 default:
@@ -1386,19 +1346,16 @@ namespace MSL
                     break;
                 case BinaryOperator::Type::AssignmentBitwiseAnd:
                     {
-                        //leftvalptr->setNumberValue((Value::NumberValType)((int64_t)leftvalptr->number() & (int64_t)rhs.number()));
                         return leftvalptr->opBitwiseAndAssign(rhs);
                     }
                     break;
                 case BinaryOperator::Type::AssignmentBitwiseXor:
                     {
-                        //leftvalptr->setNumberValue((Value::NumberValType)((int64_t)leftvalptr->number() ^ (int64_t)rhs.number()));
                         return leftvalptr->opBitwiseXorAssign(rhs);
                     }
                     break;
                 case BinaryOperator::Type::AssignmentBitwiseOr:
                     {
-                        //leftvalptr->setNumberValue((Value::NumberValType)((int64_t)leftvalptr->number() | (int64_t)rhs.number()));
                         return leftvalptr->opBitwiseOrAssign(rhs);
                     }
                     break;

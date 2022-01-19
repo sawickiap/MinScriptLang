@@ -342,10 +342,10 @@ namespace MSL
                 return std::make_unique<Runtime::ConstantValue>(t.m_place, Value{});
             case Token::Type::False:
                 ++m_tokidx;
-                return std::make_unique<Runtime::ConstantValue>(t.m_place, Value{ 0.0 });
+                return std::make_unique<Runtime::ConstantValue>(t.m_place, Value{ Number::makeInteger(0) });
             case Token::Type::True:
                 ++m_tokidx;
-                return std::make_unique<Runtime::ConstantValue>(t.m_place, Value{ 1.0 });
+                return std::make_unique<Runtime::ConstantValue>(t.m_place, Value{Number::makeInteger(1) });
             default:
                 break;
         }

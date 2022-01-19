@@ -77,6 +77,11 @@ namespace MSL
     }
     */
 
+    void Number::postInitCheck(bool wascopy)
+    {
+        
+    }
+
     Array::Array()
     {
     }
@@ -141,7 +146,7 @@ namespace MSL
         return m_location;
     }
 
-    Value::NumberValType Value::number() const
+    const Value::NumberValType& Value::number() const
     {
         assert(m_type == Value::Type::Number);
         return std::get<Value::NumberValType>(m_variant);
@@ -329,7 +334,12 @@ namespace MSL
                 break;
             case Value::Type::Number:
                 {
-                    return std::get<Value::NumberValType>(m_variant) != 0.f;
+                    auto n = std::get<Value::NumberValType>(m_variant);
+                    if(n.isInteger())
+                    {
+                        return n.toInteger() != 0;
+                    }
+                    return n.toFloat() != 0.f;
                 }
                 break;
             case Value::Type::String:
@@ -370,7 +380,14 @@ namespace MSL
                 break;
             case Value::Type::Number:
                 {
-                    os << number();
+                    if(number().isInteger())
+                    {
+                        os << number().toInteger();
+                    }
+                    else
+                    {
+                        os << number().toFloat();
+                    }
                 }
                 break;
             case Value::Type::String:
