@@ -1,0 +1,36 @@
+
+/*
+"classes" are currently just json-ish objects that are declared with a class keyword.
+initiating them is equiv to C++, or Python: calling the name likea function initiates them.
+*/
+class foo
+{
+    name: nil,
+}
+
+foo['__init__'] = function()
+{
+    print("constructor...\n");
+    return this;
+};
+
+print("foo=", foo, "\n");
+f = foo();
+print("f=", f, "\n");
+b = foo();
+print("b=", b.count, "\n");
+print("foo=", foo, "\n");
+
+print("------------\n");
+print("String=", Array(), "\n");
+print("\"foo\".length() = ", "foo".length, "\n");
+
+/*
+String["qurk"] = function()
+{
+    print("qurk() called: self=\"", this, "\"\n");
+    return "doinks";
+};
+
+print("\"foo\".qurk() = ","foo".qurk(), "\n");
+*/

@@ -1,0 +1,1182 @@
+
+// basic
+// Single line comment
+/* multi line comment
+ */
+;
+;
+;
+;
+
+print("numbers:\n");
+numbers = [
+    123,
+    -00444,
+    +0xaF250,
+    -0xFF,
+    0xAA00FF5544CD,
+    01.00,
+    10.5,
+    23.,
+    .25,
+    1e3,
+    1e+2,
+    .001e-1,
+    3.E+0,
+    2 + 6 - 3,
+    2 + 3 * 4,
+    2 - 10 / 2 + 7 % 3,
+    60 / 3 * 2,
+    2 + 3 * ((4)),
+    (2 + 3) * 4,
+];
+
+println("basic branching:");
+if (true)
+{
+}
+if (false)
+    throw "fail";
+if (2);
+if (2 - 2)
+{
+    throw "fail";
+}
+else
+{
+}
+if (false)
+    throw "fail";
+else if (false)
+    throw "fail";
+else
+    println("if-elseif-else ok");
+if (true)
+    if (false)
+        throw "fail";
+    else
+        println("if-iffalse-else ok");
+
+println("loops:");
+for (i = 0; i < 5; ++i)
+    printf("for-loop: i=%v\n", i);
+for (i = 0; ; ++i)
+{
+    printf("for-without-cond: i=%v\n", i);
+    if (i >= 5)
+    {
+        break;
+        throw "fail";
+    }
+}
+i = 5;
+while (true)
+{
+    printf("while(true): i=%v\n", i);
+    break;
+    throw "fail";
+}
+do
+{
+    printf("do-while: i=%v\n", i);
+    if (--i == 0)
+    {
+        break;
+        throw "fail";
+    }
+} while (true);
+i = 0;
+for(;;)
+{
+    printf("empty-for: i=%v\n", i);
+    if (++i == 4)
+    {
+        break;
+        throw "fail";
+    }
+}
+for (i = 0; i < 10; ++i)
+{
+    if (i > 5)
+    {
+        continue;
+        throw "fail";
+    }
+    printf("for-with-continue: i=%v\n", i);
+}
+i = -10;
+while (true)
+{
+    ++i;
+    if (i < -5)
+    {
+        continue;
+        throw "fail";
+    }
+    printf("while-true-with-continue: i=%v\n", i);
+    if (i > 0)
+    {
+        break;
+        throw "fail";
+    }
+}
+printf("unary ops (i=%v):\n", i);
+printf("i++ = %v\n", i++);
+printf("i now = %v\n", i);
+printf("i-- = ", i--, "\n");
+printf("i now = %v\n", i);
+a = 1;
+printf("other ops (+, -, /, *, %%, etc) (a=%v):\n", a);
+a += 3;
+printf("a after '+='  = %v\n", a);
+a -= 10;
+printf("a after '-='  = %v\n", a);
+a *= -2;
+printf("a after '*='  = %v\n", a);
+a /= 4;
+printf("a after '/='  = %v\n", a);
+a %= 2;
+printf("a after '%%='  = %v\n", a);
+a <<= 2;
+printf("a after '<<=' = %v\n", a);
+a >>= 1;
+printf("a after '>>=' = %v\n", a);
+a = 6;
+printf("binary ops (a=%v):\n", a);
+a |= 8;
+printf("a after '|=' = %v\n", a);
+a &= 3;
+printf("a after '&=' = %v\n", a);
+a ^= 3;
+printf("a after '^=' = %v\n", a);
+a = 1;
+b = 2;
+println("multiple assignment:");
+b *= a += 7;
+printf("b *= a += 7 = a=%v, b=%v\n", a, b);
+a = b = c = 2;
+printf("a=b=c=2 = a=%v, b=%v, c=%v\n", a, b, c);
+b = 3;
+a = 1;
+++----++++a;
+printf("a=1; ++----++++a = %v\n", a);
+a = 1;
+b = 2;
+c = a + b + b - 2 + b * 3;
+printf("operator precedence: a+b+b-2+b*3 = %v\n", c);
+a = false;
+b = true;
+c = a && b && a && b || a || a && a;
+printf("operator precedence: a&&b&&a&&b||a||a&&a = %v\n", c);
+
+println("syntax testing ....");
+a = "aaa";
+b = 'bbb
+    ccc';
+printf("a = %v, ?: = %v\n", a, a ? 1 : 0);
+empty = '';
+printf("empty = %v\n", empty ? 1 : 0);
+tmp = ('aa' 'bb' /* comment */ "cc");
+printf("string literal concat = %v\n", tmp);
+printf("escapes: %p\n", '\\ \" \' \b \f \n \r \t \? \a \v \/ \0a');
+printf("hexadecimal escapes in sq string = %p\n", '\xA5 \xa5');
+printf("unicode escapes in sq string=%p\n", '\u0104 \U00000104');
+s = 'aa' + 'bb';
+s += 'cc';
+s += s;
+printf("string concat = %p\n", s);
+b = true;
+v = b ? 123 : 'aaa';
+printf("ternary: v=%v\n", v);
+n1 = 1;
+n2 = n1;
+n3 = 3;
+printf("eq comparison: 1=%v, 2=%v, 3=%v, 4=%v, 5=%v, 6=%v\n", n1 == n1, n1 == n2, n1 == n3, n1 != n1, n1 != n2, n1 != n3);
+
+s1 = 'A';
+s2 = s1;
+s3 = 'C';
+println("eq comparison: ", s1 == s1, s1 == s2, s1 == s3, s1 != s1, s1 != s2, s1 != s3);
+
+f1 = function ()  {};
+f2 = f1;
+f3 = function ()  {};
+println("eq comparison (functions): ", f1 == f1, f1 == f2, f1 == f3, f1 != f1, f1 != f2, f1 != f3);
+
+sf1 = print;
+sf2 = sf1;
+sf3 = print;
+println("eq comparison (copied native funcs): ", sf1 == sf1, sf1 == sf2, sf1 == sf3, sf1 != sf1, sf1 != sf2, sf1 != sf3);
+
+
+s = 'ABCD';
+for (ch: s)
+    printf("for-range: ch=%p\n", ch);
+for (i, ch: s)
+    printf("for-range with index: i=%v, ch=%p\n", i, ch);
+printf("after loop: i=%v, ch=%v\n", i, ch);
+
+println("switch statements:");
+switch (123)
+{
+    case 1:
+        throw "fail";
+    case 'a':
+        throw "fail";
+    case 123:
+        println("switch-fallthrough...");
+    default:
+        println("switch-fallthrough: ok");
+}
+switch (123)
+{
+    case 1:
+        throw "fail";
+        break;
+    case 'a':
+        throw "fail";
+        break;
+    case 123:
+        println("swith with break ok");
+        break;
+    default:
+        throw "fail";
+        break;
+}
+switch (124)
+{
+    default:
+        println("switch with default ok");;
+        break;
+    case 1:
+        throw "fail";
+        break;
+    case 'a':
+        throw "fail";
+        break;
+    case 123:
+        throw "fail";
+        break;
+}
+for (i = 0; i < 5; ++i)
+{
+    switch (i)
+    {
+        case 0:
+            println("switch-in-for: 0");
+            break;
+        case 1:
+            println("switch-in-for: 1 and continue");
+            continue;
+        case 2:
+            println("switch-in-for: 2");
+            break;
+        case 3:
+        default:
+            println("switch-in-for: Other");
+    }
+}
+function ChangeDefault()
+{
+    printf("changedefault: before: a=%v\n", a);
+    a = 1;
+    printf("changedefault: after: a=%v\n", a);
+}
+function ChangeGlobal()
+{
+    printf("changeglobal: before: a=%v\n", a);
+    global.a = 2;
+    printf("changeglobal: after: a=%v\n", a);
+}
+function ChangeLocal()
+{
+    printf("changelocal: before: a=%v\n", a);
+    local.a = 3;
+    print("changelocal: after: a=%v\n");
+}
+ChangeDefault();
+ChangeGlobal();
+ChangeLocal();
+a = 10;
+ChangeDefault();
+ChangeGlobal();
+ChangeLocal();
+a = null;
+ChangeDefault();
+ChangeGlobal();
+ChangeLocal();
+function Outer()
+{
+    function InnerNone()
+    {
+        println("functions: InnerNone called");
+    }
+    local.InnerLocal = function ()
+    {
+        println("functions: InnerLocal called");
+    };
+    global.InnerGlobal = function ()
+    {
+        println("functions: InnerGlobal called");
+    };
+    InnerNone();
+    InnerLocal();
+    InnerGlobal();
+}
+Outer();
+InnerGlobal();
+
+try
+{
+    throw 1;
+    println("***ERROR*** Should not get here ....");
+}
+catch (ex)
+    printf("try-catch: caugh exception: %v\n", ex);
+
+function f()
+{
+    for (i = 0; i < 10; ++i)
+    {
+        if (i == 6)
+        {
+            throw 'AAA';
+        }
+    }
+}
+try
+{
+    f();
+}
+catch (ex)
+{
+    printf("try-catch from function: ex=%v\n", ex);
+}
+
+try
+{
+    a = 'AAA' + 5 + null;
+}
+catch (ex)
+{
+    printf("try-catch runtime: type=%v\n", ex.type);
+    printf("try-catch runtime: index=%v\n", ex.index);
+    printf("try-catch runtime: line=%v\n", ex.line);
+    printf("try-catch runtime: column=%v\n", ex.column);
+    printf("try-catch runtime: message=(%v) %s\n", typeOf(ex.message), ex.message);
+}
+
+
+try
+    println("try-finally: in try ...");
+finally
+    println("try-finally in finally ok");
+
+try
+{
+    println("throwing a number ...");
+    throw 1;
+}
+catch (ex)
+    println("throwing a number: caught ok");
+finally
+    println("throwing a number: finally ok");
+
+for (i: [1, 2, 3, 4, 5])
+{
+    try
+    {
+        printf("for-range: modifying i*100=%v\n", i * 100);
+        if (i == 4)
+            break;
+    }
+    finally
+    {
+        printf("for-range: finally: i=%v\n", i);
+    }
+}
+
+for (i: [1, 2, 3, 4, 5])
+{
+    try
+    {
+        if (i == 4)
+            continue;
+        printf("for-range with continue: i=%v\n", i * 100);
+    }
+    finally
+    {
+        printf("for-range with continue: finally: i=%v\n", i);
+    }
+}
+
+
+function fn()
+{
+    try
+    {
+        println("try-catch in func: try ...");
+    }
+    catch (ex)
+        println("try-catch in func: catch");
+    finally
+        println("try-catch in func: finally");
+}
+printf("try-catch in func: returns=%v\n", fn());
+
+a = [1, 2, 3];
+for (i = 0; i < 10; ++i)
+{
+    try
+    {
+        printf("for... a... i=%d\n", i);
+        a[i] += 100;
+    }
+    catch (ex)
+    {
+        break;
+    }
+}
+
+printf("a[2]=%v\n", a[2]);
+try
+{
+    try
+    {
+        throw [555, 666, 777];
+    }
+    catch (ex)
+    {
+        println("re-throwing in catch");
+        throw ex;
+    }
+}
+catch (ex)
+    printf("catching array: ex=%v\n", ex[1]);
+
+function f()
+{
+    try
+    {
+        println("before finally");
+    }
+    finally
+    {
+        throw 123;
+    }
+}
+try
+{
+    f();
+}
+catch (ex)
+{
+    printf("ex=%v\n", ex);
+}
+
+function f()
+{
+    try
+    {
+        println("try before throw");
+        throw 1;
+        println("try after throw");
+    }
+    finally
+    {
+        println("try finally");
+    }
+}
+try
+{
+    f();
+}
+catch (ex)
+{
+    printf("catch from function: ex=%v\n", ex);
+}
+
+function f()
+{
+    try
+    {
+        throw 1;
+        println("should not be reached");
+    }
+    finally
+    {
+        throw 123;
+    }
+}
+try
+{
+    f();
+}
+catch (ex)
+{
+    printf("catching from function again: ex=%v\n", ex);
+}
+
+s = 'A';
+printf("s=%v\n", s);
+a = [1, 2, 3];
+printf("min=%v\n", min(a[0], a[1], a[2]));
+printf("max=%v\n", max(a[0], a[1], a[2]));
+globalArr = ['AAA', 'BBB', 'CCC'];
+function getNewChar()
+{
+    globalArr = 1; // Unwanted side effect
+    return 'D';
+}
+//globalArr[0][0] = getNewChar();
+printf("typeOf(globalArr) = %v\n", typeOf(globalArr));
+
+// arrays
+
+a1 = [];
+printf("empty array: a1=%v\n", a1);
+
+a1 = [1, 2, 3];
+printf("a[0]=%v, a[1]=%v, a[2]=%v\n", a1[0], a1[1], a1[2]);
+
+a1 = [1, 2, 3, 4, 5];
+a1[0] = 10;
+a1[1] += 10;
+a1[2] *= 10;
+a1[3]++;
+++a1[4];
+printf("a[0]=%v, a[1]=%v, a[2]=%v, a[3]=%v, a[4]=%v\n" , a1[0], a1[1], a1[2], a1[3], a1[4]);
+
+a1 = [1, 2, 3];
+a2 = a1;
+function f(arg)
+{
+    arg[1]++;
+    return arg;
+}
+a3 = f(a2);
+println("ary comparison: ", a1[0], a1[1], a1[2], a3[1], a1 == a3, a1 != a3);
+
+a1 = [1, 2, 3];
+a2 = Array(a1);
+a0 = Array();
+println("ary comparison #2: ", a2[0], a2[1], a2[2], a1 == a2, a1 == a0);
+
+a = [1, 2, 3, ];
+printf("a[0]=%v, a[1]=%v, a[2]=%v\n", a[0], a[1], a[2]);
+a = [1, 2, 3];
+a[1] = null;
+a[2] = null;
+printf("a[0]=%v, a[1]=%v, a[2]=%v\n", a[0], a[1], a[2]);
+a = [1, 2, 3];
+for (val: a)
+    printf("range: val=%v\n", val);
+printf("after loop: val=%v\n", val);
+
+a = [1, 2, 3];
+for (i, val: a)
+{
+    {
+        printf("range with index: i=%v, val=%v\n", i, val);
+    }; ; ;
+}
+printf("after range with index: i=%v, val=%v\n", i, val);
+
+function f()
+{
+    a = [1, 2, 3];
+    for (i, v: a)
+    {
+        printf("range in function: i=%v, v=%v\n", i, v);
+    }
+}
+i = 'A';
+v = 'B';
+f();
+printf("i=%v, v=%v\n", i, v);
+
+a0 = [];
+a3 = [1, 2, 3];
+n = null;
+println("ternary: ", a0 ? 'Y' : 'N', a3 ? 'Y' : 'N', n ? 'Y' : 'N');
+
+a0 = [];
+a3 = [1, 2, 3];
+printf("array props: 1=%v, 2=%v\n", a0.count, a3.count);
+
+a = [1, 2, 3];
+a.add(4);
+a.add(5);
+a.add(6); /* 1, 2, 3, 4, 5, 6 */
+a.remove(0);
+a.remove(a.count - 1);
+a.remove(1); /* 2, 4, 5 */
+a.insert(3, 100);
+a.insert(2, 101);
+a.insert(0, 102); /* 102, 2, 4, 101, 5, 100 */
+printf("array: a(%v) = %v\n", a.count, a);
+
+for (i: [1, 2, 3, 4, 5, 6])
+{
+    printf("array-iterate: i=%v\n", i);
+    if (i == 3)
+        break;
+}
+
+// types
+t1 = Null;
+t2 = Number;
+t3 = String;
+t4 = Object;
+printf("builtin types: t1=%v, t2=%v, t3=%v, t4=%v\n", t1, t2, t3, t4);
+tn1 = Number;
+n2 = 123;
+tn2 = typeOf(n2);
+tnull = typeOf(nonExistent);
+printf("builtin return vals: tn1=%v, tn2=%v, tnull=%v\n", tn1, tn2, tnull);
+println("comparison: ", tn1 == tn2, tn1 != tn2, tn2 == tnull, tn2 != tnull);
+
+tobj = typeOf(
+    {
+        a: 1,
+        b: 2
+    }
+    );
+tnull = typeOf(nonExistent);
+println("comparison: ", tobj ? 1 : 0, tnull ? 1 : 0);
+
+v1 = Null();
+v2 = Null(nonExistent);
+printf("v1=%v, v2=%v\n", v1, v2);
+
+v1 = 2;
+v2 = Number(v1);
+printf("v1=%v, v2=%v\n", v1, v2);
+
+v1 = 'A';
+v2 = String(v1);
+printf("v1=%v, v2=%v\n", v1, v2);
+
+v1 =
+{
+    a: 1,
+    b: 2
+};
+v2 = Object(v1);
+printf("v1.a=%v, v2.a=%v, compare=%v\n", v1.a, v2.a, v1 == v2);
+
+function f()
+{
+    return 123;
+}
+v2 = Function(f);
+v3 = print;
+println("comparison: ", f == v2, v2 == v3, v2());
+
+v1 = typeOf(125);
+v2 = Type(v1);
+v3 = v2(123);
+println("comparison: ", v1 == v2, v3);
+
+a = {};
+printf("object: a=%v\n", a);
+printf("object: a.x=%v\n", a.x);
+a =
+{
+    'x': 2
+};
+printf("object: a=%v\n", a);
+printf("object: a.x=%v\n", a.x);
+a =
+{
+    'x': 2,
+};
+printf("object: a=%v\n", a);
+printf("object: a.x=%v\n", a.x);
+a =
+{
+    'x': 2,
+    'y': 3
+};
+printf("object: a=%v\n", a);
+printf("object: a.y=%v\n", a.y);
+a =
+{
+    'x': 2,
+    'y': 3,
+};
+printf("object: a=%v\n", a);
+printf("object: a.y=%v\n", a.y);
+a.z = 5;
+a.w = a.z;
+a.z = 4;
+printf("object: a.z=%v\n", a.z);
+printf("object: a.w=%v\n", a.w);
+obj =
+{
+    a: 1,
+    b: 2,
+    c: 3
+};
+printf("object: obj.a=%v, obj.b=%v, obj.c=%v\n", obj.a, obj.b, obj.c);
+a =
+{
+    'AAA' /*comment*/ "BBB": 5
+};
+printf("object: a.AAABBB=%v\n", a.AAABBB);
+{
+    println("in block");
+    {
+        println("in block: nested");
+    }
+    {}
+    println("in block again");
+}
+{};
+{
+    'a': 1,
+    'b': false
+};
+{
+    println("in block (after object)");
+}
+println("after block");
+o1 =
+{
+    'x': 1
+};
+o2 =
+{
+    'y': o1
+};
+printf("object: o2.y.x=%v\n", o2.y.x);
+
+o1 =
+{
+    'x':
+    {
+        'y': 5
+    }
+};
+o1.x.y += 5;
+printf("object: o1.x.y=%v\n", o1.x.y);
+
+o1 =
+{
+    'x': 1
+};
+o2 = o1;
+o2.x += 1;
+function f(arg)
+{
+    arg.x += 2;
+    return arg;
+}
+printf("object: f(o2).x=%v\n", f(o2).x);
+printf("object: o1.x=%v\n", o1.x);
+
+o1 =
+{
+    'f1': function ()
+    {
+        return o2;
+    },
+    'val1': 1
+};
+o2 =
+{
+    'f2': function ()
+    {
+        return o1;
+    },
+    'val2': 2
+};
+printf("object: %v\n", o1.f1().f2().val1);
+
+o1 =
+{
+    'x': 1,
+    'y': 2,
+    'a b c': 3
+};
+index = 'y';
+println("objects: ", o1['x'], o1[index], o1['a b' + ' c']);
+
+o1 =
+{
+    'x':
+    {
+        'y':
+        {
+            'z': 5
+        }
+    }
+};
+println("objects: ", o1['x'].y['z']);
+
+o = {};
+o['A A'] = 1;
+o['A A'] += 5;
+println("objects: ", o['A A']);
+
+o = {};
+o['A'] = {};
+o['A']['B'] = {};
+o['A']['B'].c = 10;
+println("objects: ", o.A.B['c']);
+
+o1 =
+{
+    'a': 1,
+    'b': 2
+};
+o2 = o1;
+o3 =
+{
+    'a': 1,
+    'b': 2
+};
+println("object comparison: ", o1 == o1, o1 == o2, o1 == o3, o1 != o1, o1 != o2, o1 != o3);
+
+obj =
+{
+    'a': 1,
+    'b': 2,
+    'd': null
+};
+obj.c = 3;
+obj.b = null;
+printf("obj.count=%v\n", obj.count);
+
+obj =
+{
+    'a': 1,
+    'bbbb': 4,
+    'cc': 10
+};
+sum = 0;
+for (val: obj)
+    sum += val;
+printf("sum=%v\n", sum);
+sumKeyLen = 0;
+sumVal = 0;
+for (key, val: obj)
+{
+    sumKeyLen += key.count;
+    sumVal += val;
+}
+printf("sumKeyLen=%v, sumVal=%v\n", sumKeyLen, sumVal);
+printf("key=%v, val=%v\n", key, val);
+
+obj =
+{
+    'x': 2,
+    'f1': function ()
+    {
+        x += 1;
+        printf("function in object with var access: x=%v\n", x);
+    }
+};
+obj.f1();
+obj['f1']();
+(101, '102', obj.f1)();
+obj2 =
+{
+    'subObj': obj
+};
+obj2.subObj.f1();
+obj =
+{
+    'x': 2,
+    'f1': function ()
+    {
+        this.y = 1;
+        this.x += y;
+        printf("'this' in object: this.x=%v\n", this.x);
+    }
+};
+obj.f1();
+obj['f1']();
+(101, '102', obj.f1)();
+obj2 =
+{
+    'subObj': obj
+};
+obj2.subObj.f1();
+obj =
+{
+    'x': 2,
+    'f': function ()
+    {
+        this.x += 1;
+        return this;
+    }
+};
+obj2 = obj.f();
+printf("object: obj2.x=%v\n", obj2.x);
+
+obj =
+{
+    'x': 2,
+    f: function ()
+    {
+        printf("unary op on object var: %v\n", ++this.x);
+    }
+};
+obj.f();
+obj['f']();
+
+obj =
+{
+    'x': 2,
+    f: function ()
+    {
+        printf("unary op on object var: %v\n", ++this.x);
+    }
+};
+((obj)).f();
+(111, 'AAA', obj.f)();
+
+obj1 =
+{
+    x: 2,
+    f: function ()
+    {
+        printf("unary op on object var: %v\n", ++this.x);
+    }
+};
+obj2 =
+{
+    f: function ()
+    {
+        println('obj2f');
+    }
+};
+function call_f(cond)
+{
+    (cond ? obj1 : obj2).f();
+}
+call_f(true);
+call_f(false);
+
+x = 100;
+obj =
+{
+    x: 2,
+    f: function ()
+    {
+        printf("unary op on object var: %v\n", ++x);
+    }
+};
+fn = obj.f;
+fn();
+obj.f();
+fn();
+obj.f();
+
+objInner =
+{
+    x: 2,
+    f: function ()
+    {
+        printf("unary op on object var: %v\n", ++x);
+    }
+};
+objOuter =
+{
+    o: objInner
+};
+objOuter.o.f();
+
+obj =
+{
+    'x': 2,
+    'f1': function ()
+    {
+        f2();
+        this.f2();
+    },
+    'f2': function ()
+    {
+        printf("'this' in object: x=%v, this.x=%v\n", x, this.x);
+    }
+};
+obj.f1();
+
+obj =
+{
+    var: 2,
+    fn: function ()
+    {
+        printf("object: var=%v\n", var);
+    }
+};
+obj.fn();
+
+obj =
+{
+    var: 2,
+    fn: function ()
+    {
+        println("object function call\n");
+    },
+    '__init__': function (a)
+    {
+        println("object default function call\n");
+    }
+};
+obj(3);
+
+class C
+{
+    var: 1,
+    __init__: function (x)
+    {
+        var = x;
+    },
+    print: function ()
+    {
+        global.printf("using global name: this.var=%v\n", this.var);
+    }
+}
+C(2);
+C.print();
+
+class A
+{
+    var: 1,
+    __init__: function (x)
+    {
+        var = x;
+    },
+    print: function ()
+    {
+        global.printf("using global name: this.var=%v\n", this.var);
+    }
+}
+class B: A
+{
+    __init__: function (x)
+    {
+        var = x + 1;
+    }
+}
+
+B(2);
+B.print();
+A.print();
+
+class Base
+{
+    a: 121,
+    b: 122,
+    c: 123
+};
+class Derived: Base
+{
+    b: 124,
+    c: null
+};
+print("Derived.a=", Derived.a, ", Derived.b=", Derived.b, ", Derived.c=", Derived.c, "\n");
+o1 =
+{
+    a: 123
+};
+o2 = {};
+print("o1=", o1 ? 'T' : 'F', ", o2=", o2 ? 'T' : 'F', "\n");
+o1 =
+{
+    a: 123,
+    b: 124,
+};
+o2 =
+{
+    'a': o1.a,
+    'b': o1.b,
+};
+print("o1['a']=", o1['a'], ", o1['b']=", o1['b'], ", o2.a=", o2.a, ", o2.b=", o2.b, "\n");
+
+try
+    println(math.abs());
+catch (ex)
+    print("exception.message = ", ex.message, "\n");
+
+try
+    print(math.abs(1, 2, 3));
+catch (ex)
+    print("exception.message = ", ex.message, "\n");
+
+try
+    print(math.abs([1, 2, 3]));
+catch (ex)
+    print("exception.message = ", ex.message, "\n");
+
+// functions
+
+f = function ()
+{
+    print("Foo\n");
+};
+f();
+f();
+a = 1;
+print("a = ", a, "\n");
+f = function ()
+{
+    b = 2;
+    print("b = ", b, ", a=", a, "\n");
+    a = 10;
+    print(a);
+};
+f();
+print("a = ", a, "\n");
+f = function ()
+{
+    a = 1;
+    print("a = ", a, "\n");
+};
+f();
+print(a);
+f = function (a, b)
+{
+    a = '[' + a + '] [' + b + ']';
+    print("a(a+b) = ", a, "\n");
+};
+f('AAA', 'BBB');
+f('CCC', 'DDD');
+functionNotReturning = function ()
+{
+    print("in functionNotReturning\n");
+};
+functionReturningNull = function ()
+{
+    print("in functionReturningNull\n");
+    return;
+    throw "fail";
+};
+functionReturningSomething = function ()
+{
+    print("in functionReturningSomething\n");
+    return 123;
+    throw "fail";
+};
+print("functionNotReturning()     = ", functionNotReturning(), "\n");
+print("functionReturningNull()    = ", functionReturningNull(), "\n");
+print("functionReturningSomething = ", functionReturningSomething(), "\n");
+function add(a, b)
+{
+    return a + b;
+}
+print("add(2,5)=", add(2, 5), "\n");
+function factorial(n)
+{
+    if (n == 0)
+        return 1;
+    return n * factorial(n - 1);
+}
+print("factorial(0) = ", factorial(0), "\n");
+print("factorial(3) = ", factorial(3), "\n");
+print("factorial(4) = ", factorial(4), "\n");
+
+print("\n\n");
+print("if you can read this, everything is (probably) ok!\n");

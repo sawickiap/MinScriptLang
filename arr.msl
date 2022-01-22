@@ -1,0 +1,10 @@
+
+str = "foo";
+printf("str.length=%d\n", str.length);
+
+a = ["red", "green", "blue"];
+a.add("purple");
+a[2] = "black";
+printf("a.count=%d, a[3]=%p, a=%p\n", a.count, a[3], a);
+
+print("all good.\n");

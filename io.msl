@@ -1,0 +1,23 @@
+
+cnt = 0;
+while(true)
+{
+    try
+    {
+        ch = $stdin.getChar();
+        printf("[%d] = %p\n", cnt, sprintf("%c", ch));
+        cnt++;
+    }
+    catch(e)
+    {
+        if(e.type == "EOFError")
+        {
+            break;
+        }
+        else
+        {
+            throw e;
+        }
+    }
+}
+
